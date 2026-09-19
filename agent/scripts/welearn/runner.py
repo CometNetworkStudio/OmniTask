@@ -17,6 +17,16 @@ _LIMITER = RateLimiter(
 )
 
 
+def _is_actionable(item, include_completed: bool) -> bool:
+    if not isinstance(item, dict):
+        return True
+    if str(item.get("isvisible")) == "false":
+        return False
+    if include_completed:
+        return True
+    return "未" in str(item.get("iscomplete", ""))
+
+
 def _sco_id(item) -> str | None:
     if isinstance(item, dict):
         for key in ("scoid", "sco", "sco_id", "id"):
@@ -54,9 +64,9 @@ def run(action: str, params: dict, credentials: dict):
     info = client.get_course_info(cid)
     uid, classid = info["uid"], info["classid"]
 
+    include_completed = str(params.get("include_completed", "")).lower() in ("1", "true", "yes")
     if params.get("unit_idx") not in (None, ""):
-        sco = client.get_sco_leaves(cid, uid, classid, params["unit_idx"])
-        sco_items = sco
+        sco_items = client.get_sco_leaves(cid, uid, classid, params["unit_idx"])
     else:
         sco_items = []
         for unit in info["units"]:
@@ -65,9 +75,11 @@ def run(action: str, params: dict, credentials: dict):
                 continue
             sco_items.extend(client.get_sco_leaves(cid, uid, classid, unit_idx))
 
-    scoids = [sid for sid in (_sco_id(item) for item in sco_items) if sid]
+    actionable = [item for item in sco_items if _is_actionable(item, include_completed)]
+    scoids = [sid for sid in (_sco_id(item) for item in actionable) if sid]
     if not scoids:
-        raise WeLearnError("未找到可执行的 SCO")
+        yield event(100, "没有未完成的 SCO")
+        return
     yield event(8, f"待处理 SCO 数 {len(scoids)}")
 
     duration = int(params.get("duration", 60))

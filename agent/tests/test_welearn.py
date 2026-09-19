@@ -8,7 +8,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from scripts.welearn.client import _extract  # noqa: E402
 from scripts.welearn.crypto import generate_cipher_text  # noqa: E402
-from scripts.welearn.runner import _pick_course, _sco_id  # noqa: E402
+from scripts.welearn.runner import _is_actionable, _pick_course, _sco_id  # noqa: E402
 
 
 class CryptoTest(unittest.TestCase):
@@ -60,6 +60,13 @@ class RunnerHelpersTest(unittest.TestCase):
             _pick_course(courses, "z")
         with self.assertRaises(Exception):
             _pick_course([], None)
+
+    def test_is_actionable(self):
+        self.assertFalse(_is_actionable({"isvisible": "false", "iscomplete": "未完成"}, False))
+        self.assertFalse(_is_actionable({"iscomplete": "已完成"}, False))
+        self.assertTrue(_is_actionable({"iscomplete": "未完成"}, False))
+        self.assertTrue(_is_actionable({"iscomplete": "已完成"}, True))
+        self.assertTrue(_is_actionable("42", False))
 
 
 if __name__ == "__main__":
