@@ -59,7 +59,8 @@ class Config:
 
     @classmethod
     def from_env(cls, env: dict | None = None) -> "Config":
-        e = load_dotenv(env=env) if env is not None else load_dotenv()
+        # 显式传入 env 时直接使用（便于测试隔离）；否则从进程环境 + 仓库根 .env 读取。
+        e = load_dotenv() if env is None else env
         get = e.get
         return cls(
             llm=LLMConfig(

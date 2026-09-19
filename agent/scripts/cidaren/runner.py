@@ -1,4 +1,10 @@
-"""词达人 runner：题库 → LLM → 跳过，逐题推进并回写题库。"""
+"""词达人 runner：题库 → LLM → 跳过；支持班级学习/测试任务。
+
+真实流程（已联调验证）：
+    ClassTask/PageTask 取任务 → 按 task_name 匹配 StudyTask/List 单元 →
+    StudyTask/Info 取词表 → (task_type=1) SubmitChoseWord →
+    ClassTask/StartAnswer → 逐题 VerifyAnswer/SubmitAnswerAndSave，mode 0 为阅读卡直接跳过。
+"""
 
 from __future__ import annotations
 
@@ -7,10 +13,15 @@ from core.config import Config
 from core.events import event
 from core.llm import LLMClient
 from core.ratelimit import RateLimiter
+
 from . import answer as answer_mod
 from .client import CidarenClient, CidarenError, SecurityVerifyError
 
-_MAX_QUESTIONS = 500
+MAX_QUESTIONS = 1000
+MAX_PAGES = 20
+TASK_KIND = "ClassTask"
+TASK_TYPE_INT = 2  # 班级任务协议固定为 2（无论 record.task_type 是 1 还是 2）
+
 _CONFIG = Config.from_env()
 _LIMITER = RateLimiter(
     concurrency=_CONFIG.platform_concurrency,
@@ -23,63 +34,97 @@ def _bank() -> LocalBank:
     return LocalBank(_CONFIG.bank_local_path)
 
 
-def _progress(exam: dict, percent_hint: float) -> dict:
-    if isinstance(exam, dict):
-        done = exam.get("topic_done_num")
-        total = exam.get("topic_total")
-        if done and total:
-            try:
-                percent_hint = max(percent_hint, float(done) / float(total) * 100)
-            except (TypeError, ZeroDivisionError):
-                pass
-    return event(int(percent_hint), f"进度 {int(percent_hint)}%")
+def _all_class_tasks(client: CidarenClient) -> list:
+    tasks, page = [], 1
+    while page <= MAX_PAGES:
+        data = client.list_class_tasks(page)
+        records = (data or {}).get("records") or []
+        tasks.extend(records)
+        total = (data or {}).get("total") or 0
+        if not records or len(tasks) >= total:
+            break
+        page += 1
+    return tasks
+
+
+def _select_tasks(tasks: list, params: dict) -> list:
+    want_type = params.get("task_type")
+    want_name = params.get("task_name")
+    progress_lt = int(params.get("progress_lt", 100))
+    picked = []
+    for task in tasks:
+        if task.get("over_status") == 3:
+            continue
+        if want_type not in (None, "") and int(task.get("task_type", 0)) != int(want_type):
+            continue
+        if want_name and want_name not in str(task.get("task_name", "")):
+            continue
+        if int(task.get("progress") or 0) >= progress_lt:
+            continue
+        picked.append(task)
+    limit = params.get("limit")
+    return picked[: int(limit)] if limit else picked
+
+
+def _prepare_words(client: CidarenClient, task: dict) -> None:
+    """按 task_name 匹配单元；task_type=1 需先 SubmitChoseWord（已开启则忽略错误）。"""
+    course_id = task["course_id"]
+    units = client.list_study_tasks(course_id).get("task_list") or []
+    unit = next((u for u in units if u.get("task_name") == task.get("task_name")), None)
+    if unit is None:
+        return
+    info = client.study_task_info(unit["task_id"], course_id, list_id=unit["list_id"])
+    words = [w["word"] for w in info.get("word_list") or [] if isinstance(w, dict) and w.get("word")]
+    if not words or int(task.get("task_type") or 0) != 1:
+        return
+    try:
+        client.submit_chose_word(TASK_KIND, task["task_id"], {f"{course_id}:{unit['list_id']}": words})
+    except CidarenError:
+        pass  # 任务已开启，继续答题即可
 
 
 def _run_task(client: CidarenClient, task: dict, llm, bank, params: dict):
-    task_id = task.get("task_id") or task.get("id")
-    task_type_int = int(task.get("task_type", params.get("task_type", 1)) or 1)
-    task_kind = "ClassTask" if task_type_int == 2 else "StudyTask"
-    course_id = task.get("course_id") or params.get("course_id")
-    release_id = task.get("release_id") or params.get("release_id")
-    list_id = task.get("list_id") or params.get("list_id")
-    min_time = int(params.get("min_time", 5))
-    max_time = int(params.get("max_time", 10))
+    name = task.get("task_name")
+    min_time = int(params.get("min_time", 3))
+    max_time = int(params.get("max_time", 6))
+    _prepare_words(client, task)
 
-    started = client.start_answer(task_id, task_kind, task_type_int, course_id=course_id, release_id=release_id)
+    started = client.start_answer(task["task_id"], TASK_KIND, TASK_TYPE_INT, release_id=task.get("release_id"))
     if started.get("done"):
-        yield event(100, f"任务已完成({started.get('msg')})")
+        yield event(100, f"{name}: 任务已完成({started.get('msg')})")
         return
-
     exam = started["exam"]
-    total = exam.get("topic_total") or _MAX_QUESTIONS
-    for index in range(_MAX_QUESTIONS):
+    total = exam.get("topic_total") or MAX_QUESTIONS
+    max_steps = int(params.get("max_steps", MAX_QUESTIONS))
+    for _ in range(max_steps):
         mode = exam.get("topic_mode")
-        if mode in answer_mod.UNSUPPORTED_MODES:
-            submission = None
+        if mode == 0:  # 阅读卡：直接跳读
+            step = client.next_question(TASK_KIND, exam["topic_code"], min_time, max_time)
         else:
-            record = bank.lookup("cidaren", answer_mod.question_key(exam))
             submission = None
-            if record:
-                submission = answer_mod.resolve_from_record(exam, record["answer"])
+            if mode not in answer_mod.UNSUPPORTED_MODES:
+                record = bank.lookup("cidaren", answer_mod.question_key(exam))
+                if record:
+                    submission = answer_mod.resolve_from_record(exam, record["answer"])
+                if submission is None and llm.config.enabled:
+                    try:
+                        submission = answer_mod.llm_answer(exam, llm)
+                    except Exception:
+                        submission = None
             if submission is None:
-                try:
-                    submission = answer_mod.llm_answer(exam, llm) if llm.config.enabled else None
-                except Exception:
-                    submission = None
+                step = client.skip_answer(TASK_KIND, exam["topic_code"])
+            else:
+                result = client.verify_answer(TASK_KIND, exam["topic_code"], submission)
+                bank.save(answer_mod.derive_record(exam, result), overwrite=True)
+                step = client.next_question(TASK_KIND, result["topic_code"], min_time, max_time)
 
-        if submission is None:
-            step = client.skip_answer(task_kind, exam["topic_code"])
-        else:
-            result = client.verify_answer(task_kind, exam["topic_code"], submission)
-            bank.save(answer_mod.derive_record(exam, result), overwrite=True)
-            step = client.next_question(task_kind, result["topic_code"], min_time, max_time)
-
-        yield _progress(exam, (index + 1) / total * 100)
+        done = exam.get("topic_done_num") or 0
+        yield event(int(done / total * 100), f"{name}: {done}/{total}")
         if step.get("done"):
-            yield event(100, f"任务完成({step.get('msg')})")
+            yield event(100, f"{name}: 完成({step.get('msg')})")
             return
         exam = step["exam"]
-    yield event(100, "达到本题上限，提前结束")
+    yield event(100, f"{name}: 达到单任务题量上限，提前结束")
 
 
 def run(action: str, params: dict, credentials: dict):
@@ -91,17 +136,14 @@ def run(action: str, params: dict, credentials: dict):
     bank = _bank()
     try:
         user = client.token_check()
-        yield event(1, f"token 校验通过 user={user.get('user_info', {}).get('nick_name', '')}".strip())
-        if action in ("class", "class_task"):
-            page = client.list_class_tasks(1)
-            tasks = page.get("list") or page.get("data") or []
-        else:
-            tasks = client.list_study_tasks(params["course_id"]) if params.get("course_id") else []
+        nick = (user.get("user_info") or {}).get("nick_name", "")
+        yield event(1, f"token 校验通过 user={nick}".strip())
+        tasks = _select_tasks(_all_class_tasks(client), params)
         if not tasks:
-            yield event(100, "未找到可执行任务")
+            yield event(100, "没有可执行任务")
             return
+        yield event(2, f"待执行任务 {len(tasks)} 个")
         for task in tasks:
-            task.setdefault("course_id", params.get("course_id"))
             for evt in _run_task(client, task, llm, bank, params):
                 yield evt
         yield event(100, "全部任务结束")

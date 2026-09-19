@@ -190,7 +190,7 @@ OmniTask/
 
 - [x] M0：monorepo 骨架、Nunu 后端（`backend/`，8080）、Vue 前端（`frontend/`）、proto 契约、Python Agent gRPC 骨架（冒烟通过）
 - [x] M0.5：契约补全——proto `QuestionBank.Lookup/Save`、`internal/model/model.go` 冻结 5 表 schema、`.env.example` 环境变量约定（`make proto` + Go build/vet + Python import 均通过）
-- [x] M1：平台协议层（Agent）——词达人（sign/jv/client/answer/runner）、WeLearn（crypto/client/runner）无界面实现 + `run_cli.py`；纯函数单测通过。**真实 token/账号联调待补**
+- [x] M1：平台协议层（Agent）——词达人（sign/jv/client/answer/runner）、WeLearn（crypto/client/runner）无界面实现 + `run_cli.py`；单元测试通过。**已真机联调**：词达人班级学习任务取题→LLM 作答→判分→题库回写（实测 6/6）；WeLearn 登录/课程/单元/SCO 只读链路通过；WeLearn 提交进度/挂时长待按需执行
 - [ ] M2：后端领域层——用户/凭据/任务/题库 + REST + 迁移（MySQL/Redis）
 - [ ] M3：通讯层——Go gRPC 客户端 + 进度汇聚 + WebSocket 进度
 - [ ] M4：前端——登录/凭据/任务/实时进度/题库

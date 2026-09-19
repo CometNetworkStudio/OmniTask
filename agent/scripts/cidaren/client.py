@@ -112,11 +112,13 @@ class CidarenClient:
             return payload
         raise CidarenError(f"接口错误 code={code} msg={payload.get('msg')}")
 
-    def _data(self, payload: dict) -> dict:
+    def _data(self, payload: dict):
+        """列表类接口 data 为明文；答题类接口 data 为 jv/base64 字符串。"""
         self._check(payload)
-        if "data" in payload and "jv" in payload:
-            return jvmod.decode(payload["data"], payload.get("jv", ""))
-        return payload.get("data", {})
+        data = payload.get("data")
+        if isinstance(data, str):
+            return jvmod.decode(data, payload.get("jv", ""))
+        return data
 
     # ---- 账户 ----
     def token_check(self) -> dict:

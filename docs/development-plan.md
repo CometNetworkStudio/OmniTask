@@ -33,6 +33,12 @@
 - `agent/run_cli.py`：本地命令行验证入口（P1.3）。
 - 文档：`README.md`、`docs/reference-analysis.md`、`docs/development-plan.md`。
 
+### M1 真机联调记录（凭据经 `.env` 注入，不入库）
+
+- 词达人：`Student/Main` token 校验通过；`ClassTask/PageTask` → 匹配 `StudyTask/List` 单元 → `StudyTask/Info` 词表 → `SubmitChoseWord` → `StartAnswer` 全链路通。实测 List 04 连续 6 题 LLM 作答全对；`mode 0` 为阅读卡需跳读；题库回写 39 条。
+- WeLearn：账密登录成功；4 门课程、课程单元（8）与 SCO（35）读取正常。提交进度/挂时长（写操作）尚未执行。
+- 修正：列表类接口 `data` 为明文 JSON，仅答题类接口为 jv/base64（原 `_data` 一律解码导致 KeyError）。
+
 ---
 
 ## 3. 阶段总览
