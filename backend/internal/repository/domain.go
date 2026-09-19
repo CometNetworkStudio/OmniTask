@@ -96,6 +96,30 @@ func (repo *TaskRepository) UpdateStatus(ctx context.Context, id string, fields 
 	return repo.r.DB(ctx).Model(&model.Task{}).Where("id = ?", id).Updates(fields).Error
 }
 
+func (repo *TaskRepository) ListByStatus(ctx context.Context, status string, limit int) ([]model.Task, error) {
+	var tasks []model.Task
+	if err := repo.r.DB(ctx).
+		Where("status = ?", status).
+		Order("created_at ASC").
+		Limit(limit).
+		Find(&tasks).Error; err != nil {
+		return nil, err
+	}
+	return tasks, nil
+}
+
+func (repo *TaskRepository) AppendEvent(ctx context.Context, event *model.TaskEvent) error {
+	return repo.r.DB(ctx).Create(event).Error
+}
+
+// Claim 原子地把任务从 from 状态改为 to 状态；返回是否抢到。
+func (repo *TaskRepository) Claim(ctx context.Context, id, from, to string) (bool, error) {
+	res := repo.r.DB(ctx).Model(&model.Task{}).
+		Where("id = ? AND status = ?", id, from).
+		Update("status", to)
+	return res.RowsAffected > 0, res.Error
+}
+
 type QuestionRepository struct{ r *Repository }
 
 func NewQuestionRepository(r *Repository) *QuestionRepository { return &QuestionRepository{r: r} }

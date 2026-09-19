@@ -18,6 +18,7 @@ type QuestionResponse struct {
 	Platform    string    `json:"platform"`
 	QuestionKey string    `json:"question_key"`
 	Stem        string    `json:"stem"`
+	Options     string    `json:"options"`
 	Answer      string    `json:"answer"`
 	Source      string    `json:"source"`
 	Confidence  float64   `json:"confidence"`

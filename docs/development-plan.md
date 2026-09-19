@@ -138,7 +138,21 @@
 
 ---
 
-### P3 通讯层
+### P3 通讯层（已完成）
+
+**已实现**
+- `internal/service/agent.go`：Go gRPC 客户端（`grpc.NewClient`，Health / Execute server-streaming）。
+- `internal/server/bank.go`：`QuestionBank` gRPC 服务端（Go，端口 9000），Lookup/Save 直连题库。
+- `internal/service/orchestrator.go`：轮询 pending → `Claim` 原子领取 → running → 解密凭据 → 下发 Agent → 终态；事件写 Redis（`ProgressStore`）、`task_events`、WebSocket。
+- `internal/ws/hub.go` + `handler/ws.go`：`/v1/ws?task_id=` 订阅，连上先回放 Redis 快照。
+- Agent：`core/bank.py` 新增 `GrpcBank`，`OMNITASK_BANK_MODE=grpc` 时经后端读写（Agent 不直连 DB）。
+- wire 接入 Redis/AgentClient/ProgressStore/Hub/Orchestrator/BankGRPCServer。
+
+**验收记录**
+- 端到端（WeLearn，无副作用）：REST 建任务 → orchestrator 领取 → 从 DB 解密账密 → gRPC 下发 Agent → WebSocket 依次收到 `running(start/登录成功/课程数/没有未完成的 SCO)` → `succeeded`。
+- 失败路径（词达人）：Agent 侧返回 `SecurityVerifyError`（11003 需安全验证）→ `failed` 事件经 WS 推送并落 `task_events`。
+- `QuestionBank` gRPC 直连验证：Lookup 命中/未命中、Save 写入、再次 Lookup 命中并 `hit_count+1`；MySQL `questions` 落库。
+- **待办**：词达人 token 触发平台风控（11003），需在 App/微信完成安全验证后重试；届时可验证完整答题+题库回写闭环。
 
 - proto：`AgentService` 已有；P0.5 的 `QuestionBank` 在此实现 Go 服务端，并让 Agent 以客户端接入。
 - Go gRPC 客户端：`internal/service/agent`（dial Agent@50051，`Execute` 流式）。

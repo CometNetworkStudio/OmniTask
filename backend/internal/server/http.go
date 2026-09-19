@@ -62,6 +62,10 @@ func NewHTTPServer(
 		authed.GET("/questions", deps.QuestionHandler.List)
 		authed.POST("/questions", deps.QuestionHandler.Save)
 		authed.GET("/questions/lookup", deps.QuestionHandler.Lookup)
+
+		ws := v1Group.Group("/ws")
+		ws.Use(middleware.NoStrictAuth(deps.JWT, deps.Logger))
+		ws.GET("", deps.WSHandler.Handle)
 	}
 
 	return s

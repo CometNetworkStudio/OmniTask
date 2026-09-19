@@ -95,6 +95,7 @@ func toQuestionResponse(q *model.Question) *v1.QuestionResponse {
 		Platform:    q.Platform,
 		QuestionKey: q.QuestionKey,
 		Stem:        q.Stem,
+		Options:     q.Options,
 		Answer:      q.Answer,
 		Source:      q.Source,
 		Confidence:  q.Confidence,

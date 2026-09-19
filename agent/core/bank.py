@@ -14,6 +14,8 @@ import time
 from abc import ABC, abstractmethod
 from pathlib import Path
 
+import grpc
+
 _SCHEMA = """
 CREATE TABLE IF NOT EXISTS questions (
     platform     TEXT NOT NULL,
@@ -119,3 +121,71 @@ def _as_text(value) -> str:
     if isinstance(value, str):
         return value
     return json.dumps(value, ensure_ascii=False)
+
+
+class GrpcBank(QuestionBank):
+    """经后端 gRPC QuestionBank 读写（生产路径，Agent 不直连数据库）。"""
+
+    def __init__(self, addr: str, stub=None, pb2=None, timeout: float = 10.0) -> None:
+        self.addr = addr
+        self.timeout = timeout
+        self._stub = stub
+        self._pb2 = pb2
+        self._channel = None
+
+    def _ensure(self) -> None:
+        if self._stub is not None:
+            return
+        import sys
+
+        gen = Path(__file__).resolve().parents[1] / "gen"
+        if str(gen) not in sys.path:
+            sys.path.insert(0, str(gen))
+        from agent.v1 import agent_pb2, agent_pb2_grpc
+
+        self._pb2 = agent_pb2
+        self._channel = grpc.insecure_channel(self.addr)
+        self._stub = agent_pb2_grpc.QuestionBankStub(self._channel)
+
+    def lookup(self, platform: str, question_key: str) -> dict | None:
+        self._ensure()
+        resp = self._stub.Lookup(
+            self._pb2.LookupRequest(platform=platform, question_key=question_key),
+            timeout=self.timeout,
+        )
+        if not resp.found:
+            return None
+        q = resp.question
+        return {
+            "platform": q.platform,
+            "question_key": q.question_key,
+            "stem": q.stem,
+            "options": q.options,
+            "answer": q.answer,
+            "source": q.source,
+            "confidence": q.confidence,
+            "hit_count": q.hit_count,
+        }
+
+    def save(self, question: dict, overwrite: bool = False) -> bool:
+        self._ensure()
+        message = self._pb2.Question(
+            platform=question["platform"],
+            question_key=question["question_key"],
+            stem=question.get("stem", ""),
+            options=_as_text(question.get("options", "[]")),
+            answer=_as_text(question.get("answer", "{}")),
+            source=question.get("source", "bank"),
+            confidence=float(question.get("confidence", 0.0)),
+        )
+        resp = self._stub.Save(
+            self._pb2.SaveRequest(question=message, overwrite=overwrite),
+            timeout=self.timeout,
+        )
+        return bool(resp.saved)
+
+    def close(self) -> None:
+        if self._channel is not None:
+            self._channel.close()
+            self._channel = None
+            self._stub = None

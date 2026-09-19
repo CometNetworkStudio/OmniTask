@@ -12,10 +12,12 @@ import (
 	"backend/internal/router"
 	"backend/internal/server"
 	"backend/internal/service"
+	"backend/internal/ws"
 	"backend/pkg/app"
 	"backend/pkg/crypto"
 	"backend/pkg/jwt"
 	"backend/pkg/log"
+	"backend/pkg/server/grpc"
 	"backend/pkg/server/http"
 	"backend/pkg/sid"
 	"github.com/google/wire"
@@ -45,6 +47,10 @@ func NewWire(viperViper *viper.Viper, logger *log.Logger) (*app.App, func(), err
 	questionRepository := repository.NewQuestionRepository(repositoryRepository)
 	questionService := service.NewQuestionService(questionRepository, sidSid, logger)
 	questionHandler := handler.NewQuestionHandler(questionService, logger)
+	hub := ws.NewHub()
+	client := repository.NewRedis(viperViper)
+	progressStore := service.NewProgressStore(client)
+	wsHandler := handler.NewWSHandler(hub, progressStore, logger)
 	routerDeps := router.RouterDeps{
 		Logger:            logger,
 		Config:            viperViper,
@@ -53,26 +59,32 @@ func NewWire(viperViper *viper.Viper, logger *log.Logger) (*app.App, func(), err
 		CredentialHandler: credentialHandler,
 		TaskHandler:       taskHandler,
 		QuestionHandler:   questionHandler,
+		WSHandler:         wsHandler,
 	}
 	httpServer := server.NewHTTPServer(routerDeps)
 	jobServer := server.NewJobServer(logger)
-	appApp := newApp(httpServer, jobServer)
+	grpcServer := server.NewBankGRPCServer(questionService, viperViper, logger)
+	agentClient := service.NewAgentClient(viperViper, logger)
+	orchestrator := service.NewOrchestrator(taskRepository, credentialService, agentClient, progressStore, hub, sidSid, logger)
+	appApp := newApp(httpServer, jobServer, grpcServer, orchestrator)
 	return appApp, func() {
 	}, nil
 }
 
 // wire.go:
 
-var repositorySet = wire.NewSet(repository.NewDB, repository.NewRepository, repository.NewUserRepository, repository.NewCredentialRepository, repository.NewTaskRepository, repository.NewQuestionRepository)
+var repositorySet = wire.NewSet(repository.NewDB, repository.NewRedis, repository.NewRepository, repository.NewUserRepository, repository.NewCredentialRepository, repository.NewTaskRepository, repository.NewQuestionRepository)
 
-var serviceSet = wire.NewSet(sid.NewSid, jwt.NewJwt, crypto.FromEnv, service.NewAuthService, service.NewCredentialService, service.NewTaskService, service.NewQuestionService)
+var serviceSet = wire.NewSet(sid.NewSid, jwt.NewJwt, crypto.FromEnv, ws.NewHub, service.NewAuthService, service.NewCredentialService, service.NewTaskService, service.NewQuestionService, service.NewAgentClient, service.NewProgressStore, service.NewOrchestrator)
 
-var handlerSet = wire.NewSet(handler.NewAuthHandler, handler.NewCredentialHandler, handler.NewTaskHandler, handler.NewQuestionHandler)
+var handlerSet = wire.NewSet(handler.NewAuthHandler, handler.NewCredentialHandler, handler.NewTaskHandler, handler.NewQuestionHandler, handler.NewWSHandler)
 
 // build App
 func newApp(
 	httpServer *http.Server,
 	jobServer *server.JobServer,
+	bankServer *grpc.Server,
+	orchestrator *service.Orchestrator,
 ) *app.App {
-	return app.NewApp(app.WithServer(httpServer, jobServer), app.WithName("backend"))
+	return app.NewApp(app.WithServer(httpServer, jobServer, bankServer, orchestrator), app.WithName("backend"))
 }

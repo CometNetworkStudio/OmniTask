@@ -9,10 +9,12 @@ import (
 	"backend/internal/router"
 	"backend/internal/server"
 	"backend/internal/service"
+	"backend/internal/ws"
 	"backend/pkg/app"
 	"backend/pkg/crypto"
 	"backend/pkg/jwt"
 	"backend/pkg/log"
+	grpcserver "backend/pkg/server/grpc"
 	"backend/pkg/server/http"
 	"backend/pkg/sid"
 	"github.com/google/wire"
@@ -21,6 +23,7 @@ import (
 
 var repositorySet = wire.NewSet(
 	repository.NewDB,
+	repository.NewRedis,
 	repository.NewRepository,
 	repository.NewUserRepository,
 	repository.NewCredentialRepository,
@@ -32,10 +35,14 @@ var serviceSet = wire.NewSet(
 	sid.NewSid,
 	jwt.NewJwt,
 	crypto.FromEnv,
+	ws.NewHub,
 	service.NewAuthService,
 	service.NewCredentialService,
 	service.NewTaskService,
 	service.NewQuestionService,
+	service.NewAgentClient,
+	service.NewProgressStore,
+	service.NewOrchestrator,
 )
 
 var handlerSet = wire.NewSet(
@@ -43,15 +50,18 @@ var handlerSet = wire.NewSet(
 	handler.NewCredentialHandler,
 	handler.NewTaskHandler,
 	handler.NewQuestionHandler,
+	handler.NewWSHandler,
 )
 
 // build App
 func newApp(
 	httpServer *http.Server,
 	jobServer *server.JobServer,
+	bankServer *grpcserver.Server,
+	orchestrator *service.Orchestrator,
 ) *app.App {
 	return app.NewApp(
-		app.WithServer(httpServer, jobServer),
+		app.WithServer(httpServer, jobServer, bankServer, orchestrator),
 		app.WithName("backend"),
 	)
 }
@@ -61,6 +71,7 @@ func NewWire(*viper.Viper, *log.Logger) (*app.App, func(), error) {
 		repositorySet,
 		serviceSet,
 		handlerSet,
+		server.NewBankGRPCServer,
 		wire.Struct(new(router.RouterDeps), "*"),
 		server.NewHTTPServer,
 		server.NewJobServer,

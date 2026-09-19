@@ -11,7 +11,7 @@ from __future__ import annotations
 import random
 import time
 
-from core.bank import LocalBank
+from core.bank import GrpcBank, LocalBank
 from core.config import Config
 from core.events import event
 from core.llm import LLMClient
@@ -29,7 +29,9 @@ TASK_TYPE_INT = 2  # 班级任务协议固定为 2（无论 record.task_type 是
 _CONFIG = Config.from_env()
 
 
-def _bank() -> LocalBank:
+def _bank():
+    if _CONFIG.bank_mode == "grpc":
+        return GrpcBank(_CONFIG.bank_addr)
     return LocalBank(_CONFIG.bank_local_path)
 
 
