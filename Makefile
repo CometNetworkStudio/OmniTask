@@ -15,6 +15,7 @@ proto-py:
 	touch agent/gen/__init__.py agent/gen/agent/__init__.py agent/gen/agent/v1/__init__.py
 
 agent-test:
+	cd agent && ./.venv/bin/python -m unittest discover -s tests -t .
 	cd agent && ./.venv/bin/python test_smoke.py
 
 backend-run:
