@@ -47,6 +47,23 @@ def _pick_course(courses: list, want) -> dict:
     raise WeLearnError(f"未找到课程 cid={want}")
 
 
+def _collect_sco_ids(client, cid, uid, classid, units, params) -> list[str]:
+    """收集待处理 SCO id，按单元去重。
+
+    注意：WeLearn 的 unitidx 是单元的数字下标（0-based），不是单元 id；
+    传错会导致每个单元返回同一批 SCO。
+    """
+    include_completed = str(params.get("include_completed", "")).lower() in ("1", "true", "yes")
+    if params.get("unit_idx") not in (None, ""):
+        items = client.get_sco_leaves(cid, uid, classid, int(params["unit_idx"]))
+    else:
+        items = []
+        for unit_index in range(len(units)):
+            items.extend(client.get_sco_leaves(cid, uid, classid, unit_index))
+    actionable = [item for item in items if _is_actionable(item, include_completed)]
+    return list(dict.fromkeys(sid for sid in (_sco_id(item) for item in actionable) if sid))
+
+
 def run(action: str, params: dict, credentials: dict):
     username = credentials.get("username") or params.get("username")
     password = credentials.get("password") or params.get("password")
@@ -65,18 +82,8 @@ def run(action: str, params: dict, credentials: dict):
     uid, classid = info["uid"], info["classid"]
 
     include_completed = str(params.get("include_completed", "")).lower() in ("1", "true", "yes")
-    if params.get("unit_idx") not in (None, ""):
-        sco_items = client.get_sco_leaves(cid, uid, classid, params["unit_idx"])
-    else:
-        sco_items = []
-        for unit in info["units"]:
-            unit_idx = unit.get("unitidx") or unit.get("idx") or unit.get("id")
-            if unit_idx is None:
-                continue
-            sco_items.extend(client.get_sco_leaves(cid, uid, classid, unit_idx))
-
-    actionable = [item for item in sco_items if _is_actionable(item, include_completed)]
-    scoids = [sid for sid in (_sco_id(item) for item in actionable) if sid]
+    include_completed = str(params.get("include_completed", "")).lower() in ("1", "true", "yes")
+    scoids = _collect_sco_ids(client, cid, uid, classid, info["units"], params)
     limit = params.get("limit")
     if limit:
         scoids = scoids[: int(limit)]

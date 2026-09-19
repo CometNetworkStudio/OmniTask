@@ -8,7 +8,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from scripts.welearn.client import _extract  # noqa: E402
 from scripts.welearn.crypto import generate_cipher_text  # noqa: E402
-from scripts.welearn.runner import _is_actionable, _pick_course, _sco_id  # noqa: E402
+from scripts.welearn.runner import _collect_sco_ids, _is_actionable, _pick_course, _sco_id  # noqa: E402
 
 
 class CryptoTest(unittest.TestCase):
@@ -67,6 +67,33 @@ class RunnerHelpersTest(unittest.TestCase):
         self.assertTrue(_is_actionable({"iscomplete": "未完成"}, False))
         self.assertTrue(_is_actionable({"iscomplete": "已完成"}, True))
         self.assertTrue(_is_actionable("42", False))
+
+    def test_collect_sco_ids_uses_numeric_index_and_dedupes(self):
+        class FakeClient:
+            def __init__(self, duplicate=False):
+                self.calls = []
+                self.duplicate = duplicate
+
+            def get_sco_leaves(self, cid, uid, classid, unit_idx):
+                self.calls.append(unit_idx)
+                if self.duplicate:
+                    return [{"id": "ITEM-dup", "isvisible": "true", "iscomplete": "未完成"}]
+                return [
+                    {"id": f"ITEM-{unit_idx}-0", "isvisible": "true", "iscomplete": "未完成"},
+                    {"id": f"ITEM-{unit_idx}-1", "isvisible": "true", "iscomplete": "已完成"},
+                ]
+
+        units = [{"id": "GUID-A"}, {"id": "GUID-B"}]
+        client = FakeClient()
+        self.assertEqual(_collect_sco_ids(client, "c", "u", "cl", units, {}), ["ITEM-0-0", "ITEM-1-0"])
+        self.assertEqual(client.calls, [0, 1])
+
+        dup = FakeClient(duplicate=True)
+        self.assertEqual(_collect_sco_ids(dup, "c", "u", "cl", units, {}), ["ITEM-dup"])
+
+        included = FakeClient()
+        ids = _collect_sco_ids(included, "c", "u", "cl", units, {"include_completed": "true"})
+        self.assertEqual(ids, ["ITEM-0-0", "ITEM-0-1", "ITEM-1-0", "ITEM-1-1"])
 
 
 if __name__ == "__main__":
