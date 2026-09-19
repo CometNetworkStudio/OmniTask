@@ -4,6 +4,7 @@ import { defineConfig } from 'vite'
 import vuetify from 'vite-plugin-vuetify'
 
 export default defineConfig({
+  base: process.env.VITE_BASE || '/',
   plugins: [vue(), vuetify({ autoImport: true })],
   resolve: {
     alias: {

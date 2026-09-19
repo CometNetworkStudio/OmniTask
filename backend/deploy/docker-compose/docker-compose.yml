@@ -6,15 +6,20 @@ services:
     hostname: omnitask-db
     container_name: omnitask-db
     ports:
-      - 3380:3306
+      - 127.0.0.1:3380:3306
     environment:
       - MYSQL_ROOT_PASSWORD=123456
       - MYSQL_ROOT_HOST=%
       - MYSQL_DATABASE=omnitask
+    volumes:
+      - omnitask-db-data:/var/lib/mysql
   omnitask-redis:
     image: redis:6-alpine
     hostname: omnitask-redis
     container_name: omnitask-redis
     ports:
-      - 6350:6379
+      - 127.0.0.1:6350:6379
     command: ["redis-server"]
+
+volumes:
+  omnitask-db-data:

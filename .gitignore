@@ -18,3 +18,6 @@ backend/storage/logs/
 # secrets
 .env
 .env.local
+
+# deploy secrets (not in repo)
+backend/config/deploy.yml
