@@ -6,15 +6,11 @@ import time
 
 from core.config import Config
 from core.events import event
+from core.params import resolve
 from core.ratelimit import RateLimiter
 from .client import WeLearnClient, WeLearnError
 
 _CONFIG = Config.from_env()
-_LIMITER = RateLimiter(
-    concurrency=_CONFIG.platform_concurrency,
-    min_interval=_CONFIG.request_min_interval,
-    max_interval=_CONFIG.request_max_interval,
-)
 
 
 def _is_actionable(item, include_completed: bool) -> bool:
@@ -70,7 +66,13 @@ def run(action: str, params: dict, credentials: dict):
     if not username or not password:
         raise WeLearnError("WeLearn 需要账号密码凭据")
 
-    client = WeLearnClient(username, password, _CONFIG, _LIMITER)
+    resolved = resolve("welearn", params, _CONFIG)
+    limiter = RateLimiter(
+        resolved["platform_concurrency"],
+        resolved["request_min_interval"],
+        resolved["request_max_interval"],
+    )
+    client = WeLearnClient(username, password, _CONFIG, limiter)
     message = client.login()
     yield event(2, message)
 
@@ -83,8 +85,8 @@ def run(action: str, params: dict, credentials: dict):
 
     include_completed = str(params.get("include_completed", "")).lower() in ("1", "true", "yes")
     include_completed = str(params.get("include_completed", "")).lower() in ("1", "true", "yes")
-    scoids = _collect_sco_ids(client, cid, uid, classid, info["units"], params)
-    limit = params.get("limit")
+    scoids = _collect_sco_ids(client, cid, uid, classid, info["units"], resolved)
+    limit = resolved.get("limit")
     if limit:
         scoids = scoids[: int(limit)]
     if not scoids:
@@ -92,8 +94,8 @@ def run(action: str, params: dict, credentials: dict):
         return
     yield event(8, f"待处理 SCO 数 {len(scoids)}")
 
-    duration = int(params.get("duration", 60))
-    accuracy = params.get("accuracy", "100")
+    duration = int(resolved.get("duration", 60))
+    accuracy = resolved.get("accuracy", "100")
     for index, scoid in enumerate(scoids, start=1):
         base = (index - 1) / len(scoids) * 92 + 8
         if action == "progress":

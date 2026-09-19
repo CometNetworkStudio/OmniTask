@@ -11,7 +11,34 @@ from core import events  # noqa: E402
 from core.bank import LocalBank  # noqa: E402
 from core.config import Config, load_dotenv  # noqa: E402
 from core.http import new_session  # noqa: E402
+from core.params import resolve  # noqa: E402
 from core.ratelimit import RateLimiter  # noqa: E402
+
+
+class ParamsTest(unittest.TestCase):
+    def test_defaults_and_overrides(self):
+        p = resolve("cidaren", {"think_min": "3", "task_name": "List 04"})
+        self.assertEqual(p["think_min"], 3.0)
+        self.assertEqual(p["think_max"], 4.0)
+        self.assertEqual(p["task_type"], 1)
+        self.assertEqual(p["task_name"], "List 04")  # 未知参数透传
+
+    def test_welearn_bool_and_int(self):
+        p = resolve("welearn", {"duration": "10", "include_completed": "true"})
+        self.assertEqual(p["duration"], 10)
+        self.assertTrue(p["include_completed"])
+        self.assertEqual(p["accuracy"], 100)
+
+    def test_config_fallback_then_param_override(self):
+        class FakeCfg:
+            platform_concurrency = 5
+            request_min_interval = 1.0
+            request_max_interval = 2.0
+
+        p = resolve("cidaren", {}, config=FakeCfg())
+        self.assertEqual(p["platform_concurrency"], 5)
+        p2 = resolve("cidaren", {"platform_concurrency": "1"}, config=FakeCfg())
+        self.assertEqual(p2["platform_concurrency"], 1.0)
 
 
 class EventsTest(unittest.TestCase):

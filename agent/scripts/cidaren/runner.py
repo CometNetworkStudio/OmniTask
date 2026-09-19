@@ -15,6 +15,7 @@ from core.bank import LocalBank
 from core.config import Config
 from core.events import event
 from core.llm import LLMClient
+from core.params import resolve
 from core.ratelimit import RateLimiter
 
 from . import answer as answer_mod
@@ -26,11 +27,6 @@ TASK_KIND = "ClassTask"
 TASK_TYPE_INT = 2  # 班级任务协议固定为 2（无论 record.task_type 是 1 还是 2）
 
 _CONFIG = Config.from_env()
-_LIMITER = RateLimiter(
-    concurrency=_CONFIG.platform_concurrency,
-    min_interval=_CONFIG.request_min_interval,
-    max_interval=_CONFIG.request_max_interval,
-)
 
 
 def _bank() -> LocalBank:
@@ -140,20 +136,26 @@ def run(action: str, params: dict, credentials: dict):
     token = credentials.get("token") or params.get("token")
     if not token:
         raise CidarenError("词达人需要 token 凭据")
-    client = CidarenClient(token, _CONFIG, _LIMITER)
+    resolved = resolve("cidaren", params, _CONFIG)
+    limiter = RateLimiter(
+        resolved["platform_concurrency"],
+        resolved["request_min_interval"],
+        resolved["request_max_interval"],
+    )
+    client = CidarenClient(token, _CONFIG, limiter)
     llm = LLMClient(_CONFIG.llm)
     bank = _bank()
     try:
         user = client.token_check()
         nick = (user.get("user_info") or {}).get("nick_name", "")
         yield event(1, f"token 校验通过 user={nick}".strip())
-        tasks = _select_tasks(_all_class_tasks(client), params)
+        tasks = _select_tasks(_all_class_tasks(client), resolved)
         if not tasks:
             yield event(100, "没有可执行任务")
             return
         yield event(2, f"待执行任务 {len(tasks)} 个")
         for task in tasks:
-            for evt in _run_task(client, task, llm, bank, params):
+            for evt in _run_task(client, task, llm, bank, resolved):
                 yield evt
         yield event(100, "全部任务结束")
     except SecurityVerifyError as exc:
