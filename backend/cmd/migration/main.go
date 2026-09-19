@@ -1,11 +1,11 @@
 package main
 
 import (
-	"context"
-	"flag"
 	"backend/cmd/migration/wire"
 	"backend/pkg/config"
 	"backend/pkg/log"
+	"context"
+	"flag"
 )
 
 func main() {

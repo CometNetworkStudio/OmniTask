@@ -1,8 +1,8 @@
 package app
 
 import (
-	"context"
 	"backend/pkg/server"
+	"context"
 	"log"
 	"os"
 	"os/signal"

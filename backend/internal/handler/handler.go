@@ -1,9 +1,9 @@
 package handler
 
 import (
-	"github.com/gin-gonic/gin"
 	"backend/pkg/jwt"
 	"backend/pkg/log"
+	"github.com/gin-gonic/gin"
 )
 
 type Handler struct {

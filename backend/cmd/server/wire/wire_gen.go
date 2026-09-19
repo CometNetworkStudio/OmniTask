@@ -7,12 +7,18 @@
 package wire
 
 import (
+	"backend/internal/handler"
+	"backend/internal/repository"
 	"backend/internal/router"
 	"backend/internal/server"
+	"backend/internal/service"
 	"backend/pkg/app"
+	"backend/pkg/crypto"
 	"backend/pkg/jwt"
 	"backend/pkg/log"
 	"backend/pkg/server/http"
+	"backend/pkg/sid"
+	"github.com/google/wire"
 	"github.com/spf13/viper"
 )
 
@@ -20,10 +26,33 @@ import (
 
 func NewWire(viperViper *viper.Viper, logger *log.Logger) (*app.App, func(), error) {
 	jwtJWT := jwt.NewJwt(viperViper)
+	db := repository.NewDB(viperViper, logger)
+	repositoryRepository := repository.NewRepository(logger, db)
+	userRepository := repository.NewUserRepository(repositoryRepository)
+	sidSid := sid.NewSid()
+	authService := service.NewAuthService(userRepository, sidSid, jwtJWT, logger)
+	authHandler := handler.NewAuthHandler(authService, logger)
+	credentialRepository := repository.NewCredentialRepository(repositoryRepository)
+	cipher, err := crypto.FromEnv()
+	if err != nil {
+		return nil, nil, err
+	}
+	credentialService := service.NewCredentialService(credentialRepository, cipher, sidSid, logger)
+	credentialHandler := handler.NewCredentialHandler(credentialService, logger)
+	taskRepository := repository.NewTaskRepository(repositoryRepository)
+	taskService := service.NewTaskService(taskRepository, sidSid, logger)
+	taskHandler := handler.NewTaskHandler(taskService, logger)
+	questionRepository := repository.NewQuestionRepository(repositoryRepository)
+	questionService := service.NewQuestionService(questionRepository, sidSid, logger)
+	questionHandler := handler.NewQuestionHandler(questionService, logger)
 	routerDeps := router.RouterDeps{
-		Logger: logger,
-		Config: viperViper,
-		JWT:    jwtJWT,
+		Logger:            logger,
+		Config:            viperViper,
+		JWT:               jwtJWT,
+		AuthHandler:       authHandler,
+		CredentialHandler: credentialHandler,
+		TaskHandler:       taskHandler,
+		QuestionHandler:   questionHandler,
 	}
 	httpServer := server.NewHTTPServer(routerDeps)
 	jobServer := server.NewJobServer(logger)
@@ -33,6 +62,12 @@ func NewWire(viperViper *viper.Viper, logger *log.Logger) (*app.App, func(), err
 }
 
 // wire.go:
+
+var repositorySet = wire.NewSet(repository.NewDB, repository.NewRepository, repository.NewUserRepository, repository.NewCredentialRepository, repository.NewTaskRepository, repository.NewQuestionRepository)
+
+var serviceSet = wire.NewSet(sid.NewSid, jwt.NewJwt, crypto.FromEnv, service.NewAuthService, service.NewCredentialService, service.NewTaskService, service.NewQuestionService)
+
+var handlerSet = wire.NewSet(handler.NewAuthHandler, handler.NewCredentialHandler, handler.NewTaskHandler, handler.NewQuestionHandler)
 
 // build App
 func newApp(

@@ -9,34 +9,34 @@ import "time"
 //   - 凭据密文只存 cipher+nonce，禁止任何明文列。
 
 type User struct {
-	ID           string    `gorm:"primaryKey;size:32"`
-	Username     string    `gorm:"uniqueIndex;size:64;not null"`
-	PasswordHash string    `gorm:"size:255;not null"`
-	Role         string    `gorm:"size:32;not null;default:user"`
+	ID           string `gorm:"primaryKey;size:32"`
+	Username     string `gorm:"uniqueIndex;size:64;not null"`
+	PasswordHash string `gorm:"size:255;not null"`
+	Role         string `gorm:"size:32;not null;default:user"`
 	CreatedAt    time.Time
 	UpdatedAt    time.Time
 }
 
 type Credential struct {
-	ID        string    `gorm:"primaryKey;size:32"`
-	UserID    string    `gorm:"uniqueIndex:uk_credential_user_platform;size:32;not null"`
-	Platform  string    `gorm:"uniqueIndex:uk_credential_user_platform;size:32;not null"`
-	Cipher    []byte    `gorm:"type:blob;not null"`
-	Nonce     []byte    `gorm:"type:blob;not null"`
+	ID        string `gorm:"primaryKey;size:32"`
+	UserID    string `gorm:"uniqueIndex:uk_credential_user_platform;size:32;not null"`
+	Platform  string `gorm:"uniqueIndex:uk_credential_user_platform;size:32;not null"`
+	Cipher    []byte `gorm:"type:blob;not null"`
+	Nonce     []byte `gorm:"type:blob;not null"`
 	CreatedAt time.Time
 	UpdatedAt time.Time
 }
 
 type Task struct {
-	ID         string     `gorm:"primaryKey;size:32"`
-	UserID     string     `gorm:"index;size:32;not null"`
-	Platform   string     `gorm:"size:32;not null"`
-	Action     string     `gorm:"size:64;not null"`
-	Params     string     `gorm:"type:json"`
-	Status     string     `gorm:"index;size:16;not null;default:pending"`
-	Progress   int        `gorm:"not null;default:0"`
-	Result     string     `gorm:"type:json"`
-	Error      string     `gorm:"type:text"`
+	ID         string `gorm:"primaryKey;size:32"`
+	UserID     string `gorm:"index;size:32;not null"`
+	Platform   string `gorm:"size:32;not null"`
+	Action     string `gorm:"size:64;not null"`
+	Params     string `gorm:"type:json"`
+	Status     string `gorm:"index;size:16;not null;default:pending"`
+	Progress   int    `gorm:"not null;default:0"`
+	Result     string `gorm:"type:json"`
+	Error      string `gorm:"type:text"`
 	StartedAt  *time.Time
 	FinishedAt *time.Time
 	CreatedAt  time.Time
@@ -53,15 +53,15 @@ type TaskEvent struct {
 }
 
 type Question struct {
-	ID          string    `gorm:"primaryKey;size:32"`
-	Platform    string    `gorm:"uniqueIndex:uk_question_platform_key;size:32;not null"`
-	QuestionKey string    `gorm:"uniqueIndex:uk_question_platform_key;size:128;not null"`
-	Stem        string    `gorm:"type:text"`
-	Options     string    `gorm:"type:json"`
-	Answer      string    `gorm:"type:json"`
-	Source      string    `gorm:"size:16;not null"`
-	Confidence  float64   `gorm:"not null;default:0"`
-	HitCount    int64     `gorm:"not null;default:0"`
+	ID          string  `gorm:"primaryKey;size:32"`
+	Platform    string  `gorm:"uniqueIndex:uk_question_platform_key;size:32;not null"`
+	QuestionKey string  `gorm:"uniqueIndex:uk_question_platform_key;size:128;not null"`
+	Stem        string  `gorm:"type:text"`
+	Options     string  `gorm:"type:json"`
+	Answer      string  `gorm:"type:json"`
+	Source      string  `gorm:"size:16;not null"`
+	Confidence  float64 `gorm:"not null;default:0"`
+	HitCount    int64   `gorm:"not null;default:0"`
 	CreatedAt   time.Time
 	UpdatedAt   time.Time
 }

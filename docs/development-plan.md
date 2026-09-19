@@ -109,7 +109,20 @@
 
 ---
 
-### P2 后端领域层
+### P2 后端领域层（已完成）
+
+**已实现**
+- `internal/repository/domain.go`：`UserRepository` / `CredentialRepository` / `TaskRepository` / `QuestionRepository`（GORM，凭据/题库 upsert）。
+- `internal/service/{auth,credential,task,question}.go`：bcrypt+JWT 注册登录；AES-256-GCM 凭据加解密（`pkg/crypto`，密钥 `OMNITASK_MASTER_KEY`）；任务 CRUD；题库 Lookup/Save/List。
+- `internal/handler/domain.go` + `router` + `server/http.go`：`/v1/auth/register|login`、`/v1/credentials`、`/v1/tasks`、`/v1/questions(+/lookup)`；JWT 中间件保护。
+- 迁移接入 5 张表；配置切到 MySQL(3380) `omnitask` + Redis(6350)；wire 重新生成。
+
+**验收记录**
+- `docker compose up -d` 起 MySQL/Redis；`cmd/migration` AutoMigrate 建表成功（users/credentials/tasks/task_events/questions）。
+- curl 全链路：注册 → 登录 → 凭据入库 → 建任务 → 查任务 → 题库存/查；未带 token 返回 401。
+- 凭据密文验证：`credentials.cipher` 48B、`nonce` 12B，库中无明文。
+- `go build/vet/test` 通过；新增 `pkg/crypto` 单测（往返、错误密钥、坏 nonce）。
+- 修复：MySQL JSON 列不接受空串，Task.Result 与 Question.Options/Answer 兜底为 `{}`/`[]`。
 
 **模型（`internal/model/`）**：`User`、`Credential`、`Task`、`TaskEvent`、`Question`。
 **repository**：GORM + gorm/gen；`CredentialRepository`、`TaskRepository`、`QuestionRepository`、`UserRepository`。

@@ -1,9 +1,9 @@
 package server
 
 import (
+	"backend/pkg/log"
 	"context"
 	"github.com/go-co-op/gocron"
-	"backend/pkg/log"
 	"go.uber.org/zap"
 	"time"
 )

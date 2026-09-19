@@ -1,10 +1,10 @@
 package middleware
 
 import (
-	"github.com/gin-gonic/gin"
 	"backend/api/v1"
 	"backend/pkg/jwt"
 	"backend/pkg/log"
+	"github.com/gin-gonic/gin"
 	"go.uber.org/zap"
 	"net/http"
 )
