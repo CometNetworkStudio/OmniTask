@@ -44,3 +44,46 @@ message ExecuteEvent {
   int64 timestamp = 5;
   map<string, string> result = 6;
 }
+
+// QuestionBank 由 Go 后端实现，Python Agent 作为客户端调用。
+// 题库读写统一经此服务，Agent 不直连数据库。
+service QuestionBank {
+  // Lookup 按 platform + question_key 查询题库。
+  rpc Lookup(LookupRequest) returns (LookupResponse);
+  // Save 回写答案（按 platform + question_key 幂等 upsert）。
+  rpc Save(SaveRequest) returns (SaveResponse);
+}
+
+message Question {
+  string platform = 1;
+  string question_key = 2;
+  string stem = 3;
+  // JSON 字符串，保持平台返回的选项原始结构。
+  string options = 4;
+  // JSON 字符串，答案形态随题型变化。
+  string answer = 5;
+  // 来源：bank | api | llm。
+  string source = 6;
+  double confidence = 7;
+  int64 hit_count = 8;
+}
+
+message LookupRequest {
+  string platform = 1;
+  string question_key = 2;
+}
+
+message LookupResponse {
+  bool found = 1;
+  Question question = 2;
+}
+
+message SaveRequest {
+  Question question = 1;
+  // 仅在缺失时写入为默认；true 表示覆盖已有记录。
+  bool overwrite = 2;
+}
+
+message SaveResponse {
+  bool saved = 1;
+}

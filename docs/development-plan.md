@@ -19,13 +19,15 @@
 
 ---
 
-## 2. 现状（P0 已完成）
+## 2. 现状（P0 与 P0.5 已完成）
 
 - `backend/`：Nunu advanced，端口 8080，`go build/vet` 通过，示例代码已清理并重跑 wire。
 - `frontend/`：Vite + Vue3 + JS + Pinia/Router/Axios，`npm run build` 通过。
 - `agent/`：gRPC 服务端骨架 + `scripts/{cidaren,welearn}` + 冒烟测试通过；依赖在 `agent/.venv`。
-- `proto/agent/v1/agent.proto`：`AgentService.Health/Execute(server-streaming)`。
-- 文档：`README.md`、`docs/reference-analysis.md`。
+- `proto/agent/v1/agent.proto`：`AgentService.Health/Execute(server-streaming)` + `QuestionBank.Lookup/Save`。
+- `backend/internal/model/model.go`：冻结 `User/Credential/Task/TaskEvent/Question` 五张表 schema。
+- `.env.example`：约定主密钥、JWT、Agent/QuestionBank gRPC 地址、LLM 配置。
+- 文档：`README.md`、`docs/reference-analysis.md`、`docs/development-plan.md`。
 
 ---
 
@@ -45,7 +47,7 @@
 
 ## 4. 逐阶段任务分解
 
-### P0.5 契约补全
+### P0.5 契约补全（已完成）
 
 **任务**
 - proto 增加 `QuestionBank` service（Go 实现服务端，Agent 作为客户端调用）：
@@ -157,7 +159,7 @@
 
 ## 5. 关键设计
 
-### 5.1 数据库表（草案）
+### 5.1 数据库表（已冻结，见 `backend/internal/model/model.go`）
 
 - `users(id, username unique, password_hash, role, created_at, updated_at)`
 - `credentials(id, user_id, platform, cipher, nonce, created_at, updated_at, unique(user_id, platform))`

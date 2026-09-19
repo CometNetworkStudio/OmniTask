@@ -187,7 +187,7 @@ OmniTask/
 > 详细任务、验收与风险见 **`docs/development-plan.md`**。开发顺序：契约 → 平台协议(Python) → 后端 → 通讯 → 前端 → 集成 → 部署。
 
 - [x] M0：monorepo 骨架、Nunu 后端（`backend/`，8080）、Vue 前端（`frontend/`）、proto 契约、Python Agent gRPC 骨架（冒烟通过）
-- [ ] M0.5：契约补全（题库 gRPC、DB schema、配置约定）
+- [x] M0.5：契约补全——proto `QuestionBank.Lookup/Save`、`internal/model/model.go` 冻结 5 表 schema、`.env.example` 环境变量约定（`make proto` + Go build/vet + Python import 均通过）
 - [ ] M1：平台协议层（Agent）——词达人、WeLearn 无界面实现 + 本地 CLI 验证（最高风险，优先）
 - [ ] M2：后端领域层——用户/凭据/任务/题库 + REST + 迁移（MySQL/Redis）
 - [ ] M3：通讯层——Go gRPC 客户端 + 进度汇聚 + WebSocket 进度
