@@ -1,24 +1,24 @@
 # OmniTask 项目规则
 
-> 本文件供 AI 助手（opencode 等）读取。前端 UI 规则另见
-> `frontend/.cursor/rules/Frontend-UI-Rules.mdc`（Cursor 规则），两处保持一致。
+> 本文件供 AI 助手（opencode 等）读取，必须严格遵守。
 
 ## 前端 UI（必须遵守）
 
-1. 使用 Vuetify 官方组件完成页面。
-2. 优先使用 Props、Utility Classes（`pa-*`、`ma-*`、`ga-*`、`d-flex`、`flex-*` 等）完成布局。
-3. 禁止为了调整间距、Flex、Grid、颜色、圆角、字体等编写 CSS。
-4. 只有 Vuetify 无法实现时，才允许新增 CSS。
-5. 优先使用 `v-container`、`v-row`、`v-col`、`v-card`、`v-data-table`、`v-dialog`、`v-form`、`v-toolbar`、`v-navigation-drawer`、`v-list` 等组件。
-6. 页面保持 Less is More 风格，避免过度动画、渐变、毛玻璃和复杂装饰。
-7. 所有颜色、字体、圆角、阴影必须使用 Vuetify Theme，不允许硬编码。
-8. API 调用统一通过 `api/service` 层，页面禁止直接使用 `axios`。
-9. 状态统一使用 `Pinia`。
+1. 只用 Vuetify 官方组件；布局优先 Props / Utility Classes（`pa-*`、`ma-*`、`ga-*`、`d-flex`、`flex-*`）。
+2. 禁止为间距/Flex/Grid/颜色/圆角/字体写 CSS；仅 Vuetify 无法实现时才允许新增 CSS。
+3. 优先 `v-container`、`v-row`、`v-col`、`v-card`、`v-data-table`、`v-dialog`、`v-form`、`v-toolbar`、`v-navigation-drawer`、`v-list`。
+4. Less is More，避免过度动画、渐变、毛玻璃、复杂装饰。
+5. 颜色/字体/圆角/阴影走 Vuetify Theme，禁止硬编码。
+6. API 走 `api/service` 层，页面禁止 `axios`；状态用 Pinia。
+7. **MD3 圆角固定写死**：按钮/列表/表格/alert/card 等统一 `variant="elevated"` + `rounded="xl"`，card 额外 `elevation="2"`；本就圆角的组件（如 `v-chip`）不改。以 Vuetify `defaults` 全局设定，个别组件不支持该 prop 则就近设置。
+8. **含用户输入的对话框必须加 `persistent`**。
+9. **禁止 `v-snackbar`**，统一用 `v-snackbar-queue`（右上角、多条、bouncy 动画 `transition="bouncy-slide-auto"`）。
 
-## 其它通用约定
+## 通用约定
 
 - 前端：Vue3 + JavaScript（禁止 TypeScript）+ Vite。
-- 后端：Go + Gin + GORM，遵循 `docs/development-plan.md`。
-- Agent：Python，平台脚本独立实现（见 `docs/reference-analysis.md`）。
+- 后端：Go + Gin + GORM，规划见 `docs/development-plan.md`。
+- Agent：Python，平台脚本独立实现（`docs/reference-analysis.md`）。
 - 密钥/凭据永不入库明文、永不提交到仓库。
 - 重要决策与进展回写 `README.md` / `docs/development-plan.md`。
+- 每次对话结束用 `./deploy.sh` 重新部署到 `https://<your-host>:4096/omnitask/` 供查看。

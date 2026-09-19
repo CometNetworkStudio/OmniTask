@@ -7,9 +7,12 @@ import './style.css'
 import App from './App.vue'
 import router from './router'
 
+const savedTheme = localStorage.getItem('omnitask_theme')
+const systemDark = window.matchMedia('(prefers-color-scheme: dark)').matches
+
 const vuetify = createVuetify({
   theme: {
-    defaultTheme: 'light',
+    defaultTheme: savedTheme || (systemDark ? 'dark' : 'light'),
     themes: {
       light: {
         colors: {
@@ -34,10 +37,12 @@ const vuetify = createVuetify({
     },
   },
   defaults: {
-    VCard: { rounded: 'lg' },
-    VBtn: { variant: 'flat' },
-    VTextField: { variant: 'outlined', density: 'comfortable' },
-    VSelect: { variant: 'outlined', density: 'comfortable' },
+    VBtn: { variant: 'elevated', rounded: 'xl' },
+    VCard: { variant: 'elevated', rounded: 'xl', elevation: 2 },
+    VAlert: { variant: 'elevated', rounded: 'xl' },
+    VTextField: { variant: 'outlined', density: 'comfortable', rounded: 'xl' },
+    VSelect: { variant: 'outlined', density: 'comfortable', rounded: 'xl' },
+    VList: { rounded: 'xl' },
   },
 })
 

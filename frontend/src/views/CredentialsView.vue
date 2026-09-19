@@ -95,7 +95,7 @@ async function save() {
       </v-data-table>
     </v-card>
 
-    <v-dialog v-model="dialog" max-width="520">
+    <v-dialog v-model="dialog" max-width="520" persistent>
       <v-card>
         <v-card-item>
           <v-card-title class="text-h6">凭据</v-card-title>

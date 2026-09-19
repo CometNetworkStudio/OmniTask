@@ -159,7 +159,7 @@ async function createTask() {
       </v-data-table>
     </v-card>
 
-    <v-dialog v-model="dialog" max-width="640">
+    <v-dialog v-model="dialog" max-width="640" persistent>
       <v-card>
         <v-card-item>
           <v-card-title class="text-h6">新建任务</v-card-title>

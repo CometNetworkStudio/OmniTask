@@ -33,7 +33,7 @@ async function submit() {
 
 <template>
   <v-container class="fill-height">
-    <v-row justify="center" align="center" class="w-100">
+    <v-row class="fill-height" justify="center" align="center">
       <v-col cols="12" sm="8" md="5" lg="4">
         <v-card>
           <v-card-item>

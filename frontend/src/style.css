@@ -2,3 +2,25 @@ html,
 body {
   margin: 0;
 }
+
+/* Vuetify 无 bouncy 过渡，按官方示例补充（规则允许 Vuetify 无法实现时新增 CSS） */
+.bouncy-slide-x-transition-enter-active,
+.bouncy-slide-x-transition-leave-active,
+.bouncy-slide-x-transition-move,
+.bouncy-slide-reverse-transition-enter-active,
+.bouncy-slide-reverse-transition-leave-active,
+.bouncy-slide-reverse-transition-move {
+  transition: transform, opacity;
+  transition-duration: 0.5s;
+  transition-timing-function: cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+.bouncy-slide-x-transition-enter-from,
+.bouncy-slide-x-transition-leave-to {
+  opacity: 0;
+  transform: translateX(-30%);
+}
+.bouncy-slide-reverse-transition-enter-from,
+.bouncy-slide-reverse-transition-leave-to {
+  opacity: 0;
+  transform: translateX(30%);
+}
