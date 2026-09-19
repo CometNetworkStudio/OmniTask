@@ -8,6 +8,9 @@
 
 from __future__ import annotations
 
+import random
+import time
+
 from core.bank import LocalBank
 from core.config import Config
 from core.events import event
@@ -85,8 +88,12 @@ def _prepare_words(client: CidarenClient, task: dict) -> None:
 
 def _run_task(client: CidarenClient, task: dict, llm, bank, params: dict):
     name = task.get("task_name")
-    min_time = int(params.get("min_time", 3))
-    max_time = int(params.get("max_time", 6))
+    # 思考延迟：答完一题后停一会，模拟人类（参考默认 2s）。
+    think_min = float(params.get("think_min", 2))
+    think_max = float(params.get("think_max", max(think_min, 2)))
+    # 服务端 time_spent：本题“用时”，单位 500=1 秒（参考默认 5~15s）。
+    spend_min = int(params.get("spend_min", 5))
+    spend_max = int(params.get("spend_max", 15))
     _prepare_words(client, task)
 
     started = client.start_answer(task["task_id"], TASK_KIND, TASK_TYPE_INT, release_id=task.get("release_id"))
@@ -99,7 +106,8 @@ def _run_task(client: CidarenClient, task: dict, llm, bank, params: dict):
     for _ in range(max_steps):
         mode = exam.get("topic_mode")
         if mode == 0:  # 阅读卡：直接跳读
-            step = client.next_question(TASK_KIND, exam["topic_code"], min_time, max_time)
+            step = client.next_question(TASK_KIND, exam["topic_code"], spend_min, spend_max)
+            time.sleep(random.uniform(1, 3))
         else:
             submission = None
             if mode not in answer_mod.UNSUPPORTED_MODES:
@@ -116,7 +124,8 @@ def _run_task(client: CidarenClient, task: dict, llm, bank, params: dict):
             else:
                 result = client.verify_answer(TASK_KIND, exam["topic_code"], submission)
                 bank.save(answer_mod.derive_record(exam, result), overwrite=True)
-                step = client.next_question(TASK_KIND, result["topic_code"], min_time, max_time)
+                step = client.next_question(TASK_KIND, result["topic_code"], spend_min, spend_max)
+            time.sleep(random.uniform(think_min, think_max))
 
         done = exam.get("topic_done_num") or 0
         yield event(int(done / total * 100), f"{name}: {done}/{total}")

@@ -77,6 +77,9 @@ def run(action: str, params: dict, credentials: dict):
 
     actionable = [item for item in sco_items if _is_actionable(item, include_completed)]
     scoids = [sid for sid in (_sco_id(item) for item in actionable) if sid]
+    limit = params.get("limit")
+    if limit:
+        scoids = scoids[: int(limit)]
     if not scoids:
         yield event(100, "没有未完成的 SCO")
         return
