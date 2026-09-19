@@ -164,7 +164,19 @@
 
 ---
 
-### P4 前端
+### P4 前端（已完成）
+
+**已实现**（严格遵守 `AGENTS.md` 前端 UI 规则）
+- 基础设施：Vuetify 4 + 自定义 Theme（`main.js`，颜色/圆角/默认值走 Theme）、Pinia、Vue Router（登录守卫）、Axios 封装 `api/http.js`（JWT 注入、响应解包、401 跳登录）、Vite 代理 `/v1`（含 ws）。
+- 分层：`api/services/{auth,credentials,tasks,questions}.js`；页面不直接使用 axios。
+- Store：`stores/auth.js`（token/用户，localStorage 持久化）、`stores/ui.js`（snackbar）。
+- 页面：登录、注册、任务列表（`v-data-table` + 新建任务对话框，参数按平台 schema 动态渲染，覆盖 `docs/parameters.md`）、任务详情（`/v1/ws` 实时进度时间线）、凭据管理（按平台动态字段）、题库（平台筛选 + 表格）。
+- `src/config/platforms.js`：平台/动作/参数/凭据字段 schema；`src/ws/taskSocket.js`：WebSocket 客户端。
+- 合规检查：无内联 `style=`、无 `<style>`、页面无 axios、组件无硬编码颜色。
+
+**验收记录**
+- `npm run build` 通过。
+- `npm run dev` + 后端联调：`/v1/tasks` 经 Vite 代理返回 401 `{code:401}`，代理与鉴权链路正常。
 
 - 页面：登录/注册、凭据管理（平台 + token/账号密码）、平台/任务类型选择、任务创建、任务详情（实时进度）、题库查看。
 - 结构：`src/api/*`、`src/stores/*`（Pinia）、`src/router/*`、`src/ws/*`。
