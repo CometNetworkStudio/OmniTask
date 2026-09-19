@@ -26,7 +26,11 @@
 - `agent/`：gRPC 服务端骨架 + `scripts/{cidaren,welearn}` + 冒烟测试通过；依赖在 `agent/.venv`。
 - `proto/agent/v1/agent.proto`：`AgentService.Health/Execute(server-streaming)` + `QuestionBank.Lookup/Save`。
 - `backend/internal/model/model.go`：冻结 `User/Credential/Task/TaskEvent/Question` 五张表 schema。
-- `.env.example`：约定主密钥、JWT、Agent/QuestionBank gRPC 地址、LLM 配置。
+- `.env.example`：约定主密钥、JWT、Agent/QuestionBank gRPC 地址、LLM、限流与本地 CLI 凭据。
+- `agent/core/`：公共层 config/events/http/ratelimit/bank/llm（P1.0，单测通过）。
+- `agent/scripts/cidaren/`：sign/jv/client/answer/runner（P1.1）。
+- `agent/scripts/welearn/`：crypto/client/runner（P1.2）。
+- `agent/run_cli.py`：本地命令行验证入口（P1.3）。
 - 文档：`README.md`、`docs/reference-analysis.md`、`docs/development-plan.md`。
 
 ---
@@ -62,7 +66,7 @@
 
 ---
 
-### P1 Agent 平台协议层（最高风险，先做）
+### P1 Agent 平台协议层（最高风险；代码已实现，待真实凭据联调）
 
 **P1.0 公共层**
 - `agent/core/config.py`：读取 env/yaml（平台凭据、限流、LLM）。

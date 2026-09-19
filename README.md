@@ -25,7 +25,7 @@
 | 项目名 | **OmniTask / 万务通** | |
 | 产品形态 | **个人自用** | 不做支付、不做复杂多租户 |
 | Agent 部署 | **服务器集中式** | 所有 Agent 跑在服务器，剥离 GUI，headless |
-| 脚本来源 | **全部净室重写** | 不抄原代码，只依据平台接口自行实现 |
+| 脚本来源 | **独立重写（未复制原码）** | 协议事实经所有者授权从参考源码提取，见 `docs/reference-analysis.md` |
 | 开源自用 | **全部 MIT 开源** | 自己写、自己开源，杜绝原项目授权问题 |
 | Go ↔ Python 通信 | **gRPC** | protobuf 强类型，支持 server-streaming 回传进度 |
 | 前端 | Vue3 + **JavaScript（非 TS）** + Vite + Pinia + Vue Router + Axios | |
@@ -36,7 +36,7 @@
 | 工具链版本 | Go 1.27.1 / Node 22.20.0 / Python 3.12 | Agent 用 `agent/.venv` |
 | proto 生成 | `make proto`（Go→`backend/api/agent/v1`，Py→`agent/gen`），产物 gitignore | |
 | 词达人凭据 | **仅接受 Token**（原项目无密码登录，靠 mitmproxy 抓取） | 见 `docs/reference-analysis.md` |
-| 词达人答题 | **三级策略**：MySQL 题库命中 → 接口 `answer_corrects`/`answer_tag` → LLM；`VerifyAnswer` 回写题库 | 已核实接口返回标准答案 |
+| 词达人答题 | **题库 → LLM → SkipAnswer**；`VerifyAnswer.answer_corrects` 权威回写题库 | 源码核对：`answer_tag` 是提交码，非正确标记（原设想已修正） |
 | 开发期存储 | **Docker MySQL(3380) + Redis(6350)** | 复用 Nunu compose，避开系统端口 |
 | 用户体系 | **注册/登录 + JWT**（少用户） | |
 | 并发限流 | **全可配，默认低**（同账号串行，平台并发默认 2） | |
@@ -52,6 +52,8 @@
 - **Easy_Cidaren（词达人）**：仓库标注 GPL-3.0，但 README 写明"仅供个人学习、请勿商用、严禁盗卖盈利"。GPL-3.0 与作者声明冲突；GPL 有传染性，吸收其代码会导致本项目被迫 GPL。→ 因此**只参考其行为，不参考其代码，净室重写**。
 - **Auto_WeLearn（WeLearn）**：**无 LICENSE 文件**（README 仅"免费"徽章），法律上默认保留所有权利，README 也禁止倒卖/代刷牟利。→ 同样**净室重写**。
 - 结论：本项目代码独立实现，采用 **MIT** 协议对外（开源与发布由项目所有者手动执行）。
+
+> **权衡说明（已拍板）**：M1 阶段缺少真实抓包样本，所有者授权阅读参考源码以**提取协议事实**（签名、jv 规则表、加密码算法、端点与参数顺序），再独立重写。实现代码为本项目原创、未复制原项目代码；但严格"净室"主张因此减弱，生产使用前建议以真实报文复核。
 
 ---
 
@@ -188,7 +190,7 @@ OmniTask/
 
 - [x] M0：monorepo 骨架、Nunu 后端（`backend/`，8080）、Vue 前端（`frontend/`）、proto 契约、Python Agent gRPC 骨架（冒烟通过）
 - [x] M0.5：契约补全——proto `QuestionBank.Lookup/Save`、`internal/model/model.go` 冻结 5 表 schema、`.env.example` 环境变量约定（`make proto` + Go build/vet + Python import 均通过）
-- [ ] M1：平台协议层（Agent）——词达人、WeLearn 无界面实现 + 本地 CLI 验证（最高风险，优先）
+- [x] M1：平台协议层（Agent）——词达人（sign/jv/client/answer/runner）、WeLearn（crypto/client/runner）无界面实现 + `run_cli.py`；纯函数单测通过。**真实 token/账号联调待补**
 - [ ] M2：后端领域层——用户/凭据/任务/题库 + REST + 迁移（MySQL/Redis）
 - [ ] M3：通讯层——Go gRPC 客户端 + 进度汇聚 + WebSocket 进度
 - [ ] M4：前端——登录/凭据/任务/实时进度/题库
