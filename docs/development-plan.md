@@ -35,9 +35,11 @@
 
 ### M1 真机联调记录（凭据经 `.env` 注入，不入库）
 
-- 词达人：`Student/Main` token 校验通过；`ClassTask/PageTask` → 匹配 `StudyTask/List` 单元 → `StudyTask/Info` 词表 → `SubmitChoseWord` → `StartAnswer` 全链路通。实测 List 04 连续 6 题 LLM 作答全对；`mode 0` 为阅读卡需跳读；题库回写 39 条。
-- WeLearn：账密登录成功；4 门课程、课程单元与 SCO 读取正常。写路径（`startsco`/`savescoinfo160928`/`setscoinfo`）在课程 2417 一个**本就已完成**的 SCO 上验证通过（`ret:0`，无状态变更）。当前课程完成度：565/566/2417 全部完成，2416 有 144 个未完成。
-- 修正：列表类接口 `data` 为明文 JSON，仅答题类接口为 jv/base64（原 `_data` 一律解码导致 KeyError）。
+- 词达人：`Student/Main` token 校验通过；班级学习任务全链路通（`PageTask → StudyTask/List → StudyTask/Info → SubmitChoseWord → StartAnswer → VerifyAnswer → SubmitAnswerAndSave`）。完成 **List 04（196/196，100%）**，题库回写 129 条；`mode 0` 为阅读卡需跳读。答题后加入人类思考延迟（`think_min/max` 默认 2s，`spend_min/max` 默认 5~15s）。
+- WeLearn：账密登录成功；完成 **课程 2416 全部 144 个 SCO**。两种模式均验证：`time`（挂时长，2 个 SCO）与 `progress`（提交进度，其余）；写接口 `startsco`/`setscoinfo`/`savescoinfo` 均 `ret:0`。
+- 修正 1：列表类接口 `data` 为明文 JSON，仅答题类接口为 jv/base64。
+- 修正 2：WeLearn `unitidx` 必须是**单元数字下标（0-based）**，传单元 GUID 会导致 8 个单元返回同一批 18 个 SCO（144 条中仅 18 唯一）；修正后按 scoid 去重，144 个唯一 SCO。
+- 术语：SCO = SCORM Shareable Content Object，WeLearn 课程的最小学习单元（视频/练习/听力等），刷时长与提交进度都按 SCO 操作。
 
 ---
 
