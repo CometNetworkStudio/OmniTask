@@ -1,0 +1,20 @@
+# generated protobuf (run: make proto)
+/backend/api/agent/
+/agent/gen/
+
+# python
+agent/.venv/
+__pycache__/
+*.pyc
+
+# node
+node_modules/
+dist/
+
+# runtime data
+backend/storage/*.db
+backend/storage/logs/
+
+# secrets
+.env
+.env.local

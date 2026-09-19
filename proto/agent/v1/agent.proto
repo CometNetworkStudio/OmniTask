@@ -1,0 +1,46 @@
+syntax = "proto3";
+
+package agent.v1;
+
+option go_package = "backend/api/agent/v1;agentv1";
+
+// AgentService 是 Go 后端与 Python Agent 之间的唯一契约。
+// 后端通过 Execute 下发任务，Agent 以 server-streaming 持续回传进度与结果。
+service AgentService {
+  rpc Health(HealthRequest) returns (HealthResponse);
+  rpc Execute(ExecuteRequest) returns (stream ExecuteEvent);
+}
+
+message HealthRequest {}
+
+message HealthResponse {
+  string version = 1;
+  repeated string platforms = 2;
+}
+
+message ExecuteRequest {
+  string task_id = 1;
+  string platform = 2;
+  string action = 3;
+  map<string, string> params = 4;
+  // 已由后端解密后下发的平台凭据，Agent 不得持久化。
+  map<string, string> credentials = 5;
+}
+
+enum EventType {
+  EVENT_TYPE_UNSPECIFIED = 0;
+  EVENT_TYPE_STARTED = 1;
+  EVENT_TYPE_PROGRESS = 2;
+  EVENT_TYPE_LOG = 3;
+  EVENT_TYPE_SUCCEEDED = 4;
+  EVENT_TYPE_FAILED = 5;
+}
+
+message ExecuteEvent {
+  string task_id = 1;
+  EventType type = 2;
+  int32 percent = 3;
+  string message = 4;
+  int64 timestamp = 5;
+  map<string, string> result = 6;
+}
