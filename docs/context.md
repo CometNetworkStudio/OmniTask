@@ -262,3 +262,9 @@ cd frontend && npm run build
 - 分层切换：业务代码零改动，仅 `repository.NewDB`（驱动）与 `NewRedis`（是否连接）按 `mode` 分支。
 - 说明：golang-migrate 的 sqlite 驱动依赖 CGO，与“纯 Go”目标冲突，故 lite 采用 AutoMigrate；接受该取舍。
 - ✅ `go:embed` 前端 dist：后端单文件托管 SPA（`internal/server/static.go`），HTTP API 统一前缀 `/api/v1`，`/api/*` 未命中返回 404，其余走 SPA 回退。
+
+## 16. 引导式构建脚本（2026-09）
+- 新增 `omnitask.sh`（Linux/macOS）与 `omnitask.bat`（Windows）引导式菜单：部署 / 编译 server·agent·migrate（可选 linux-amd64、windows-amd64、两者）/ 构建前端。
+- 交叉编译：`CGO_ENABLED=0 GOOS/GOARCH=amd64`（依赖全为纯 Go：glebarez/sqlite、mysql、casbin）；产物在 `build/`（gitignore）。
+- `deploy.sh` 保留为 Linux 部署实现，由菜单「部署」调用。
+- Makefile 仅为开发辅助（proto 生成/nunu/测试），普通构建不需要。

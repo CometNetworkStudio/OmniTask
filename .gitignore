@@ -27,3 +27,6 @@ backend/config/deploy.yml
 # embedded frontend dist (built by deploy.sh); keep .keep
 /backend/internal/server/webdist/*
 !backend/internal/server/webdist/.gitkeep
+
+# 构建产物
+/build/

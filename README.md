@@ -82,6 +82,19 @@ go run ./cmd/server -conf config/deploy.yml
 go run ./cmd/agent  -conf config/deploy.yml
 ```
 
+## 构建与工具
+
+引导式工具箱（推荐）：
+
+- Linux/macOS：`./omnitask.sh`
+- Windows：`omnitask.bat`
+
+运行后是数字菜单：部署、构建后端 server / Host agent / 迁移工具（可选 **linux-amd64 / windows-amd64 / 两者**）、构建前端。产物输出到 `build/`（已 gitignore），命名如 `omnitask-server-linux-amd64`、`omnitask-server-windows-amd64.exe`。
+
+`deploy.sh` 是 Linux 部署实现（构建前端并内嵌 → 编译 → 迁移 → 重启），由菜单选项「部署」调用，也可单独执行。
+
+`Makefile` 仅为开发辅助（非构建必需）：`make proto` 需 `protoc` + `protoc-gen-go`/`protoc-gen-go-grpc` + `agent/.venv`(grpc_tools)；`make backend-run` 需 Nunu CLI；`make agent-test`/`frontend-dev` 分别需 Python venv / npm。
+
 ## 脚本生态：开发与接入
 
 平台能力全部来自**可插拔脚本**。官方脚本已独立开源：
