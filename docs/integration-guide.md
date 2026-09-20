@@ -156,7 +156,7 @@ python cli.py --action <action> --credential <k=v> --param <k=v>
 3. 后端下载 zip → 解压到运行目录 `scripts/<id>/` → 校验 `runtime` → 写入注册表（状态：可用 / 缺少运行时）。Host **热扫描**，无需重启。
 4. 之后即可在任务页选择该平台创建任务。
 
-> 当前后端按仓库**默认分支**下载（`/archive/refs/heads/main.zip`）；指定 commit/tag 的固定安装为后续增强。
+> 当前后端把 `github.com/owner/repo` 自动转换为 **codeload 直链**下载（更稳定），默认分支 `main`；指定 commit/tag 的固定安装为后续增强。
 >
 > 安全：仅**管理员**可安装脚本；安装前请审阅源码。脚本以宿主权限运行，恶意脚本可窃取凭据或攻击主机，请只安装可信来源。
 
