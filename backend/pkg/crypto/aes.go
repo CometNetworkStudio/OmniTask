@@ -11,6 +11,8 @@ import (
 	"io"
 	"os"
 	"strings"
+
+	"github.com/spf13/viper"
 )
 
 // ParseMasterKey 接受 32 字节密钥：hex(64 字符)、base64 或原始 32 字符。
@@ -53,6 +55,19 @@ func FromEnv() (*Cipher, error) {
 	key, err := ParseMasterKey(os.Getenv("OMNITASK_MASTER_KEY"))
 	if err != nil {
 		return nil, fmt.Errorf("OMNITASK_MASTER_KEY: %w", err)
+	}
+	return NewCipher(key)
+}
+
+// FromConfig 优先读配置 security.master_key，其次环境变量 OMNITASK_MASTER_KEY。
+func FromConfig(conf *viper.Viper) (*Cipher, error) {
+	keyStr := conf.GetString("security.master_key")
+	if keyStr == "" {
+		keyStr = os.Getenv("OMNITASK_MASTER_KEY")
+	}
+	key, err := ParseMasterKey(keyStr)
+	if err != nil {
+		return nil, fmt.Errorf("master key: %w", err)
 	}
 	return NewCipher(key)
 }

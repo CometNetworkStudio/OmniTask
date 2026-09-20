@@ -40,7 +40,7 @@ func NewWire(viperViper *viper.Viper, logger *log.Logger) (*app.App, func(), err
 	authService := service.NewAuthService(userRepository, sidSid, jwtJWT, logger)
 	authHandler := handler.NewAuthHandler(authService, logger)
 	credentialRepository := repository.NewCredentialRepository(repositoryRepository)
-	cipher, err := crypto.FromEnv()
+	cipher, err := crypto.FromConfig(viperViper)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -85,7 +85,7 @@ func NewWire(viperViper *viper.Viper, logger *log.Logger) (*app.App, func(), err
 
 var repositorySet = wire.NewSet(repository.NewDB, repository.NewRedis, repository.NewRepository, repository.NewUserRepository, repository.NewCredentialRepository, repository.NewTaskRepository, repository.NewQuestionRepository, repository.NewScriptRepository)
 
-var serviceSet = wire.NewSet(sid.NewSid, jwt.NewJwt, crypto.FromEnv, authz.NewEnforcer, ws.NewHub, service.NewAuthService, service.NewCredentialService, service.NewTaskService, service.NewQuestionService, service.NewScriptService, service.NewAgentClient, service.NewProgressStore, service.NewOrchestrator)
+var serviceSet = wire.NewSet(sid.NewSid, jwt.NewJwt, crypto.FromConfig, authz.NewEnforcer, ws.NewHub, service.NewAuthService, service.NewCredentialService, service.NewTaskService, service.NewQuestionService, service.NewScriptService, service.NewAgentClient, service.NewProgressStore, service.NewOrchestrator)
 
 var handlerSet = wire.NewSet(handler.NewAuthHandler, handler.NewCredentialHandler, handler.NewTaskHandler, handler.NewQuestionHandler, handler.NewScriptHandler, handler.NewWSHandler)
 

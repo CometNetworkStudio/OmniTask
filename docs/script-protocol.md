@@ -85,8 +85,9 @@ Host 启动脚本后，**一个任务一个子进程**：
 
 ## 4. 运行时检测
 
-- Host 加载 manifest 后用 `exec.LookPath(runtime)` 预检；缺失则该脚本标记为不可用、不对外暴露，并在日志与 `Health` 中体现。
-- 例：缺少 Python 时提示用户安装 Python（Host 日志 + 前端脚本页状态，后续实现）。
+- Host 加载 manifest 后用 `exec.LookPath(runtime)` 预检；缺失则该脚本标记为不可用、不对外暴露，并在日志中体现。
+- Host 在 `Health`/`Execute` 时**热扫描**脚本目录，安装后无需重启。
+- 例：缺少 Python 时会提示安装 Python（Host 日志；前端脚本页状态显示“缺少运行时”）。
 
 ## 5. 与后端 gRPC 的映射
 

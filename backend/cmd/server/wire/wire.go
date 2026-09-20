@@ -36,7 +36,7 @@ var repositorySet = wire.NewSet(
 var serviceSet = wire.NewSet(
 	sid.NewSid,
 	jwt.NewJwt,
-	crypto.FromEnv,
+	crypto.FromConfig,
 	authz.NewEnforcer,
 	ws.NewHub,
 	service.NewAuthService,

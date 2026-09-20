@@ -121,3 +121,9 @@
 1. WeLearn 密码加密算法：**按协议规范重写**（采纳，原作者已摸透平台规律）。
 2. 词达人：**仅 Token 登录**（无密码登录，token 由用户抓包提供）。
 3. 自动答题：**要做**，采用题库 → 接口答案 → LLM 的三级策略并回写题库。
+
+## 五、脚本迁出说明
+
+原 `agent/scripts/{cidaren,welearn}` 已迁出主库，作为独立 MIT 项目发布并开源：
+`github.com/CometNetworkStudio/cidaren`、`github.com/CometNetworkStudio/welearn`。
+主库通过运行目录 `scripts/<id>/`（gitignore）与 OmniTask「脚本」页安装，见 `docs/script-protocol.md`。

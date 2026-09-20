@@ -253,3 +253,12 @@ cd frontend && npm run build
 - 运行目录改为仓库根 `scripts/`（**gitignore**）；内置脚本已从主库移除，改为“安装”。
 - `task` 创建校验：内置集合 ∪ 已启用脚本。
 - 建议：加速域名用户写了 `.com` 与示例 `.org` 两个，前端都提供，按可用者选。
+
+## 15. lite/full 双模式（2026-09）
+
+- **统一配置 `config.yaml`**：`mode: lite|full`，默认 **lite**；仅当使用默认文件名 `config.yaml` 且不存在时自动生成（含随机 `jwt.key` / `master_key`，明文）。
+- **lite**：`github.com/glebarez/sqlite`（纯 Go 无 CGO）+ **无 Redis**（进度走进程内 `ProgressStore`）；启动时 GORM AutoMigrate。
+- **full**：MySQL + Redis；迁移用 golang-migrate（`cmd/migrate`）。
+- 分层切换：业务代码零改动，仅 `repository.NewDB`（驱动）与 `NewRedis`（是否连接）按 `mode` 分支。
+- 说明：golang-migrate 的 sqlite 驱动依赖 CGO，与“纯 Go”目标冲突，故 lite 采用 AutoMigrate；接受该取舍。
+- 待办：`go:embed` 前端 dist 实现真正单二进制 + 静态托管。

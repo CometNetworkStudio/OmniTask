@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"time"
 
+	"backend/internal/model"
 	"backend/pkg/log"
 	"backend/pkg/zapgorm2"
 	"github.com/glebarez/sqlite"
@@ -97,6 +98,14 @@ func NewDB(conf *viper.Viper, l *log.Logger) *gorm.DB {
 	if err != nil {
 		panic(err)
 	}
+	if driver == "sqlite" {
+		if err := db.AutoMigrate(
+			&model.User{}, &model.Credential{}, &model.Task{},
+			&model.TaskEvent{}, &model.Question{}, &model.Script{},
+		); err != nil {
+			panic(err)
+		}
+	}
 	db = db.Debug()
 
 	// Connection Pool config
@@ -110,6 +119,9 @@ func NewDB(conf *viper.Viper, l *log.Logger) *gorm.DB {
 	return db
 }
 func NewRedis(conf *viper.Viper) *redis.Client {
+	if conf.GetString("mode") == "lite" {
+		return nil // lite 模式无 Redis，进度走进程内存储
+	}
 	rdb := redis.NewClient(&redis.Options{
 		Addr:     conf.GetString("data.redis.addr"),
 		Password: conf.GetString("data.redis.password"),

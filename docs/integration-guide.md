@@ -145,12 +145,20 @@ python cli.py --action <action> --credential <k=v> --param <k=v>
 
 ## 9. 发布与接入
 
-1. 在自己的 GitHub 仓库按上述规范实现并打 tag/commit。
-2. 管理员的 OmniTask「脚本」页面填入仓库地址（可指定 commit，便于审核与可复现）。
-3. 平台校验 manifest → 拉取代码 → 安装依赖 → 注册平台。
+官方脚本（已开源，可作为模板）：
+- 词达人：https://github.com/CometNetworkStudio/cidaren
+- WeLearn：https://github.com/CometNetworkStudio/welearn
+
+接入步骤：
+
+1. 在自己仓库按上述规范实现（`script.json` + `main.py`）并保证默认分支可下载。
+2. 管理员的 OmniTask「脚本」页填写仓库地址（或 zip 地址），可选加速源（如 `https://gh-proxy.com/`，前端会拼接）。
+3. 后端下载 zip → 解压到运行目录 `scripts/<id>/` → 校验 `runtime` → 写入注册表（状态：可用 / 缺少运行时）。Host **热扫描**，无需重启。
 4. 之后即可在任务页选择该平台创建任务。
 
-> 安全：仅**管理员**可安装脚本；安装前请审阅源码。脚本以宿主权限运行，恶意脚本可窃取凭据或攻击主机，请只安装可信来源并固定 commit。
+> 当前后端按仓库**默认分支**下载（`/archive/refs/heads/main.zip`）；指定 commit/tag 的固定安装为后续增强。
+>
+> 安全：仅**管理员**可安装脚本；安装前请审阅源码。脚本以宿主权限运行，恶意脚本可窃取凭据或攻击主机，请只安装可信来源。
 
 ## 10. Vibecoding Prompt（可直接复制给 AI）
 

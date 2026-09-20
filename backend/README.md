@@ -1,18 +1,42 @@
-# Nunu — A CLI tool for building Go applications.
+# OmniTask Backend
 
-Nunu is a scaffolding tool for building Go applications. Its name comes from a game character in League of Legends, a little boy riding on the shoulders of a Yeti. Just like Nunu, this project stands on the shoulders of giants, as it is built upon a combination of popular libraries from the Go ecosystem. This combination allows you to quickly build efficient and reliable applications.
+Go + Gin + GORM + gRPC 后端：用户/凭据/任务/题库/脚本注册表与任务编排。
 
-[简体中文介绍](https://github.com/go-nunu/nunu/blob/main/README_zh.md)
+## 运行模式（`config.yaml` 的 `mode`）
 
-![Nunu](https://github.com/go-nunu/nunu/blob/main/.github/assets/banner.png)
+- **lite（默认）**：SQLite（`github.com/glebarez/sqlite`，纯 Go 无需 CGO）+ 无 Redis（进度走进程内）。
+- **full**：MySQL + Redis。
 
-## Documentation
-* [User Guide](https://github.com/go-nunu/nunu/blob/main/docs/en/guide.md)
-* [Architecture](https://github.com/go-nunu/nunu/blob/main/docs/en/architecture.md)
-* [Getting Started Tutorial](https://github.com/go-nunu/nunu/blob/main/docs/en/tutorial.md)
-* [Unit Testing](https://github.com/go-nunu/nunu/blob/main/docs/en/unit_testing.md)
+`config.yaml` 首次运行自动生成（含随机密钥，明文存于其中）；仅当路径为默认 `config.yaml` 时自动创建。数据库迁移：
 
+- lite：启动时 GORM AutoMigrate。
+- full：`go run ./cmd/migrate -conf config.yaml`（golang-migrate，见 `cmd/migrate/migrations`）。
 
-## License
+## 组件
 
-Nunu is released under the MIT License. For more information, see the [LICENSE](LICENSE) file.
+| 入口 | 说明 |
+|------|------|
+| `cmd/server` | HTTP API + WebSocket + 任务编排 + `QuestionBank` gRPC |
+| `cmd/agent` | Go 脚本 Host：扫描脚本目录，以子进程 + stdio JSON 运行平台脚本 |
+| `cmd/migrate` | 数据库迁移（golang-migrate，full 模式） |
+
+## 目录
+
+```
+internal/
+├── agenthost/     # Go Host（manifest 解析 / 子进程 stdio / 热扫描）
+├── handler/       # HTTP handler（auth/credential/task/question/script/ws）
+├── middleware/    # JWT / Casbin 鉴权 / 日志 / CORS
+├── model/         # GORM 模型
+├── repository/    # 数据访问（驱动可切：sqlite/mysql）
+├── service/       # 业务（含编排 Orchestrator、脚本安装、进度）
+├── ws/            # WebSocket Hub
+└── server/        # HTTP / gRPC / 迁移装配
+pkg/               # config / crypto(AES-GCM) / authz(Casbin) / jwt / sid / log ...
+```
+
+## 验收
+
+```bash
+go build ./... && go vet ./... && go test ./pkg/...
+```

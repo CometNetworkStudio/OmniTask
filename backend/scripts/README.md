@@ -1,11 +1,8 @@
-# `/scripts`
+# backend/scripts
 
-Scripts to perform various build, install, analysis, etc operations.
+Nunu 脚手架留下的占位目录。
 
-These scripts keep the root level Makefile small and simple.
+平台脚本**不在本仓库**：运行期脚本存放在仓库根目录 `scripts/<id>/`（已 gitignore），
+由管理员在 OmniTask「脚本」页从 GitHub 安装，或手动放入。
 
-Examples:
-
-* https://github.com/kubernetes/helm/tree/master/scripts
-* https://github.com/cockroachdb/cockroach/tree/master/scripts
-* https://github.com/hashicorp/terraform/tree/master/scripts
+规范见：`docs/script-protocol.md`；开发与接入见：`docs/integration-guide.md`。

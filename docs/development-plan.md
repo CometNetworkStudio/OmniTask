@@ -302,3 +302,9 @@ AES-256-GCM，`OMNITASK_MASTER_KEY`（32 字节，hex/base64）来源 env；随�
 - `scripts` 注册表（迁移 000002）、`ScriptService`（下载 zip + 解压 + 校验 runtime + 注册）、REST（`/v1/scripts` 系列，仅 admin）、前端「脚本」页。
 - 运行目录 `scripts/`（gitignore）；Host 热扫描；`README`/`integration-guide` 指向独立脚本仓库。
 - 验证：从 GitHub 安装 cidaren/welearn → Host Health 识别 → welearn 任务经安装脚本执行成功。
+
+### 9.2 lite/full 双模式（已完成）
+- `config.yaml` 统一配置（自动生成、`mode` 默认 lite、密钥明文）；lite=SQLite+无 Redis+AutoMigrate；full=MySQL+Redis+golang-migrate。
+- `pkg/config` 处理 mode/密钥/目录；`crypto.FromConfig`；`repository.NewRedis` 在 lite 返回 nil；`ProgressStore` 支持内存。
+- 验证：临时目录运行 `-conf config.yaml` → 自动生成配置与 data/logs/scripts → 注册/登录成功 → SQLite 含 `users/credentials/tasks/task_events/questions/scripts/casbin_rule`。
+- 待办：`go:embed` 前端 dist（单二进制静态托管）。
