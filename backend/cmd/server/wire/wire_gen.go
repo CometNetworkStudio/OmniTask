@@ -47,11 +47,14 @@ func NewWire(viperViper *viper.Viper, logger *log.Logger) (*app.App, func(), err
 	credentialService := service.NewCredentialService(credentialRepository, cipher, sidSid, logger)
 	credentialHandler := handler.NewCredentialHandler(credentialService, logger)
 	taskRepository := repository.NewTaskRepository(repositoryRepository)
-	taskService := service.NewTaskService(taskRepository, sidSid, logger)
+	scriptRepository := repository.NewScriptRepository(repositoryRepository)
+	taskService := service.NewTaskService(taskRepository, scriptRepository, sidSid, logger)
 	taskHandler := handler.NewTaskHandler(taskService, logger)
 	questionRepository := repository.NewQuestionRepository(repositoryRepository)
 	questionService := service.NewQuestionService(questionRepository, sidSid, logger)
 	questionHandler := handler.NewQuestionHandler(questionService, logger)
+	scriptService := service.NewScriptService(scriptRepository, viperViper, sidSid, logger)
+	scriptHandler := handler.NewScriptHandler(scriptService, logger)
 	hub := ws.NewHub()
 	client := repository.NewRedis(viperViper)
 	progressStore := service.NewProgressStore(client)
@@ -65,6 +68,7 @@ func NewWire(viperViper *viper.Viper, logger *log.Logger) (*app.App, func(), err
 		CredentialHandler: credentialHandler,
 		TaskHandler:       taskHandler,
 		QuestionHandler:   questionHandler,
+		ScriptHandler:     scriptHandler,
 		WSHandler:         wsHandler,
 	}
 	httpServer := server.NewHTTPServer(routerDeps)
@@ -79,11 +83,11 @@ func NewWire(viperViper *viper.Viper, logger *log.Logger) (*app.App, func(), err
 
 // wire.go:
 
-var repositorySet = wire.NewSet(repository.NewDB, repository.NewRedis, repository.NewRepository, repository.NewUserRepository, repository.NewCredentialRepository, repository.NewTaskRepository, repository.NewQuestionRepository)
+var repositorySet = wire.NewSet(repository.NewDB, repository.NewRedis, repository.NewRepository, repository.NewUserRepository, repository.NewCredentialRepository, repository.NewTaskRepository, repository.NewQuestionRepository, repository.NewScriptRepository)
 
-var serviceSet = wire.NewSet(sid.NewSid, jwt.NewJwt, crypto.FromEnv, authz.NewEnforcer, ws.NewHub, service.NewAuthService, service.NewCredentialService, service.NewTaskService, service.NewQuestionService, service.NewAgentClient, service.NewProgressStore, service.NewOrchestrator)
+var serviceSet = wire.NewSet(sid.NewSid, jwt.NewJwt, crypto.FromEnv, authz.NewEnforcer, ws.NewHub, service.NewAuthService, service.NewCredentialService, service.NewTaskService, service.NewQuestionService, service.NewScriptService, service.NewAgentClient, service.NewProgressStore, service.NewOrchestrator)
 
-var handlerSet = wire.NewSet(handler.NewAuthHandler, handler.NewCredentialHandler, handler.NewTaskHandler, handler.NewQuestionHandler, handler.NewWSHandler)
+var handlerSet = wire.NewSet(handler.NewAuthHandler, handler.NewCredentialHandler, handler.NewTaskHandler, handler.NewQuestionHandler, handler.NewScriptHandler, handler.NewWSHandler)
 
 // build App
 func newApp(

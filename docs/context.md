@@ -244,3 +244,12 @@ cd frontend && npm run build
 - 安装：后端接收 GitHub 链接 → 下载 zip 到 `scripts/<id>/`（预留加速源，前端拼接）；仅管理员；固定 commit。
 - 多机 Agent：**暂不做**（未来再加 `agent_id`/心跳）。
 - full/lite 双模式：待脚本化稳定后做；lite 用 `github.com/glebarez/sqlite`（纯 Go）+ 无 Redis；密钥明文入 `config.yaml`（拍板）。
+
+## 14. 脚本生态落地（2026-09）
+
+- 独立脚本仓库已发布并开源（MIT + 净室重写声明）：
+  `github.com/CometNetworkStudio/cidaren`、`github.com/CometNetworkStudio/welearn`。
+- OmniTask 新增「脚本」页（仅 admin）与注册表：`scripts` 表（迁移 000002）；后端接收 GitHub 链接/zip，下载解压到运行目录 `scripts/<id>/`（支持加速前缀，如 `https://gh-proxy.com/`）；Host **热扫描**，安装后无需重启。
+- 运行目录改为仓库根 `scripts/`（**gitignore**）；内置脚本已从主库移除，改为“安装”。
+- `task` 创建校验：内置集合 ∪ 已启用脚本。
+- 建议：加速域名用户写了 `.com` 与示例 `.org` 两个，前端都提供，按可用者选。

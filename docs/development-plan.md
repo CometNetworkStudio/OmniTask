@@ -297,3 +297,8 @@ AES-256-GCM，`OMNITASK_MASTER_KEY`（32 字节，hex/base64）来源 env；随�
 - `SupportedPlatforms` 改为读取注册表/ Host Health，而非硬编码。
 - 运行时缺失的**前端状态展示**（Host 预检结果上报）。
 - 内置 `cidaren/welearn` 拆到独立仓库并 `gitignore` 运行目录脚本。
+
+### 9.1 脚本安装/注册表（已完成）
+- `scripts` 注册表（迁移 000002）、`ScriptService`（下载 zip + 解压 + 校验 runtime + 注册）、REST（`/v1/scripts` 系列，仅 admin）、前端「脚本」页。
+- 运行目录 `scripts/`（gitignore）；Host 热扫描；`README`/`integration-guide` 指向独立脚本仓库。
+- 验证：从 GitHub 安装 cidaren/welearn → Host Health 识别 → welearn 任务经安装脚本执行成功。

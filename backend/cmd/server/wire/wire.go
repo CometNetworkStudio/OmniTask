@@ -30,6 +30,7 @@ var repositorySet = wire.NewSet(
 	repository.NewCredentialRepository,
 	repository.NewTaskRepository,
 	repository.NewQuestionRepository,
+	repository.NewScriptRepository,
 )
 
 var serviceSet = wire.NewSet(
@@ -42,6 +43,7 @@ var serviceSet = wire.NewSet(
 	service.NewCredentialService,
 	service.NewTaskService,
 	service.NewQuestionService,
+	service.NewScriptService,
 	service.NewAgentClient,
 	service.NewProgressStore,
 	service.NewOrchestrator,
@@ -52,6 +54,7 @@ var handlerSet = wire.NewSet(
 	handler.NewCredentialHandler,
 	handler.NewTaskHandler,
 	handler.NewQuestionHandler,
+	handler.NewScriptHandler,
 	handler.NewWSHandler,
 )
 

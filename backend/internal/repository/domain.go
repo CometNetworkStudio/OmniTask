@@ -2,6 +2,7 @@ package repository
 
 import (
 	"context"
+	"time"
 
 	"backend/internal/model"
 	"gorm.io/gorm"
@@ -173,4 +174,48 @@ func (repo *QuestionRepository) List(ctx context.Context, platform string, limit
 		return nil, 0, err
 	}
 	return questions, total, nil
+}
+
+type ScriptRepository struct{ r *Repository }
+
+func NewScriptRepository(r *Repository) *ScriptRepository { return &ScriptRepository{r: r} }
+
+func (repo *ScriptRepository) List(ctx context.Context) ([]model.Script, error) {
+	var scripts []model.Script
+	if err := repo.r.DB(ctx).Order("id").Find(&scripts).Error; err != nil {
+		return nil, err
+	}
+	return scripts, nil
+}
+
+func (repo *ScriptRepository) Get(ctx context.Context, id string) (*model.Script, error) {
+	var script model.Script
+	if err := repo.r.DB(ctx).Where("id = ?", id).First(&script).Error; err != nil {
+		return nil, err
+	}
+	return &script, nil
+}
+
+func (repo *ScriptRepository) Upsert(ctx context.Context, script *model.Script) error {
+	return repo.r.DB(ctx).Clauses(clause.OnConflict{
+		Columns: []clause.Column{{Name: "id"}},
+		DoUpdates: clause.AssignmentColumns([]string{
+			"name", "version", "source_url", "manifest", "enabled", "status", "updated_at",
+		}),
+	}).Create(script).Error
+}
+
+func (repo *ScriptRepository) SetEnabled(ctx context.Context, id string, enabled bool) error {
+	return repo.r.DB(ctx).Model(&model.Script{}).Where("id = ?", id).
+		Updates(map[string]interface{}{"enabled": enabled, "updated_at": time.Now()}).Error
+}
+
+func (repo *ScriptRepository) Delete(ctx context.Context, id string) error {
+	return repo.r.DB(ctx).Where("id = ?", id).Delete(&model.Script{}).Error
+}
+
+func (repo *ScriptRepository) EnabledIDs(ctx context.Context) ([]string, error) {
+	var ids []string
+	err := repo.r.DB(ctx).Model(&model.Script{}).Where("enabled = ?", true).Pluck("id", &ids).Error
+	return ids, err
 }

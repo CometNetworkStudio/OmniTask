@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+	"sync"
 	"time"
 
 	agentv1 "backend/api/agent/v1"
@@ -20,48 +21,65 @@ import (
 const Version = "agent-go/0.1.0"
 
 // Host 是 Go 脚本宿主：扫描脚本目录，按 manifest 以子进程 + stdio JSON 调用脚本，
-// 并实现 gRPC AgentService 供后端调用。
+// 并实现 gRPC AgentService 供后端调用。支持热扫描（安装后无需重启）。
 type Host struct {
 	agentv1.UnimplementedAgentServiceServer
+	mu        sync.RWMutex
 	scripts   map[string]Script
 	available map[string]bool
 	runtimes  map[string]string
-	python    string
-	sdkDir    string
-	bankAddr  string
-	logger    *log.Logger
+
+	dir      string
+	python   string
+	sdkDir   string
+	bankAddr string
+	logger   *log.Logger
 }
 
 func NewHost(conf *viper.Viper, logger *log.Logger) (*Host, error) {
-	scripts, err := LoadScripts(conf.GetString("agent.scripts_dir"))
-	if err != nil {
-		return nil, err
-	}
 	h := &Host{
 		scripts:   map[string]Script{},
 		available: map[string]bool{},
 		runtimes:  map[string]string{},
+		dir:       conf.GetString("agent.scripts_dir"),
 		python:    conf.GetString("agent.python"),
 		sdkDir:    absolute(conf.GetString("agent.pythonpath")),
 		bankAddr:  conf.GetString("agent.bank_addr"),
 		logger:    logger,
 	}
-	for _, s := range scripts {
-		h.scripts[s.Manifest.ID] = s
-		resolved, err := h.resolveRuntime(s.Manifest)
-		if err != nil {
-			logger.Warn("script runtime not found",
-				zap.String("script", s.Manifest.ID), zap.String("runtime", s.Manifest.Runtime))
-			h.available[s.Manifest.ID] = false
-			continue
-		}
-		h.runtimes[s.Manifest.ID] = resolved
-		h.available[s.Manifest.ID] = true
+	if err := os.MkdirAll(h.dir, 0o755); err != nil {
+		return nil, err
 	}
+	h.reload()
 	return h, nil
 }
 
-// resolveRuntime 返回绝对可执行路径（cmd.Dir 会改变相对路径基准）。
+func (h *Host) reload() {
+	loaded, err := LoadScripts(h.dir)
+	if err != nil {
+		h.logger.Warn("scan scripts dir failed", zap.String("dir", h.dir), zap.Error(err))
+		return
+	}
+	scripts := map[string]Script{}
+	available := map[string]bool{}
+	runtimes := map[string]string{}
+	for _, s := range loaded {
+		scripts[s.Manifest.ID] = s
+		runtimePath, err := h.resolveRuntime(s.Manifest)
+		if err != nil {
+			h.logger.Warn("script runtime not found",
+				zap.String("script", s.Manifest.ID), zap.String("runtime", s.Manifest.Runtime))
+			available[s.Manifest.ID] = false
+			continue
+		}
+		runtimes[s.Manifest.ID] = runtimePath
+		available[s.Manifest.ID] = true
+	}
+	h.mu.Lock()
+	h.scripts, h.available, h.runtimes = scripts, available, runtimes
+	h.mu.Unlock()
+}
+
 func (h *Host) resolveRuntime(m Manifest) (string, error) {
 	name := m.Runtime
 	if h.python != "" && strings.HasPrefix(name, "python") {
@@ -77,7 +95,20 @@ func (h *Host) resolveRuntime(m Manifest) (string, error) {
 	return filepath.Abs(path)
 }
 
+func (h *Host) lookup(id string) (Script, string, bool) {
+	h.mu.RLock()
+	defer h.mu.RUnlock()
+	script, ok := h.scripts[id]
+	if !ok || !h.available[id] {
+		return Script{}, "", false
+	}
+	return script, h.runtimes[id], true
+}
+
 func (h *Host) Health(ctx context.Context, req *agentv1.HealthRequest) (*agentv1.HealthResponse, error) {
+	h.reload()
+	h.mu.RLock()
+	defer h.mu.RUnlock()
 	platforms := make([]string, 0, len(h.available))
 	for id, ok := range h.available {
 		if ok {
@@ -108,17 +139,11 @@ type scriptEvent struct {
 }
 
 func (h *Host) Execute(req *agentv1.ExecuteRequest, stream agentv1.AgentService_ExecuteServer) error {
+	h.reload()
 	taskID := req.GetTaskId()
-	script, ok := h.scripts[req.GetPlatform()]
+	script, runtimePath, ok := h.lookup(req.GetPlatform())
 	if !ok {
-		return h.fail(stream, taskID, "unknown platform: "+req.GetPlatform())
-	}
-	if !h.available[script.Manifest.ID] {
-		return h.fail(stream, taskID, "runtime not available: "+script.Manifest.Runtime)
-	}
-	runtimePath := h.runtimes[script.Manifest.ID]
-	if runtimePath == "" {
-		return h.fail(stream, taskID, "runtime not resolved: "+script.Manifest.Runtime)
+		return h.fail(stream, taskID, "platform unavailable: "+req.GetPlatform())
 	}
 
 	cmd := exec.CommandContext(stream.Context(), runtimePath, append([]string{script.Manifest.Entry}, script.Manifest.Args...)...)

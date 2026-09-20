@@ -66,6 +66,11 @@ func NewHTTPServer(
 		authed.POST("/questions", deps.QuestionHandler.Save)
 		authed.GET("/questions/lookup", deps.QuestionHandler.Lookup)
 
+		authed.GET("/scripts", deps.ScriptHandler.List)
+		authed.POST("/scripts/install", deps.ScriptHandler.Install)
+		authed.POST("/scripts/:id/enable", deps.ScriptHandler.Toggle)
+		authed.DELETE("/scripts/:id", deps.ScriptHandler.Uninstall)
+
 		ws := v1Group.Group("/ws")
 		ws.Use(middleware.NoStrictAuth(deps.JWT, deps.Logger))
 		ws.GET("", deps.WSHandler.Handle)

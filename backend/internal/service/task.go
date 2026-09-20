@@ -18,17 +18,34 @@ var SupportedPlatforms = map[string]bool{"cidaren": true, "welearn": true}
 func IsPlatformSupported(platform string) bool { return SupportedPlatforms[platform] }
 
 type TaskService struct {
-	repo   *repository.TaskRepository
-	sid    *sid.Sid
-	logger *log.Logger
+	repo       *repository.TaskRepository
+	scriptRepo *repository.ScriptRepository
+	sid        *sid.Sid
+	logger     *log.Logger
 }
 
-func NewTaskService(repo *repository.TaskRepository, sid *sid.Sid, logger *log.Logger) *TaskService {
-	return &TaskService{repo: repo, sid: sid, logger: logger}
+func NewTaskService(repo *repository.TaskRepository, scriptRepo *repository.ScriptRepository, sid *sid.Sid, logger *log.Logger) *TaskService {
+	return &TaskService{repo: repo, scriptRepo: scriptRepo, sid: sid, logger: logger}
+}
+
+func (s *TaskService) allowedPlatform(ctx context.Context, platform string) bool {
+	if IsPlatformSupported(platform) {
+		return true
+	}
+	ids, err := s.scriptRepo.EnabledIDs(ctx)
+	if err != nil {
+		return false
+	}
+	for _, id := range ids {
+		if id == platform {
+			return true
+		}
+	}
+	return false
 }
 
 func (s *TaskService) Create(ctx context.Context, userID string, req *v1.TaskCreateRequest) (*v1.TaskResponse, error) {
-	if !IsPlatformSupported(req.Platform) {
+	if !s.allowedPlatform(ctx, req.Platform) {
 		return nil, v1.ErrUnsupportedPlatform
 	}
 	params, err := json.Marshal(req.Params)

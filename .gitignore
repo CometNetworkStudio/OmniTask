@@ -22,3 +22,5 @@ backend/storage/logs/
 # deploy secrets (not in repo)
 backend/config/deploy.yml
 /backend/migrate
+/scripts/
+/scripts-src/

@@ -65,3 +65,16 @@ type Question struct {
 	CreatedAt   time.Time
 	UpdatedAt   time.Time
 }
+
+// Script 是已安装的平台脚本注册表。
+type Script struct {
+	ID          string `gorm:"primaryKey;size:64"`
+	Name        string `gorm:"size:128;not null;default:''"`
+	Version     string `gorm:"size:32;not null;default:''"`
+	SourceURL   string `gorm:"size:512;not null;default:''"`
+	Manifest    string `gorm:"type:json"`
+	Enabled     bool   `gorm:"not null;default:true"`
+	Status      string `gorm:"size:32;not null;default:installed"`
+	InstalledAt time.Time
+	UpdatedAt   time.Time
+}
