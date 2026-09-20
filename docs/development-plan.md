@@ -280,3 +280,20 @@ AES-256-GCM，`OMNITASK_MASTER_KEY`（32 字节，hex/base64）来源 env；随�
 5. **WeLearn 风控**：账号无图形验证码，直接账密登录。✅
 
 > 注意：Vuetify 最新为 **4.2.1**（2026-09-09 发布，较新），而官方文档/MCP 目前主推 3.13 LTS。若 v4 遇到 API 不稳定，可回退 `npm i vuetify@3`（本项目尚未写业务 UI，回退成本低）。
+
+---
+
+## 9. 脚本插件化（方案 C：Go Host + stdio JSON，第一阶段已完成）
+
+**已完成**
+- 协议文档 `docs/script-protocol.md`（manifest + NDJSON 事件 + 运行时检测 + gRPC 映射）。
+- Go Host：`backend/internal/agenthost`（扫描脚本目录、manifest 解析、绝对路径解析、子进程 + stdio JSON 转发、事件映射），入口 `cmd/agent`，实现既有 `AgentService`，后端零改动。
+- Python 便捷运行时 `agent/runtime.py`（`serve(run_func)`）；`agent/scripts/<id>/{main.py,script.json}`。
+- 配置：`agent.{host,port,scripts_dir,python,pythonpath,bank_addr}`；`deploy.sh` 改为构建并运行 Go Host（不再跑 Python gRPC server）。
+- 验证：`Health` 返回 `['cidaren','welearn']`；`Execute(welearn, progress)` 子进程执行成功（登录→课程→完成→SUCCEEDED）。
+
+**待办（下一阶段）**
+- 脚本注册表（DB 表）+ 安装 API（GitHub zip → `scripts/<id>/`，固定 commit、加速源由前端拼接）+ 前端「脚本」页（列表/安装/启停/卸载）。
+- `SupportedPlatforms` 改为读取注册表/ Host Health，而非硬编码。
+- 运行时缺失的**前端状态展示**（Host 预检结果上报）。
+- 内置 `cidaren/welearn` 拆到独立仓库并 `gitignore` 运行目录脚本。

@@ -12,7 +12,7 @@ mkdir -p "$RUN"
 
 # 清理可能残留的进程（无 pidfile 时也能幂等）
 pkill -x omnitask-server 2>/dev/null || true
-pkill -f 'python -u grpc_server.py' 2>/dev/null || true
+pkill -x omnitask-agent 2>/dev/null || true
 
 stop_by_pidfile() {
   local f="$1"
@@ -34,6 +34,9 @@ echo "==> build backend"
 cd "$ROOT/backend"
 go build -o "$RUN/omnitask-server" ./cmd/server
 
+echo "==> build agent host"
+go build -o "$RUN/omnitask-agent" ./cmd/agent
+
 echo "==> migrate"
 set -a
 # shellcheck disable=SC1091
@@ -48,8 +51,8 @@ echo $! > "$PID_BACKEND"
 
 echo "==> restart agent"
 stop_by_pidfile "$PID_AGENT"
-cd "$ROOT/agent"
-OMNITASK_BANK_MODE=grpc setsid ./.venv/bin/python -u grpc_server.py < /dev/null > "$RUN/agent.log" 2>&1 &
+cd "$ROOT/backend"
+setsid "$RUN/omnitask-agent" -conf config/deploy.yml < /dev/null > "$RUN/agent.log" 2>&1 &
 echo $! > "$PID_AGENT"
 
 sleep 2

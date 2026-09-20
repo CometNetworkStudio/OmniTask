@@ -235,3 +235,12 @@ cd frontend && npm run build
 - **脚本插件化方向**：`manifest(script.json)` + gRPC 契约（`AgentService.Execute` 已是通用）；仅**管理员**安装、固定 commit、安装前审核；脚本独立仓库、**不入主库并 gitignore**；恶意脚本风险由使用者自辨，平台声明免责。
 - **前端规则**：MD3 圆角（`elevated`+`rounded=xl`，card `elevation=2`）、含输入对话框 `persistent`、统一 `v-snackbar-queue`（见 `AGENTS.md`）。
 - **部署**：`./deploy.sh` 一键构建+迁移+重启；公网 `https://<your-host>:4096/omnitask/`；nginx 497 回退到 HTTPS。
+
+## 13. 脚本插件化决策（2026-09）
+
+- **采用方案 C**：Go Host（`cmd/agent`，可与 backend 同构）+ 子进程脚本 + **stdio NDJSON** 协议；脚本任意语言，可独立单跑。
+- 运行时缺失（如未装 Python）→ Host 预检标记不可用并提示；接受“检测并提示用户装 Python”。
+- 脚本 manifest `script.json` 含 `runtime/entry/requires/actions/params/credentials`；规范见 `docs/script-protocol.md`。
+- 安装：后端接收 GitHub 链接 → 下载 zip 到 `scripts/<id>/`（预留加速源，前端拼接）；仅管理员；固定 commit。
+- 多机 Agent：**暂不做**（未来再加 `agent_id`/心跳）。
+- full/lite 双模式：待脚本化稳定后做；lite 用 `github.com/glebarez/sqlite`（纯 Go）+ 无 Redis；密钥明文入 `config.yaml`（拍板）。

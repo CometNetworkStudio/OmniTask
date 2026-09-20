@@ -55,17 +55,32 @@ omnitask-script-example/
 
 ## 4. runner 契约
 
-```python
-from collections.abc import Iterator
+> 完整协议（Host 与脚本的 stdio NDJSON 约定）见 **`docs/script-protocol.md`**。
+> 脚本由 Go Host 以子进程启动：Host 写一行 execute 请求到 stdin，脚本逐行输出事件 JSON 到 stdout。
 
-def run(action: str, params: dict[str, str], credentials: dict[str, str]) -> Iterator[dict]:
-    """执行一个动作，逐条 yield 进度事件；失败直接 raise。"""
+Python 作者最简方式：实现生成器 + 一行 `serve`。
+
+```python
+# runner.py
+def run(action: str, params: dict[str, str], credentials: dict[str, str]):
+    """逐条 yield 进度事件；失败直接 raise。"""
     yield {"percent": 0, "message": "开始", "result": {}}
     ...
     yield {"percent": 100, "message": "完成", "result": {"ok": "1"}}
 ```
 
-事件约定：`{"percent": int, "message": str, "result": dict|None}`。异常会被 gRPC 层转成 `FAILED` 事件。
+```python
+# main.py
+import importlib, os, sys
+_HERE = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, os.environ.get("OMNITASK_SDK") or os.path.dirname(os.path.dirname(_HERE)))
+sys.path.insert(0, os.path.dirname(_HERE))
+from runtime import serve
+run = importlib.import_module(f"{os.path.basename(_HERE)}.runner").run
+serve(run)
+```
+
+事件约定：`{"percent": int, "message": str, "result": dict|None}`。异常会被转成 `failed` 事件。
 
 **运行时提供的能力**（无需自己实现网络层）：
 
