@@ -48,14 +48,14 @@ func NewEnforcer(db *gorm.DB, logger *log.Logger) (*casbin.Enforcer, error) {
 
 func seed(e *casbin.Enforcer) error {
 	policies := [][]string{
-		{"admin", "/v1/*", "*"},
-		{"user", "/v1/credentials", "GET"},
-		{"user", "/v1/credentials", "POST"},
-		{"user", "/v1/tasks", "GET"},
-		{"user", "/v1/tasks", "POST"},
-		{"user", "/v1/tasks/:id", "GET"},
-		{"user", "/v1/questions", "GET"},
-		{"user", "/v1/questions/lookup", "GET"},
+		{"admin", "/api/v1/*", "*"},
+		{"user", "/api/v1/credentials", "GET"},
+		{"user", "/api/v1/credentials", "POST"},
+		{"user", "/api/v1/tasks", "GET"},
+		{"user", "/api/v1/tasks", "POST"},
+		{"user", "/api/v1/tasks/:id", "GET"},
+		{"user", "/api/v1/questions", "GET"},
+		{"user", "/api/v1/questions/lookup", "GET"},
 	}
 	for _, p := range policies {
 		if _, err := e.AddPolicy(p[0], p[1], p[2]); err != nil {

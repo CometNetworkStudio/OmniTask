@@ -6,7 +6,7 @@ Vue3 + JavaScript + Vite + Vuetify（MD3）+ Pinia + Vue Router + Axios。
 
 ```bash
 npm install
-npm run dev        # http://127.0.0.1:5173，/v1 代理到后端 :8080（含 WebSocket）
+npm run dev        # http://127.0.0.1:5173，/api 代理到后端 :8080（含 WebSocket）
 ```
 
 ## 构建（子路径部署）

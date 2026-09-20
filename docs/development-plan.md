@@ -114,7 +114,7 @@
 **已实现**
 - `internal/repository/domain.go`：`UserRepository` / `CredentialRepository` / `TaskRepository` / `QuestionRepository`（GORM，凭据/题库 upsert）。
 - `internal/service/{auth,credential,task,question}.go`：bcrypt+JWT 注册登录；AES-256-GCM 凭据加解密（`pkg/crypto`，密钥 `OMNITASK_MASTER_KEY`）；任务 CRUD；题库 Lookup/Save/List。
-- `internal/handler/domain.go` + `router` + `server/http.go`：`/v1/auth/register|login`、`/v1/credentials`、`/v1/tasks`、`/v1/questions(+/lookup)`；JWT 中间件保护。
+- `internal/handler/domain.go` + `router` + `server/http.go`：`/api/v1/auth/register|login`、`/api/v1/credentials`、`/api/v1/tasks`、`/api/v1/questions(+/lookup)`；JWT 中间件保护。
 - 迁移接入 5 张表；配置切到 MySQL(3380) `omnitask` + Redis(6350)；wire 重新生成。
 
 **验收记录**
@@ -131,7 +131,7 @@
 - `credential`：AES-256-GCM 加解密，密钥 `OMNITASK_MASTER_KEY`（env）；入库密文+nonce。
 - `task`：增删查、状态机。
 - `question`：Lookup/Save、去重（`platform+question_key` 唯一）。
-**handler/router**：`/v1/auth/*`、`/v1/credentials`、`/v1/tasks`、`/v1/questions`。
+**handler/router**：`/api/v1/auth/*`、`/api/v1/credentials`、`/api/v1/tasks`、`/api/v1/questions`。
 **迁移**：`cmd/migration` 接入全部模型；配置切到 MySQL(3380)+Redis(6350)，用 `backend/deploy/docker-compose`。
 
 **验收**：curl 完成注册/登录/建任务/查任务/题库增查；数据库确认凭据为密文；`make` 迁移成功。
@@ -144,7 +144,7 @@
 - `internal/service/agent.go`：Go gRPC 客户端（`grpc.NewClient`，Health / Execute server-streaming）。
 - `internal/server/bank.go`：`QuestionBank` gRPC 服务端（Go，端口 9000），Lookup/Save 直连题库。
 - `internal/service/orchestrator.go`：轮询 pending → `Claim` 原子领取 → running → 解密凭据 → 下发 Agent → 终态；事件写 Redis（`ProgressStore`）、`task_events`、WebSocket。
-- `internal/ws/hub.go` + `handler/ws.go`：`/v1/ws?task_id=` 订阅，连上先回放 Redis 快照。
+- `internal/ws/hub.go` + `handler/ws.go`：`/api/v1/ws?task_id=` 订阅，连上先回放 Redis 快照。
 - Agent：`core/bank.py` 新增 `GrpcBank`，`OMNITASK_BANK_MODE=grpc` 时经后端读写（Agent 不直连 DB）。
 - wire 接入 Redis/AgentClient/ProgressStore/Hub/Orchestrator/BankGRPCServer。
 
@@ -167,16 +167,16 @@
 ### P4 前端（已完成）
 
 **已实现**（严格遵守 `AGENTS.md` 前端 UI 规则）
-- 基础设施：Vuetify 4 + 自定义 Theme（`main.js`，颜色/圆角/默认值走 Theme）、Pinia、Vue Router（登录守卫）、Axios 封装 `api/http.js`（JWT 注入、响应解包、401 跳登录）、Vite 代理 `/v1`（含 ws）。
+- 基础设施：Vuetify 4 + 自定义 Theme（`main.js`，颜色/圆角/默认值走 Theme）、Pinia、Vue Router（登录守卫）、Axios 封装 `api/http.js`（JWT 注入、响应解包、401 跳登录）、Vite 代理 `/api`（含 ws）。
 - 分层：`api/services/{auth,credentials,tasks,questions}.js`；页面不直接使用 axios。
 - Store：`stores/auth.js`（token/用户，localStorage 持久化）、`stores/ui.js`（snackbar）。
-- 页面：登录、注册、任务列表（`v-data-table` + 新建任务对话框，参数按平台 schema 动态渲染，覆盖 `docs/parameters.md`）、任务详情（`/v1/ws` 实时进度时间线）、凭据管理（按平台动态字段）、题库（平台筛选 + 表格）。
+- 页面：登录、注册、任务列表（`v-data-table` + 新建任务对话框，参数按平台 schema 动态渲染，覆盖 `docs/parameters.md`）、任务详情（`/api/v1/ws` 实时进度时间线）、凭据管理（按平台动态字段）、题库（平台筛选 + 表格）。
 - `src/config/platforms.js`：平台/动作/参数/凭据字段 schema；`src/ws/taskSocket.js`：WebSocket 客户端。
 - 合规检查：无内联 `style=`、无 `<style>`、页面无 axios、组件无硬编码颜色。
 
 **验收记录**
 - `npm run build` 通过。
-- `npm run dev` + 后端联调：`/v1/tasks` 经 Vite 代理返回 401 `{code:401}`，代理与鉴权链路正常。
+- `npm run dev` + 后端联调：`/api/v1/tasks` 经 Vite 代理返回 401 `{code:401}`，代理与鉴权链路正常。
 
 - 页面：登录/注册、凭据管理（平台 + token/账号密码）、平台/任务类型选择、任务创建、任务详情（实时进度）、题库查看。
 - 结构：`src/api/*`、`src/stores/*`（Pinia）、`src/router/*`、`src/ws/*`。
@@ -299,7 +299,7 @@ AES-256-GCM，`OMNITASK_MASTER_KEY`（32 字节，hex/base64）来源 env；随�
 - 内置 `cidaren/welearn` 拆到独立仓库并 `gitignore` 运行目录脚本。
 
 ### 9.1 脚本安装/注册表（已完成）
-- `scripts` 注册表（迁移 000002）、`ScriptService`（下载 zip + 解压 + 校验 runtime + 注册）、REST（`/v1/scripts` 系列，仅 admin）、前端「脚本」页。
+- `scripts` 注册表（迁移 000002）、`ScriptService`（下载 zip + 解压 + 校验 runtime + 注册）、REST（`/api/v1/scripts` 系列，仅 admin）、前端「脚本」页。
 - 运行目录 `scripts/`（gitignore）；Host 热扫描；`README`/`integration-guide` 指向独立脚本仓库。
 - 验证：从 GitHub 安装 cidaren/welearn → Host Health 识别 → welearn 任务经安装脚本执行成功。
 
@@ -307,4 +307,4 @@ AES-256-GCM，`OMNITASK_MASTER_KEY`（32 字节，hex/base64）来源 env；随�
 - `config.yaml` 统一配置（自动生成、`mode` 默认 lite、密钥明文）；lite=SQLite+无 Redis+AutoMigrate；full=MySQL+Redis+golang-migrate。
 - `pkg/config` 处理 mode/密钥/目录；`crypto.FromConfig`；`repository.NewRedis` 在 lite 返回 nil；`ProgressStore` 支持内存。
 - 验证：临时目录运行 `-conf config.yaml` → 自动生成配置与 data/logs/scripts → 注册/登录成功 → SQLite 含 `users/credentials/tasks/task_events/questions/scripts/casbin_rule`。
-- 待办：`go:embed` 前端 dist（单二进制静态托管）。
+- ✅ `go:embed` 前端 dist 单二进制静态托管；API 前缀改为 `/api/v1`。

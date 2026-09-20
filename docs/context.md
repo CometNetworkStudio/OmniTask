@@ -191,8 +191,8 @@ OmniTask/
 - [x] M0：monorepo 骨架、Nunu 后端（`backend/`，8080）、Vue 前端（`frontend/`）、proto 契约、Python Agent gRPC 骨架（冒烟通过）
 - [x] M0.5：契约补全——proto `QuestionBank.Lookup/Save`、`internal/model/model.go` 冻结 5 表 schema、`.env.example` 环境变量约定（`make proto` + Go build/vet + Python import 均通过）
 - [x] M1：平台协议层（Agent）——词达人、WeLearn 无界面实现 + `run_cli.py`；单元测试通过。**已真机联调**：词达人完成 List 04（196/196，题库回写 129 条，含人类思考延迟）；WeLearn 完成课程 2416 全部 144 个 SCO（挂时长 + 提交进度两种模式）
-- [x] M2：后端领域层——User/Credential/Task/Question repository + service（bcrypt+JWT、AES-256-GCM 凭据、任务/题库）+ REST（`/v1/auth|credentials|tasks|questions`）+ GORM 迁移（MySQL 3380 / Redis 6350）；curl 验收通过，凭据确认为密文
-- [x] M3：通讯层——Go gRPC 客户端（Agent 50051）+ `QuestionBank` gRPC 服务端（9000）+ 任务编排（pending→queued→running→终态、凭据解密、Redis 进度、TaskEvent）+ WebSocket `/v1/ws`；端到端联调通过（WebSocket 实时事件、成功/失败终态、题库 gRPC 读写）
+- [x] M2：后端领域层——User/Credential/Task/Question repository + service（bcrypt+JWT、AES-256-GCM 凭据、任务/题库）+ REST（`/api/v1/auth|credentials|tasks|questions`）+ GORM 迁移（MySQL 3380 / Redis 6350）；curl 验收通过，凭据确认为密文
+- [x] M3：通讯层——Go gRPC 客户端（Agent 50051）+ `QuestionBank` gRPC 服务端（9000）+ 任务编排（pending→queued→running→终态、凭据解密、Redis 进度、TaskEvent）+ WebSocket `/api/v1/ws`；端到端联调通过（WebSocket 实时事件、成功/失败终态、题库 gRPC 读写）
 - [x] M4：前端——登录/注册、凭据管理、任务列表+参数表单创建、任务详情（WebSocket 实时进度）、题库；Vuetify 4 + 主题 + Pinia + api/service 层，严格遵循前端 UI 规则（`npm run build` 通过，Vite 代理联调通过）
 - [ ] M5：集成测试与加固
 - [ ] M6：Docker 化部署与文档
@@ -261,4 +261,4 @@ cd frontend && npm run build
 - **full**：MySQL + Redis；迁移用 golang-migrate（`cmd/migrate`）。
 - 分层切换：业务代码零改动，仅 `repository.NewDB`（驱动）与 `NewRedis`（是否连接）按 `mode` 分支。
 - 说明：golang-migrate 的 sqlite 驱动依赖 CGO，与“纯 Go”目标冲突，故 lite 采用 AutoMigrate；接受该取舍。
-- 待办：`go:embed` 前端 dist 实现真正单二进制 + 静态托管。
+- ✅ `go:embed` 前端 dist：后端单文件托管 SPA（`internal/server/static.go`），HTTP API 统一前缀 `/api/v1`，`/api/*` 未命中返回 404，其余走 SPA 回退。

@@ -1,7 +1,7 @@
 import axios from 'axios'
 
 const http = axios.create({
-  baseURL: import.meta.env.VITE_API_BASE || `${import.meta.env.BASE_URL}v1`,
+  baseURL: import.meta.env.VITE_API_BASE || `${import.meta.env.BASE_URL}api/v1`,
   timeout: 15000,
 })
 

@@ -26,9 +26,10 @@ stop_by_pidfile() {
 echo "==> build frontend (base=/omnitask/)"
 cd "$ROOT/frontend"
 VITE_BASE=/omnitask/ npm run build
-rm -rf "$WEB"
-mkdir -p "$WEB"
-cp -r dist/* "$WEB/"
+DISTDIR="$ROOT/backend/internal/server/webdist"
+mkdir -p "$DISTDIR"
+find "$DISTDIR" -mindepth 1 ! -name '.gitkeep' -delete
+cp -r dist/* "$DISTDIR/"
 
 echo "==> build backend"
 cd "$ROOT/backend"

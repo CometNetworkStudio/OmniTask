@@ -25,7 +25,7 @@ func NewHTTPServer(
 	)
 
 	// swagger doc
-	docs.SwaggerInfo.BasePath = "/v1"
+	docs.SwaggerInfo.BasePath = "/api/v1"
 	s.GET("/swagger/*any", ginSwagger.WrapHandler(
 		swaggerfiles.Handler,
 		//ginSwagger.URL(fmt.Sprintf("http://localhost:%d/swagger/doc.json", deps.Config.GetInt("app.http.port"))),
@@ -39,14 +39,14 @@ func NewHTTPServer(
 		middleware.RequestLogMiddleware(deps.Logger),
 		//middleware.SignMiddleware(log),
 	)
-	s.GET("/", func(ctx *gin.Context) {
+	s.GET("/api/health", func(ctx *gin.Context) {
 		apiV1.HandleSuccess(ctx, map[string]interface{}{
 			"name":    "OmniTask",
 			"version": "0.1.0",
 		})
 	})
 
-	v1Group := s.Group("/v1")
+	v1Group := s.Group("/api/v1")
 	{
 		auth := v1Group.Group("/auth")
 		auth.POST("/register", deps.AuthHandler.Register)
@@ -75,6 +75,8 @@ func NewHTTPServer(
 		ws.Use(middleware.NoStrictAuth(deps.JWT, deps.Logger))
 		ws.GET("", deps.WSHandler.Handle)
 	}
+
+	registerStatic(s, deps.Logger)
 
 	return s
 }
