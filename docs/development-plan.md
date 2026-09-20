@@ -289,7 +289,7 @@ AES-256-GCM，`OMNITASK_MASTER_KEY`（32 字节，hex/base64）来源 env；随�
 - 协议文档 `docs/script-protocol.md`（manifest + NDJSON 事件 + 运行时检测 + gRPC 映射）。
 - Go Host：`backend/internal/agenthost`（扫描脚本目录、manifest 解析、绝对路径解析、子进程 + stdio JSON 转发、事件映射），入口 `cmd/agent`，实现既有 `AgentService`，后端零改动。
 - Python 便捷运行时 `agent/runtime.py`（`serve(run_func)`）；`agent/scripts/<id>/{main.py,script.json}`。
-- 配置：`agent.{host,port,scripts_dir,python,pythonpath,bank_addr}`；`deploy.sh` 改为构建并运行 Go Host（不再跑 Python gRPC server）。
+- 配置：`agent.{host,port,scripts_dir,python,pythonpath,bank_addr}`；`omnitask.sh deploy` 改为构建并运行 Go Host（不再跑 Python gRPC server）。
 - 验证：`Health` 返回 `['cidaren','welearn']`；`Execute(welearn, progress)` 子进程执行成功（登录→课程→完成→SUCCEEDED）。
 
 **待办（下一阶段）**

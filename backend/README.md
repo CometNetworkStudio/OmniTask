@@ -16,7 +16,7 @@ Go + Gin + GORM + gRPC 后端：用户/凭据/任务/题库/脚本注册表与�
 
 | 入口 | 说明 |
 |------|------|
-| `cmd/server` | HTTP API（前缀 `/api/v1`）+ WebSocket + 任务编排 + `QuestionBank` gRPC；并在 `/` 托管内嵌的前端 dist（`go:embed`，构建时由 `deploy.sh` 从 `frontend/dist` 拷入 `internal/server/webdist`）|
+| `cmd/server` | HTTP API（前缀 `/api/v1`）+ WebSocket + 任务编排 + `QuestionBank` gRPC；并在 `/` 托管内嵌的前端 dist（`go:embed`，构建时由 `omnitask.sh deploy` 从 `frontend/dist` 拷入 `internal/server/webdist`）|
 | `cmd/agent` | Go 脚本 Host：扫描脚本目录，以子进程 + stdio JSON 运行平台脚本 |
 | `cmd/migrate` | 数据库迁移（golang-migrate，full 模式） |
 

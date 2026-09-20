@@ -91,9 +91,11 @@ go run ./cmd/agent  -conf config/deploy.yml
 
 运行后是数字菜单：部署、构建后端 server / Host agent / 迁移工具（可选 **linux-amd64 / windows-amd64 / 两者**）、构建前端。产物输出到 `build/`（已 gitignore），命名如 `omnitask-server-linux-amd64`、`omnitask-server-windows-amd64.exe`。
 
-`deploy.sh` 是 Linux 部署实现（构建前端并内嵌 → 编译 → 迁移 → 重启），由菜单选项「部署」调用，也可单独执行。
+部署：菜单选项「部署」或非交互 `./omnitask.sh deploy`（构建前端并内嵌 → 编译 → 迁移 → 重启）。
 
 `Makefile` 仅为开发辅助（非构建必需）：`make proto` 需 `protoc` + `protoc-gen-go`/`protoc-gen-go-grpc` + `agent/.venv`(grpc_tools)；`make backend-run` 需 Nunu CLI；`make agent-test`/`frontend-dev` 分别需 Python venv / npm。
+
+三个程序的职责、工作流程与构建参数详见 **[docs/build-and-run.md](docs/build-and-run.md)**。
 
 ## 脚本生态：开发与接入
 

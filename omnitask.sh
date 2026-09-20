@@ -1,14 +1,25 @@
 #!/usr/bin/env bash
 # OmniTask 引导式工具箱（Linux/macOS）
-# 用法：./omnitask.sh  然后按提示输入选项
+# 用法：
+#   ./omnitask.sh                     # 进入数字菜单
+#   ./omnitask.sh deploy              # 非交互：部署（=旧 deploy.sh）
+#   ./omnitask.sh server|agent|migrate [linux|windows|both]
+#   ./omnitask.sh frontend [base]     # base 默认 /
+#   ./omnitask.sh all [linux|windows|both]
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 BUILD="$ROOT/build"
 WEB="$ROOT/backend/internal/server/webdist"
+RUN="${OMNITASK_RUN:-/tmp/opencode}"
+PID_BACKEND="$RUN/omnitask-backend.pid"
+PID_AGENT="$RUN/omnitask-agent.pid"
+GOCMD=(go build -trimpath -ldflags "-s -w")   # -s -w 去掉符号表/调试信息，减小体积
+mkdir -p "$BUILD" "$RUN"
 
+# build_frontend [base]
 build_frontend() {
-  local base="${VITE_BASE:-/}"
+  local base="${1:-${VITE_BASE:-/}}"
   echo "==> 构建前端 (base=$base)"
   ( cd "$ROOT/frontend" && VITE_BASE="$base" npm run build )
   mkdir -p "$WEB"
@@ -18,31 +29,33 @@ build_frontend() {
 
 # build_go <server|agent|migrate> <linux|windows|both>
 build_go() {
-  local cmd="$1" target="$2"
-  local name="$cmd"
-  local out
+  local cmd="$1" target="$2" out
   case "$cmd" in
     server) out="omnitask-server" ;;
     agent) out="omnitask-agent" ;;
     migrate) out="omnitask-migrate" ;;
     *) echo "未知命令: $cmd"; return 1 ;;
   esac
-  mkdir -p "$BUILD"
   ( cd "$ROOT/backend"
     case "$target" in
       linux)
         echo "==> 编译 $out (linux/amd64)"
-        CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath -o "$BUILD/${out}-linux-amd64" "./cmd/${cmd}" ;;
+        CGO_ENABLED=0 GOOS=linux GOARCH=amd64 "${GOCMD[@]}" -o "$BUILD/${out}-linux-amd64" "./cmd/${cmd}" ;;
       windows)
         echo "==> 编译 $out (windows/amd64)"
-        CGO_ENABLED=0 GOOS=windows GOARCH=amd64 go build -trimpath -o "$BUILD/${out}-windows-amd64.exe" "./cmd/${cmd}" ;;
+        CGO_ENABLED=0 GOOS=windows GOARCH=amd64 "${GOCMD[@]}" -o "$BUILD/${out}-windows-amd64.exe" "./cmd/${cmd}" ;;
       both)
-        CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath -o "$BUILD/${out}-linux-amd64" "./cmd/${cmd}"
-        CGO_ENABLED=0 GOOS=windows GOARCH=amd64 go build -trimpath -o "$BUILD/${out}-windows-amd64.exe" "./cmd/${cmd}"
+        CGO_ENABLED=0 GOOS=linux GOARCH=amd64 "${GOCMD[@]}" -o "$BUILD/${out}-linux-amd64" "./cmd/${cmd}"
+        CGO_ENABLED=0 GOOS=windows GOARCH=amd64 "${GOCMD[@]}" -o "$BUILD/${out}-windows-amd64.exe" "./cmd/${cmd}"
         echo "==> 编译 $out (linux+windows/amd64) 完成" ;;
       *) echo "未知目标: $target"; return 1 ;;
     esac
   )
+}
+
+# 当前系统原生编译到指定路径
+build_native() {
+  ( cd "$ROOT/backend" && "${GOCMD[@]}" -o "$2" "./cmd/$1" )
 }
 
 ask_target() {
@@ -70,10 +83,48 @@ build_all() {
   ls -1 "$BUILD"
 }
 
+stop_by_pidfile() {
+  local f="$1"
+  if [ -f "$f" ]; then
+    kill "$(cat "$f")" 2>/dev/null || true
+    sleep 1
+    rm -f "$f"
+  fi
+}
+
+# 部署：构建前端(base=/omnitask/) + 后端/Host(原生) + 迁移 + 重启
+deploy() {
+  echo "==> 部署"
+  build_frontend /omnitask/
+  echo "==> 编译 backend / agent（原生）"
+  build_native server "$RUN/omnitask-server"
+  build_native agent "$RUN/omnitask-agent"
+
+  echo "==> 迁移"
+  set -a
+  # shellcheck disable=SC1091
+  . "$ROOT/.env"
+  set +a
+  ( cd "$ROOT/backend" && go run ./cmd/migrate -conf config/deploy.yml )
+
+  echo "==> 重启 backend"
+  stop_by_pidfile "$PID_BACKEND"
+  setsid "$RUN/omnitask-server" -conf config/deploy.yml < /dev/null > "$RUN/backend.log" 2>&1 &
+  echo $! > "$PID_BACKEND"
+
+  echo "==> 重启 agent"
+  stop_by_pidfile "$PID_AGENT"
+  setsid "$RUN/omnitask-agent" -conf config/deploy.yml < /dev/null > "$RUN/agent.log" 2>&1 &
+  echo $! > "$PID_AGENT"
+
+  sleep 2
+  echo "==> 完成"
+}
+
 menu() {
   echo
   echo "================ OmniTask 工具箱 ================"
-  echo " 1) 部署（构建前端+后端+Host，迁移，重启）[Linux]"
+  echo " 1) 部署（构建前端+后端+Host，迁移，重启）"
   echo " 2) 构建后端 server（选择目标平台）"
   echo " 3) 构建脚本 Host agent（选择目标平台）"
   echo " 4) 构建迁移工具 migrate（选择目标平台）"
@@ -83,11 +134,26 @@ menu() {
   echo "================================================="
 }
 
+# 非交互模式
+if [ -n "${1:-}" ]; then
+  case "$1" in
+    deploy) deploy ;;
+    server) build_go server "${2:-linux}" ;;
+    agent) build_go agent "${2:-linux}" ;;
+    migrate) build_go migrate "${2:-linux}" ;;
+    frontend) build_frontend "${2:-}" ;;
+    all) build_all "${2:-both}" ;;
+    *) echo "未知命令: $1"; exit 1 ;;
+  esac
+  exit 0
+fi
+
+# 交互菜单
 while true; do
   menu
   read -r -p "请输入选项数字: " choice
   case "${choice:-}" in
-    1) "$ROOT/deploy.sh" ;;
+    1) deploy ;;
     2) build_go server "$(ask_target)" ;;
     3) build_go agent "$(ask_target)" ;;
     4) build_go migrate "$(ask_target)" ;;

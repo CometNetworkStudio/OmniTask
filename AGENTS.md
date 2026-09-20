@@ -21,4 +21,4 @@
 - 脚本：平台脚本**不在本仓库**，作为独立项目经 Host 以子进程 + stdio JSON 运行；协议见 `docs/script-protocol.md`，接入见 `docs/integration-guide.md`。Host 为 Go（`cmd/agent`）。
 - 密钥/凭据永不入库明文、永不提交到仓库（lite 的 `config.yaml` 除外，它由用户本机生成且 gitignore）。
 - 重要决策与进展回写 `docs/context.md` / `docs/development-plan.md`。
-- 每次对话结束用 `./deploy.sh` 重新部署到 `https://<your-host>:4096/omnitask/` 供查看。
+- 每次对话结束用 `./omnitask.sh deploy` 重新部署到 `https://<your-host>:4096/omnitask/` 供查看。

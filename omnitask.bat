@@ -56,12 +56,12 @@ goto bg_linux
 :bg_linux
 set "GOOS=linux"
 echo ==^> 编译 omnitask-%GOCMD% (linux/amd64)
-go build -trimpath -o "%BUILD%\omnitask-%GOCMD%-linux-amd64" ".\cmd\%GOCMD%"
+go build -trimpath -ldflags="-s -w" -o "%BUILD%\omnitask-%GOCMD%-linux-amd64" ".\cmd\%GOCMD%"
 if not "%GT%"=="both" goto bg_done
 :bg_windows
 set "GOOS=windows"
 echo ==^> 编译 omnitask-%GOCMD% (windows/amd64)
-go build -trimpath -o "%BUILD%\omnitask-%GOCMD%-windows-amd64.exe" ".\cmd\%GOCMD%"
+go build -trimpath -ldflags="-s -w" -o "%BUILD%\omnitask-%GOCMD%-windows-amd64.exe" ".\cmd\%GOCMD%"
 :bg_done
 popd
 exit /b

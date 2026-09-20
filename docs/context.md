@@ -234,7 +234,7 @@ cd frontend && npm run build
 - **README**：根目录改为面向 GitHub 的展示型 README；原上下文存档移至 `docs/context.md`；接入文档 `docs/integration-guide.md`。
 - **脚本插件化方向**：`manifest(script.json)` + gRPC 契约（`AgentService.Execute` 已是通用）；仅**管理员**安装、固定 commit、安装前审核；脚本独立仓库、**不入主库并 gitignore**；恶意脚本风险由使用者自辨，平台声明免责。
 - **前端规则**：MD3 圆角（`elevated`+`rounded=xl`，card `elevation=2`）、含输入对话框 `persistent`、统一 `v-snackbar-queue`（见 `AGENTS.md`）。
-- **部署**：`./deploy.sh` 一键构建+迁移+重启；公网 `https://<your-host>:4096/omnitask/`；nginx 497 回退到 HTTPS。
+- **部署**：`./omnitask.sh deploy` 一键构建+迁移+重启；公网 `https://<your-host>:4096/omnitask/`；nginx 497 回退到 HTTPS。
 
 ## 13. 脚本插件化决策（2026-09）
 
@@ -266,5 +266,5 @@ cd frontend && npm run build
 ## 16. 引导式构建脚本（2026-09）
 - 新增 `omnitask.sh`（Linux/macOS）与 `omnitask.bat`（Windows）引导式菜单：部署 / 编译 server·agent·migrate（可选 linux-amd64、windows-amd64、两者）/ 构建前端。
 - 交叉编译：`CGO_ENABLED=0 GOOS/GOARCH=amd64`（依赖全为纯 Go：glebarez/sqlite、mysql、casbin）；产物在 `build/`（gitignore）。
-- `deploy.sh` 保留为 Linux 部署实现，由菜单「部署」调用。
+- 部署逻辑已并入 `omnitask.sh`（非交互 `./omnitask.sh deploy`）与 `omnitask.bat`；`deploy.sh` 已删除。
 - Makefile 仅为开发辅助（proto 生成/nunu/测试），普通构建不需要。
