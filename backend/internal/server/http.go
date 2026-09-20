@@ -53,7 +53,10 @@ func NewHTTPServer(
 		auth.POST("/login", deps.AuthHandler.Login)
 
 		authed := v1Group.Group("")
-		authed.Use(middleware.StrictAuth(deps.JWT, deps.Logger))
+		authed.Use(
+			middleware.StrictAuth(deps.JWT, deps.Logger),
+			middleware.Authorize(deps.Casbin, deps.Logger),
+		)
 		authed.POST("/credentials", deps.CredentialHandler.Upsert)
 		authed.GET("/credentials", deps.CredentialHandler.List)
 		authed.POST("/tasks", deps.TaskHandler.Create)

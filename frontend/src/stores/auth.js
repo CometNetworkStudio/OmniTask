@@ -11,6 +11,7 @@ export const useAuthStore = defineStore('auth', {
   }),
   getters: {
     isAuthenticated: (state) => Boolean(state.token),
+    isAdmin: (state) => state.user?.role === 'admin',
     username: (state) => state.user?.username || '',
   },
   actions: {
@@ -22,7 +23,7 @@ export const useAuthStore = defineStore('auth', {
     },
     setSession(data) {
       this.token = data.token
-      this.user = { id: data.user_id, username: data.username }
+      this.user = { id: data.user_id, username: data.username, role: data.role || 'user' }
       localStorage.setItem(TOKEN_KEY, this.token)
       localStorage.setItem(USER_KEY, JSON.stringify(this.user))
     },

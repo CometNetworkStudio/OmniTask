@@ -14,6 +14,7 @@ import (
 	"backend/internal/service"
 	"backend/internal/ws"
 	"backend/pkg/app"
+	"backend/pkg/authz"
 	"backend/pkg/crypto"
 	"backend/pkg/jwt"
 	"backend/pkg/log"
@@ -29,6 +30,10 @@ import (
 func NewWire(viperViper *viper.Viper, logger *log.Logger) (*app.App, func(), error) {
 	jwtJWT := jwt.NewJwt(viperViper)
 	db := repository.NewDB(viperViper, logger)
+	enforcer, err := authz.NewEnforcer(db, logger)
+	if err != nil {
+		return nil, nil, err
+	}
 	repositoryRepository := repository.NewRepository(logger, db)
 	userRepository := repository.NewUserRepository(repositoryRepository)
 	sidSid := sid.NewSid()
@@ -55,6 +60,7 @@ func NewWire(viperViper *viper.Viper, logger *log.Logger) (*app.App, func(), err
 		Logger:            logger,
 		Config:            viperViper,
 		JWT:               jwtJWT,
+		Casbin:            enforcer,
 		AuthHandler:       authHandler,
 		CredentialHandler: credentialHandler,
 		TaskHandler:       taskHandler,
@@ -75,7 +81,7 @@ func NewWire(viperViper *viper.Viper, logger *log.Logger) (*app.App, func(), err
 
 var repositorySet = wire.NewSet(repository.NewDB, repository.NewRedis, repository.NewRepository, repository.NewUserRepository, repository.NewCredentialRepository, repository.NewTaskRepository, repository.NewQuestionRepository)
 
-var serviceSet = wire.NewSet(sid.NewSid, jwt.NewJwt, crypto.FromEnv, ws.NewHub, service.NewAuthService, service.NewCredentialService, service.NewTaskService, service.NewQuestionService, service.NewAgentClient, service.NewProgressStore, service.NewOrchestrator)
+var serviceSet = wire.NewSet(sid.NewSid, jwt.NewJwt, crypto.FromEnv, authz.NewEnforcer, ws.NewHub, service.NewAuthService, service.NewCredentialService, service.NewTaskService, service.NewQuestionService, service.NewAgentClient, service.NewProgressStore, service.NewOrchestrator)
 
 var handlerSet = wire.NewSet(handler.NewAuthHandler, handler.NewCredentialHandler, handler.NewTaskHandler, handler.NewQuestionHandler, handler.NewWSHandler)
 

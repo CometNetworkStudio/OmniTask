@@ -32,6 +32,12 @@ func (repo *UserRepository) GetByID(ctx context.Context, id string) (*model.User
 	return &user, nil
 }
 
+func (repo *UserRepository) Count(ctx context.Context) (int64, error) {
+	var total int64
+	err := repo.r.DB(ctx).Model(&model.User{}).Count(&total).Error
+	return total, err
+}
+
 type CredentialRepository struct{ r *Repository }
 
 func NewCredentialRepository(r *Repository) *CredentialRepository {

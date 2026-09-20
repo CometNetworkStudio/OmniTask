@@ -19,4 +19,5 @@ var (
 	ErrCredentialEncrypt    = newError(1007, "凭据加密失败")
 	ErrCredentialDecrypt    = newError(1008, "凭据解密失败")
 	ErrMasterKeyUnavailable = newError(1009, "主密钥未配置")
+	ErrForbidden            = newError(1010, "无权限访问")
 )

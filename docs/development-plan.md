@@ -1,6 +1,6 @@
 # OmniTask 开发规划
 
-> 本文是执行蓝图，配合根目录 `README.md`（上下文存档）与 `docs/reference-analysis.md`（平台协议事实）阅读。
+> 本文是执行蓝图，配合`docs/context.md`（上下文存档）与 `docs/reference-analysis.md`（平台协议事实）阅读。
 > 每完成一个阶段，回写本文件与 README 的 Roadmap。
 
 ---

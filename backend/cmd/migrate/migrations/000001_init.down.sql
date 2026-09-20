@@ -1,0 +1,5 @@
+DROP TABLE IF EXISTS `questions`;
+DROP TABLE IF EXISTS `task_events`;
+DROP TABLE IF EXISTS `tasks`;
+DROP TABLE IF EXISTS `credentials`;
+DROP TABLE IF EXISTS `users`;

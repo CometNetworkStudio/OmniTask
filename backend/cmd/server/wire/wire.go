@@ -11,6 +11,7 @@ import (
 	"backend/internal/service"
 	"backend/internal/ws"
 	"backend/pkg/app"
+	"backend/pkg/authz"
 	"backend/pkg/crypto"
 	"backend/pkg/jwt"
 	"backend/pkg/log"
@@ -35,6 +36,7 @@ var serviceSet = wire.NewSet(
 	sid.NewSid,
 	jwt.NewJwt,
 	crypto.FromEnv,
+	authz.NewEnforcer,
 	ws.NewHub,
 	service.NewAuthService,
 	service.NewCredentialService,

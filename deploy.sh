@@ -39,9 +39,7 @@ set -a
 # shellcheck disable=SC1091
 . "$ROOT/.env"
 set +a
-go run ./cmd/migration -conf config/deploy.yml > /dev/null 2>&1 || {
-  echo "migration failed"; exit 1;
-}
+go run ./cmd/migrate -conf config/deploy.yml
 
 echo "==> restart backend"
 stop_by_pidfile "$PID_BACKEND"

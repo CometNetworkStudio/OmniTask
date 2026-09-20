@@ -13,11 +13,17 @@ const theme = useTheme()
 const drawer = ref(true)
 const userMenu = ref(false)
 
-const navItems = [
-  { title: '任务', to: '/', icon: 'mdi-clipboard-list-outline' },
-  { title: '凭据', to: '/credentials', icon: 'mdi-key-variant' },
-  { title: '题库', to: '/questions', icon: 'mdi-database-outline' },
-]
+const navItems = computed(() => {
+  const items = [
+    { title: '任务', to: '/', icon: 'mdi-clipboard-list-outline' },
+    { title: '凭据', to: '/credentials', icon: 'mdi-key-variant' },
+    { title: '题库', to: '/questions', icon: 'mdi-database-outline' },
+  ]
+  if (auth.isAdmin) {
+    items.push({ title: '脚本', to: '/scripts', icon: 'mdi-puzzle-outline' })
+  }
+  return items
+})
 
 const avatarLetter = computed(() => (auth.username || '?').charAt(0).toUpperCase())
 const isDark = computed(() => theme.global.name.value === 'dark')

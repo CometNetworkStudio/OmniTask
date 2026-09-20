@@ -43,6 +43,9 @@ func (s *AuthService) Register(ctx context.Context, req *v1.RegisterRequest) (*v
 		return nil, err
 	}
 	user := &model.User{ID: id, Username: req.Username, PasswordHash: string(hash), Role: "user"}
+	if total, err := s.userRepo.Count(ctx); err == nil && total == 0 {
+		user.Role = "admin" // 首个注册用户为管理员
+	}
 	if err := s.userRepo.Create(ctx, user); err != nil {
 		return nil, err
 	}
@@ -65,7 +68,7 @@ func (s *AuthService) Login(ctx context.Context, req *v1.LoginRequest) (*v1.Logi
 
 func (s *AuthService) issue(user *model.User) (*v1.LoginResponse, error) {
 	expiresAt := time.Now().Add(tokenTTL)
-	token, err := s.jwt.GenToken(user.ID, expiresAt)
+	token, err := s.jwt.GenToken(user.ID, user.Role, expiresAt)
 	if err != nil {
 		return nil, err
 	}
@@ -74,5 +77,6 @@ func (s *AuthService) issue(user *model.User) (*v1.LoginResponse, error) {
 		ExpiresAt: expiresAt.Unix(),
 		UserID:    user.ID,
 		Username:  user.Username,
+		Role:      user.Role,
 	}, nil
 }

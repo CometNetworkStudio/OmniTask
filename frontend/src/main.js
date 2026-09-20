@@ -11,6 +11,9 @@ const savedTheme = localStorage.getItem('omnitask_theme')
 const systemDark = window.matchMedia('(prefers-color-scheme: dark)').matches
 
 const vuetify = createVuetify({
+  icons: {
+    defaultSet: 'mdi',
+  },
   theme: {
     defaultTheme: savedTheme || (systemDark ? 'dark' : 'light'),
     themes: {

@@ -20,5 +20,5 @@
 - 后端：Go + Gin + GORM，规划见 `docs/development-plan.md`。
 - Agent：Python，平台脚本独立实现（`docs/reference-analysis.md`）。
 - 密钥/凭据永不入库明文、永不提交到仓库。
-- 重要决策与进展回写 `README.md` / `docs/development-plan.md`。
+- 重要决策与进展回写 `docs/context.md` / `docs/development-plan.md`。
 - 每次对话结束用 `./deploy.sh` 重新部署到 `https://<your-host>:4096/omnitask/` 供查看。
