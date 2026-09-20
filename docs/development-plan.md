@@ -23,15 +23,13 @@
 
 - `backend/`：Nunu advanced，端口 8080，`go build/vet` 通过，示例代码已清理并重跑 wire。
 - `frontend/`：Vite + Vue3 + JS + Pinia/Router/Axios，`npm run build` 通过。
-- `agent/`：gRPC 服务端骨架 + `scripts/{cidaren,welearn}` + 冒烟测试通过；依赖在 `agent/.venv`。
+- `sdk/python/`：平台脚本 Python SDK（`core/`、`runtime.py`、`gen/`、`tests/`），依赖在 `sdk/python/.venv`。
 - `proto/agent/v1/agent.proto`：`AgentService.Health/Execute(server-streaming)` + `QuestionBank.Lookup/Save`。
 - `backend/internal/model/model.go`：冻结 `User/Credential/Task/TaskEvent/Question` 五张表 schema。
-- `.env.example`：约定主密钥、JWT、Agent/QuestionBank gRPC 地址、LLM、限流与本地 CLI 凭据。
-- `agent/core/`：公共层 config/events/http/ratelimit/bank/llm（P1.0，单测通过）。
-- `agent/scripts/cidaren/`：sign/jv/client/answer/runner（P1.1）。
-- `agent/scripts/welearn/`：crypto/client/runner（P1.2）。
-- `agent/run_cli.py`：本地命令行验证入口（P1.3）。
-- 文档：`README.md`、`docs/reference-analysis.md`、`docs/development-plan.md`。
+- `.env.example`：约定主密钥、JWT、Agent/QuestionBank gRPC 地址、LLM、限流与脚本凭据。
+- `sdk/python/core/`：公共层 config/events/http/ratelimit/bank/llm（单测通过）。
+- 平台脚本：已迁出为独立仓库（`CometNetworkStudio/{cidaren,welearn}`），由 Go Host 以子进程运行；旧 `run_cli.py` 已移除。
+- 文档：`README.md`、`docs/`（reference-analysis / development-plan / script-protocol / integration-guide / build-and-run 等）。
 
 ### M1 真机联调记录（凭据经 `.env` 注入，不入库）
 
@@ -77,12 +75,12 @@
 ### P1 Agent 平台协议层（最高风险；代码已实现，待真实凭据联调）
 
 **P1.0 公共层**
-- `agent/core/config.py`：读取 env/yaml（平台凭据、限流、LLM）。
-- `agent/core/http.py`：会话、UA、重试、超时、Brotli、代理。
-- `agent/core/events.py`：进度事件约定（已知 `scripts/base.py` 的 runner 接口）。
-- `agent/core/ratelimit.py`：平台级信号量 + 账号串行（全可配，默认平台并发 2）。
-- `agent/core/bank.py`：题库抽象接口；P1 用**本地 SQLite/JSON 适配器**独立验证，P3 替换为 gRPC 适配器。
-- `agent/core/llm.py`：OpenAI 兼容客户端（`base_url/api_key/model` 可配），仅词达人使用。
+- `sdk/python/core/config.py`：读取 env/yaml（平台凭据、限流、LLM）。
+- `sdk/python/core/http.py`：会话、UA、重试、超时、Brotli、代理。
+- `sdk/python/core/events.py`：进度事件约定（已知 `scripts/base.py` 的 runner 接口）。
+- `sdk/python/core/ratelimit.py`：平台级信号量 + 账号串行（全可配，默认平台并发 2）。
+- `sdk/python/core/bank.py`：题库抽象接口；P1 用**本地 SQLite/JSON 适配器**独立验证，P3 替换为 gRPC 适配器。
+- `sdk/python/core/llm.py`：OpenAI 兼容客户端（`base_url/api_key/model` 可配），仅词达人使用。
 
 **P1.1 词达人（`scripts/cidaren/`）**
 - 协议层：`sign = md5(按序参数 & 连接 + "ajfajfamsnfaflfasakljdlalkflak")`；响应 `jv` 混淆 + base64 解码（`JV_TWO/JV_THREE`）。
@@ -100,7 +98,7 @@
 - 两种动作：刷时长（按配置时长 + 每 60s keepalive）、提交进度。
 
 **P1.3 本地验证**
-- 新增 `agent/run_cli.py`：`python run_cli.py --platform cidaren --action study`，从 env 读 token/账号。
+- （历史）曾用 `agent/run_cli.py` 本地验证；该入口已移除，改用脚本自带 CLI 与 Go Host。
 - **当前无可用 token**：先用脱敏样本写单元测试（签名、jv 解码、答题分支）；拿到 token 后再跑真实取题/判分/回写。
 
 **验收**：命令行独立完成词达人与 WeLearn 各一次任务；题库有新增记录；不依赖 Go 后端。（真实 token 到位前，以单测 + 脱敏回放通过为阶段验收）
@@ -288,7 +286,7 @@ AES-256-GCM，`OMNITASK_MASTER_KEY`（32 字节，hex/base64）来源 env；随�
 **已完成**
 - 协议文档 `docs/script-protocol.md`（manifest + NDJSON 事件 + 运行时检测 + gRPC 映射）。
 - Go Host：`backend/internal/agenthost`（扫描脚本目录、manifest 解析、绝对路径解析、子进程 + stdio JSON 转发、事件映射），入口 `cmd/agent`，实现既有 `AgentService`，后端零改动。
-- Python 便捷运行时 `agent/runtime.py`（`serve(run_func)`）；`agent/scripts/<id>/{main.py,script.json}`。
+- Python 便捷运行时 `sdk/python/runtime.py`（`serve(run_func)`）；`agent/scripts/<id>/{main.py,script.json}`。
 - 配置：`agent.{host,port,scripts_dir,python,pythonpath,bank_addr}`；`omnitask.sh deploy` 改为构建并运行 Go Host（不再跑 Python gRPC server）。
 - 验证：`Health` 返回 `['cidaren','welearn']`；`Execute(welearn, progress)` 子进程执行成功（登录→课程→完成→SUCCEEDED）。
 

@@ -93,7 +93,7 @@ go run ./cmd/agent  -conf config/deploy.yml
 
 部署：菜单选项「部署」或非交互 `./omnitask.sh deploy`（构建前端并内嵌 → 编译 → 迁移 → 重启）。
 
-`Makefile` 仅为开发辅助（非构建必需）：`make proto` 需 `protoc` + `protoc-gen-go`/`protoc-gen-go-grpc` + `agent/.venv`(grpc_tools)；`make backend-run` 需 Nunu CLI；`make agent-test`/`frontend-dev` 分别需 Python venv / npm。
+`Makefile` 仅为开发辅助（非构建必需）：`make proto` 需 `protoc` + `protoc-gen-go`/`protoc-gen-go-grpc` + `sdk/python/.venv`(grpc_tools)；`make backend-run` 需 Nunu CLI；`make sdk-test`/`frontend-dev` 分别需 Python venv / npm。
 
 三个程序的职责、工作流程与构建参数详见 **[docs/build-and-run.md](docs/build-and-run.md)**。
 

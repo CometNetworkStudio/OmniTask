@@ -10,7 +10,7 @@ OmniTask 后端编译后会生成三个程序（可按需只编译其中一个�
 | **omnitask-agent** | `backend/cmd/agent/main.go` | 脚本 Host：扫描脚本目录，按 `script.json` 以**子进程 + stdio JSON** 运行平台脚本（实现在 `backend/internal/agenthost`），对后端暴露 gRPC `AgentService` |
 | **omnitask-migrate** | `backend/cmd/migrate/main.go` | 数据库迁移（golang-migrate，SQL 在 `backend/cmd/migrate/migrations`），**full 模式**使用 |
 
-> 注意：产物里的 `omnitask-agent-windows-amd64.exe` 就是上表的 Host，编译自 **`backend/cmd/agent`** 目录，入口是 **`backend/cmd/agent/main.go`**；它**不是**仓库根目录的 `agent/`。
+> 注意：产物里的 `omnitask-agent-windows-amd64.exe` 就是上表的 Host，编译自 **`backend/cmd/agent`** 目录，入口是 **`backend/cmd/agent/main.go`**；它**不是**仓库根目录的 `sdk/python/`（那是 Python 脚本 SDK）。
 
 ## 2. 工作流程（简化）
 

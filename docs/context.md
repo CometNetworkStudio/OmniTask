@@ -31,10 +31,10 @@
 | 前端 | Vue3 + **JavaScript（非 TS）** + Vite + Pinia + Vue Router + Axios | |
 | 后端 | Go + Gin + MySQL + Redis + GORM/gen | 脚手架 Nunu |
 | 首批平台 | **词达人、WeLearn** | 后续扩展学习通等 |
-| 仓库布局 | **Nunu advanced 作 `backend/`**，根目录另建 `frontend/`、`agent/`、`proto/` | 不采用 Nunu monorepo（其前端为 TS） |
+| 仓库布局 | **Nunu advanced 作 `backend/`**，根目录另建 `frontend/`、`sdk/python/`、`proto/` | 不采用 Nunu monorepo（其前端为 TS） |
 | 前端脚手架 | **Vite `vue` 模板（纯 JS）** + Pinia + Vue Router + Axios | 忽略 Nunu 自带 web（TS） |
-| 工具链版本 | Go 1.27.1 / Node 22.20.0 / Python 3.12 | Agent 用 `agent/.venv` |
-| proto 生成 | `make proto`（Go→`backend/api/agent/v1`，Py→`agent/gen`），产物 gitignore | |
+| 工具链版本 | Go 1.27.1 / Node 22.20.0 / Python 3.12 | Agent 用 `sdk/python/.venv` |
+| proto 生成 | `make proto`（Go→`backend/api/agent/v1`，Py→`sdk/python/gen`），产物 gitignore | |
 | 词达人凭据 | **仅接受 Token**（原项目无密码登录，靠 mitmproxy 抓取） | 见 `docs/reference-analysis.md` |
 | 词达人答题 | **题库 → LLM → SkipAnswer**；`VerifyAnswer.answer_corrects` 权威回写题库 | 源码核对：`answer_tag` 是提交码，非正确标记（原设想已修正） |
 | 开发期存储 | **Docker MySQL(3380) + Redis(6350)** | 复用 Nunu compose，避开系统端口 |
@@ -113,36 +113,32 @@
 
 ```
 OmniTask/
-├── README.md              # 本文件（上下文存档）
-├── Makefile               # make proto / agent-test / backend-run / frontend-dev
-├── .gitignore
-├── proto/                 # protobuf 定义（Go 与 Python 共享的唯一契约）
-│   └── agent/v1/agent.proto
-├── backend/               # Go 后端（Nunu advanced 模板，module = backend）
+├── README.md
+├── AGENTS.md              # 项目规则（含前端 UI 规则）
+├── Makefile               # make proto / sdk-test / backend-run / frontend-dev
+├── omnitask.sh/.bat       # 引导式工具箱（部署 / 交叉编译）
+├── .env.example           # 环境变量模板（.env 为本机实际值，gitignore）
+├── proto/agent/v1/agent.proto   # gRPC 契约
+├── backend/               # Go 后端（Nunu，module=backend）
 │   ├── api/agent/v1/      # protoc 生成，gitignore，make proto 重建
-│   ├── cmd/{server,migration,task}/
-│   ├── config/            # 默认 SQLite（local.yml），MySQL/Redis 配置预留
-│   ├── internal/{handler,service,repository,model,middleware,server,job,task,router}/
-│   ├── pkg/               # 含 pkg/server/grpc
-│   ├── deploy/            # Dockerfile / docker-compose
-│   └── storage/           # 运行期数据（gitignore）
-├── frontend/              # Vue3 + JS + Vite + Pinia + Router + Axios
-│   └── src/{router,api,views}/
-├── agent/                 # Python Agent
-│   ├── grpc_server.py     # gRPC 服务端（实现 AgentService）
-│   ├── scripts/           # 各平台脚本（净室重写）
-│   │   ├── base.py        # runner 接口约定
-│   │   ├── cidaren/       # 词达人（M3）
-│   │   └── welearn/       # WeLearn（M4）
+│   ├── cmd/{server,agent,migrate}/   # 主服务 / 脚本 Host / 迁移
+│   ├── config/{local.yml, deploy.yml(gitignore), prod.yml(遗留)}
+│   ├── internal/{agenthost,handler,middleware,model,repository,service,router,server,ws}/
+│   ├── pkg/{config,crypto,authz,jwt,sid,log,server,...}/
+│   └── deploy/docker-compose/   # MySQL/Redis（full）
+├── frontend/              # Vue3 + Vuetify(MD3) + Pinia + Router + Axios
+│   └── src/{router,api,views,stores,config,ws}/
+├── sdk/python/            # 平台脚本 Python SDK
+│   ├── core/              # http/ratelimit/bank/config/llm/params/events
+│   ├── runtime.py         # stdio JSON 运行时（serve）
 │   ├── gen/agent/v1/      # protoc 生成，gitignore
-│   ├── test_smoke.py      # gRPC 冒烟自检
-│   └── requirements.txt
+│   └── tests/
+├── scripts/<id>/          # 已安装脚本（gitignore）
+├── build/                 # 交叉编译产物（gitignore）
 └── docs/
-    ├── reference-analysis.md   # 参考项目行为/接口分析（净室依据）
-    └── development-plan.md     # 开发规划：阶段/任务/验收/风险
 ```
 
-> 说明：脚本与后端同处一个工作区（monorepo），通过 `proto/` 契约通信。
+> 说明：平台脚本为**独立项目**（`CometNetworkStudio/{cidaren,welearn}`），由 Go Host 以子进程运行；`sdk/python/` 是其共享 SDK 源头。
 
 ---
 
@@ -201,7 +197,7 @@ OmniTask/
 
 ```bash
 make proto          # 生成 Go/Python proto 代码（产物已 gitignore）
-make agent-test     # Python Agent gRPC 冒烟测试
+make sdk-test     # Python Agent gRPC 冒烟测试
 cd backend && go build ./... && go vet ./...
 cd frontend && npm run build
 ```
@@ -215,9 +211,9 @@ cd frontend && npm run build
 - **密钥/凭据永不入库明文、永不提交到仓库**。
 - **无注释除非必要**；命名与现有代码风格保持一致。
 - 每次重要改动后更新本 README 的 Decision Log 与 Roadmap。
-- 提交前运行：`make agent-test`、`cd backend && go build ./...`、`cd frontend && npm run build`；改 proto 后先 `make proto`。
-- proto 生成产物（`backend/api/agent/`、`agent/gen/`）不入库，由 `make proto` 重建。
-- Agent 依赖装在 `agent/.venv`，不污染系统 Python。
+- 提交前运行：`make sdk-test`、`cd backend && go build ./...`、`cd frontend && npm run build`；改 proto 后先 `make proto`。
+- proto 生成产物（`backend/api/agent/`、`sdk/python/gen/`）不入库，由 `make proto` 重建。
+- Agent 依赖装在 `sdk/python/.venv`，不污染系统 Python。
 
 ---
 
@@ -268,3 +264,10 @@ cd frontend && npm run build
 - 交叉编译：`CGO_ENABLED=0 GOOS/GOARCH=amd64`（依赖全为纯 Go：glebarez/sqlite、mysql、casbin）；产物在 `build/`（gitignore）。
 - 部署逻辑已并入 `omnitask.sh`（非交互 `./omnitask.sh deploy`）与 `omnitask.bat`；`deploy.sh` 已删除。
 - Makefile 仅为开发辅助（proto 生成/nunu/测试），普通构建不需要。
+
+## 17. 目录更名（2026-09）
+- 根目录 `agent/` → `sdk/python/`：定位为「Python 脚本 SDK 源头（core/runtime/gen/tests）」。
+- 删除历史遗留 `grpc_server.py`（旧 Python gRPC Agent）与 `test_smoke.py`；Host 已由 Go 实现（`backend/cmd/agent` + `backend/internal/agenthost`）。
+- `Makefile`：`proto-py` 输出到 `sdk/python/gen`；`agent-test` 更名为 `sdk-test`。
+- 配置：Host `agent.pythonpath` 默认 `sdk/python`；`local.yml`/`deploy.yml` 同步。
+- 新增 `sdk/python/README.md`（SDK 用法与接入）。

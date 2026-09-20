@@ -13,7 +13,7 @@ agent:
   port: 50051
   scripts_dir: ../scripts
   python: ../agent/.venv/bin/python
-  pythonpath: ../agent
+  pythonpath: ../sdk/python
   bank_addr: 127.0.0.1:9000
 security:
   api_sign:

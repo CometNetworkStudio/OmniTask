@@ -27,7 +27,7 @@ agent:
   port: 50051
   scripts_dir: scripts
   python: python3
-  pythonpath: agent
+  pythonpath: sdk/python
   bank_addr: 127.0.0.1:9000
 security:
   jwt:

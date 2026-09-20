@@ -109,7 +109,7 @@
 
 ## 三、对 Agent 架构的映射
 
-- 每个平台一个 `agent/scripts/<platform>/runner.py`，实现 `run(action, params, credentials)` 生成器（见 `agent/scripts/base.py`）。
+- 每个平台一个独立脚本项目，实现 `run(action, params, credentials)` 生成器；共享 SDK 见 `sdk/python/`。
 - 凭据：
   - WeLearn：`{"username": ..., "password": ...}`
   - 词达人：`{"token": ...}`

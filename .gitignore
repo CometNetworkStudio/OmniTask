@@ -1,9 +1,9 @@
 # generated protobuf (run: make proto)
 /backend/api/agent/
-/agent/gen/
+/sdk/python/gen/
 
 # python
-agent/.venv/
+sdk/python/.venv/
 __pycache__/
 *.pyc
 
