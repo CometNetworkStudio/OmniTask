@@ -15,7 +15,7 @@ import (
 
 // OmniTask Agent Host：Go 脚本宿主，以子进程 + stdio JSON 运行平台脚本。
 func main() {
-	var envConf = flag.String("conf", "config/deploy.yml", "config path, eg: -conf ./config/deploy.yml")
+	var envConf = flag.String("conf", "config.yaml", "config path, eg: -conf ./config.yaml")
 	flag.Parse()
 	conf := config.NewConfig(*envConf)
 	logger := log.NewLog(conf)

@@ -17,7 +17,7 @@ import (
 var migrationsFS embed.FS
 
 func main() {
-	var envConf = flag.String("conf", "config/deploy.yml", "config path, eg: -conf ./config/deploy.yml")
+	var envConf = flag.String("conf", "config.yaml", "config path, eg: -conf ./config.yaml")
 	var down = flag.Bool("down", false, "rollback one step")
 	flag.Parse()
 
