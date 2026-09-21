@@ -4,6 +4,8 @@ import "time"
 
 type ScriptInstallRequest struct {
 	URL string `json:"url" binding:"required"`
+	// Ref 可选：分支/标签/commit。为空则默认分支 main。
+	Ref string `json:"ref"`
 }
 
 type ScriptToggleRequest struct {

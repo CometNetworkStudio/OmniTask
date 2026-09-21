@@ -106,8 +106,10 @@ func (h *TaskHandler) Create(ctx *gin.Context) {
 
 func (h *TaskHandler) List(ctx *gin.Context) {
 	page, _ := strconv.Atoi(ctx.DefaultQuery("page", "1"))
-	size, _ := strconv.Atoi(ctx.DefaultQuery("size", "20"))
-	list, total, err := h.svc.List(ctx, GetUserIdFromCtx(ctx), page, size)
+	size, _ := strconv.Atoi(ctx.DefaultQuery("size", "0"))
+	status := ctx.Query("status")
+	platform := ctx.Query("platform")
+	list, total, err := h.svc.List(ctx, GetUserIdFromCtx(ctx), status, platform, page, size)
 	if err != nil {
 		v1.HandleError(ctx, statusFor(err), err, nil)
 		return

@@ -126,9 +126,9 @@ func (s *TaskService) Delete(ctx context.Context, userID, id string) error {
 	return s.repo.DeleteEvents(ctx, id)
 }
 
-func (s *TaskService) List(ctx context.Context, userID string, page, size int) ([]v1.TaskResponse, int64, error) {
+func (s *TaskService) List(ctx context.Context, userID, status, platform string, page, size int) ([]v1.TaskResponse, int64, error) {
 	page, size = normalizePage(s.conf, page, size)
-	tasks, total, err := s.repo.ListByUser(ctx, userID, size, (page-1)*size)
+	tasks, total, err := s.repo.ListByUser(ctx, userID, status, platform, size, (page-1)*size)
 	if err != nil {
 		return nil, 0, err
 	}

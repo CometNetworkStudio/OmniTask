@@ -28,7 +28,7 @@ watch(
 const navGroups = computed(() => {
   const groups = [
     {
-      title: '任务',
+      title: '概览',
       items: [
         { title: '任务', to: '/', icon: 'mdi-clipboard-list-outline' },
         { title: '凭据', to: '/credentials', icon: 'mdi-key-variant' },
@@ -48,6 +48,15 @@ const navGroups = computed(() => {
   return groups
 })
 
+const PAGE_TITLES = {
+  tasks: '任务',
+  'task-detail': '任务详情',
+  credentials: '凭据',
+  questions: '题库',
+  scripts: '脚本',
+  users: '用户',
+}
+const currentTitle = computed(() => PAGE_TITLES[route.name] || 'OmniTask')
 const avatarLetter = computed(() => (auth.username || '?').charAt(0).toUpperCase())
 const isDark = computed(() => theme.global.name.value === 'dark')
 
@@ -79,57 +88,72 @@ onMounted(() => {
 <template>
   <v-app>
     <template v-if="auth.isAuthenticated">
-      <v-navigation-drawer v-model="drawer" :temporary="mobile">
-        <v-list nav>
-          <v-list-item
-            title="OmniTask"
-            subtitle="万务通"
-            prepend-icon="mdi-auto-fix"
-            class="text-primary"
-          />
-          <template v-for="(group, gi) in navGroups" :key="group.title">
-            <v-divider v-if="gi > 0" class="my-2" />
-            <v-list-subheader>{{ group.title }}</v-list-subheader>
-            <v-list-item
-              v-for="item in group.items"
-              :key="item.to"
-              :to="item.to"
-              :prepend-icon="item.icon"
-              :title="item.title"
-              color="primary"
-            />
-          </template>
-        </v-list>
+      <v-navigation-drawer
+        v-model="drawer"
+        :temporary="mobile"
+        :permanent="!mobile"
+        width="280"
+        color="surface"
+        class="app-drawer"
+      >
+        <div class="drawer-scroll overflow-y-auto hide-scrollbar">
+          <v-list nav bg-color="transparent" class="px-2 pt-3 app-drawer__nav">
+            <template v-for="(group, gi) in navGroups" :key="group.title">
+              <v-divider v-if="gi > 0" class="my-2" />
+              <v-list-subheader class="text-caption text-medium-emphasis px-3">
+                {{ group.title }}
+              </v-list-subheader>
+              <v-list-item
+                v-for="item in group.items"
+                :key="item.to"
+                :to="item.to"
+                :prepend-icon="item.icon"
+                :title="item.title"
+                :value="item.to"
+                color="primary"
+                rounded="xl"
+              />
+            </template>
+          </v-list>
+
+          <div class="drawer-legal-spacer" aria-hidden="true" />
+
+          <div class="px-4 pb-8 pt-4 text-caption text-medium-emphasis drawer-legal">
+            <div>© CometNetworkStudio</div>
+          </div>
+        </div>
 
         <template #append>
           <v-divider />
-          <v-list density="compact">
+          <v-list nav bg-color="transparent" class="px-2 py-2 flex-shrink-0 app-drawer__nav">
             <v-list-item
-              :title="auth.username"
-              subtitle="当前账号"
-              prepend-icon="mdi-account-circle-outline"
+              :prepend-icon="isDark ? 'mdi-weather-sunny' : 'mdi-weather-night'"
+              :title="isDark ? '浅色模式' : '深色模式'"
+              color="primary"
+              rounded="xl"
+              @click="toggleTheme"
+            />
+            <v-list-item
+              prepend-icon="mdi-logout"
+              title="退出登录"
+              color="primary"
+              rounded="xl"
+              @click="logout"
             />
           </v-list>
-          <div class="pa-3 pt-1 d-flex flex-column ga-2">
-            <v-btn block color="primary" prepend-icon="mdi-logout" @click="logout">
-              退出登录
-            </v-btn>
-            <div class="text-caption text-center text-medium-emphasis">© CometNetworkStudio</div>
-          </div>
         </template>
       </v-navigation-drawer>
 
-      <v-app-bar flat color="surface">
+      <v-app-bar flat :height="64" color="surface">
         <v-app-bar-nav-icon @click="drawer = !drawer" />
-        <v-app-bar-title>OmniTask</v-app-bar-title>
+        <v-app-bar-title class="text-body-1 font-weight-medium text-truncate">
+          {{ currentTitle }}
+        </v-app-bar-title>
         <v-spacer />
 
-        <v-btn
-          :icon="isDark ? 'mdi-weather-sunny' : 'mdi-weather-night'"
-          variant="text"
-          :title="isDark ? '切换浅色' : '切换深色'"
-          @click="toggleTheme"
-        />
+        <v-btn icon variant="text" :title="isDark ? '切换浅色' : '切换深色'" @click="toggleTheme">
+          <v-icon :icon="isDark ? 'mdi-weather-sunny' : 'mdi-weather-night'" />
+        </v-btn>
 
         <v-menu v-model="userMenu" location="bottom end">
           <template #activator="{ props }">
@@ -164,3 +188,37 @@ onMounted(() => {
     />
   </v-app>
 </template>
+
+<style scoped>
+.app-drawer :deep(.v-navigation-drawer__content) {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.drawer-scroll {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+.drawer-legal-spacer {
+  min-height: calc(100% - 16rem);
+  pointer-events: none;
+}
+
+.hide-scrollbar {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.hide-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+.app-drawer :deep(.app-drawer__nav .v-list-item),
+.app-drawer .drawer-legal {
+  cursor: default;
+  user-select: none;
+  -webkit-user-select: none;
+}
+</style>

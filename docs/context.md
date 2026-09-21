@@ -326,3 +326,12 @@ cd frontend && npm run build
 - 布局：抽屉分组导航 + append 底部账号/退出/版权；顶栏头像用 `v-btn` 包装 + `me-2` 修复裁剪；移动端临时抽屉。全程无自定义 CSS（合规）。
 - 用户禁用：登录返回 `1013 账号已被禁用`。
 - 剩余 P1（筛选、脚本页体验、systemd）见 `docs/todo.md`。
+
+## 23. P1 收尾（2026-09）
+- 任务列表筛选：`GET /tasks?status=&platform=`（后端查询参数 + 前端下拉）。
+- 脚本安装支持 `ref`（分支/标签/commit，commit 走 codeload `/zip/<sha>`）；「运行时缺失」帮助弹窗。
+- **systemd 服务化**：`deploy/systemd/{omnitask-server,omnitask-agent}.service` + `install.sh`；已在本机 enable+active，`omnitask.sh deploy` 检测到 unit 后改用 `systemctl restart`。
+- 产物与日志目录改为稳定路径 `bin/`、`logs/`（gitignore；不再用 /tmp，避免重启丢失）。
+- 抽屉仿 `AppLayout.vue`：去掉顶部 hero、分组导航、底部 append（主题/退出）、版权；`v-list-item` 加 `rounded="xl"`；允许必要 scoped CSS（滚动/隐藏滚动条/spacer/禁选）。
+- 剩余（见 `docs/todo.md`）：真实安装进度、脚本依赖自动安装。
+- 说明：ID 维持现状（Sonyflake），不做 UUIDv7 改动。

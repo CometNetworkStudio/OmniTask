@@ -33,7 +33,7 @@ func (h *ScriptHandler) Install(ctx *gin.Context) {
 		v1.HandleError(ctx, http.StatusBadRequest, v1.ErrBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	resp, err := h.svc.Install(ctx, req.URL)
+	resp, err := h.svc.Install(ctx, req.URL, req.Ref)
 	if err != nil {
 		v1.HandleError(ctx, http.StatusBadRequest, v1.ErrBadRequest, gin.H{"error": err.Error()})
 		return

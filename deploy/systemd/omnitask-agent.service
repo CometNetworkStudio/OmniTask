@@ -1,0 +1,15 @@
+[Unit]
+Description=OmniTask agent host (runs platform scripts)
+After=network-online.target omnitask-server.service
+Wants=network-online.target
+StartLimitIntervalSec=0
+
+[Service]
+Type=simple
+WorkingDirectory=/home/OmniTask/backend
+ExecStart=/home/OmniTask/bin/omnitask-agent -conf /home/OmniTask/backend/config/deploy.yml
+Restart=always
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target

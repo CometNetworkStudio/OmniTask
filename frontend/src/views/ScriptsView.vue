@@ -9,6 +9,7 @@ const scripts = ref([])
 const loading = ref(false)
 const dialog = ref(false)
 const installing = ref(false)
+const helpDialog = ref(false)
 
 const ACCEL = [
   { title: '不使用加速', value: '' },
@@ -21,7 +22,7 @@ const PRESETS = [
   { title: 'WeLearn (welearn)', value: 'https://github.com/CometNetworkStudio/welearn' },
 ]
 
-const form = reactive({ url: '', accel: '' })
+const form = reactive({ url: '', ref: '', accel: '' })
 
 const headers = [
   { title: '脚本', key: 'name' },
@@ -50,10 +51,11 @@ async function install() {
   installing.value = true
   try {
     const url = form.accel ? `${form.accel}${form.url}` : form.url
-    await scriptsApi.install(url)
+    await scriptsApi.install(url, form.ref)
     ui.notify('脚本安装成功')
     dialog.value = false
     form.url = ''
+    form.ref = ''
     form.accel = ''
     await load()
   } catch (err) {
@@ -100,6 +102,7 @@ function statusColor(status) {
           <v-btn variant="text" prepend-icon="mdi-refresh" :loading="loading" @click="load">
             刷新
           </v-btn>
+          <v-btn variant="text" icon="mdi-help-circle-outline" title="运行时说明" @click="helpDialog = true" />
           <v-btn color="primary" prepend-icon="mdi-github" @click="dialog = true">
             从 GitHub 安装
           </v-btn>
@@ -162,6 +165,11 @@ function statusColor(status) {
               label="GitHub 仓库或 zip 地址"
               placeholder="https://github.com/owner/repo"
             />
+            <v-text-field
+              v-model="form.ref"
+              label="分支 / 标签 / commit（可选，默认 main）"
+              placeholder="main"
+            />
             <v-select
               v-model="form.accel"
               :items="ACCEL"
@@ -174,6 +182,22 @@ function statusColor(status) {
               <v-btn type="submit" color="primary" :loading="installing">安装</v-btn>
             </div>
           </v-form>
+        </v-card-text>
+      </v-card>
+    </v-dialog>
+
+    <v-dialog v-model="helpDialog" max-width="560">
+      <v-card>
+        <v-card-item>
+          <v-card-title class="text-h6">脚本运行时说明</v-card-title>
+        </v-card-item>
+        <v-card-text class="text-body-2">
+          <p class="mb-2">脚本需要对应的运行时才能执行。状态显示「缺少运行时」时，请在服务器上安装：</p>
+          <ul class="ps-4">
+            <li>Python 脚本：安装 <code>python3</code> 与依赖（<code>pip install -r requirements.txt</code>）</li>
+            <li>Host 使用的解释器由配置 <code>agent.python</code> 指定</li>
+            <li>也可在脚本仓库中自带二进制，并把 <code>runtime</code> 指向它</li>
+          </ul>
         </v-card-text>
       </v-card>
     </v-dialog>

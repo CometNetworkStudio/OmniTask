@@ -16,6 +16,20 @@ const tasks = ref([])
 const total = ref(0)
 const page = ref(1)
 const size = ref(100)
+const filterStatus = ref('')
+const filterPlatform = ref('')
+
+const statusOptions = [
+  { title: '全部状态', value: '' },
+  { title: '待执行', value: 'pending' },
+  { title: '排队中', value: 'queued' },
+  { title: '执行中', value: 'running' },
+  { title: '成功', value: 'succeeded' },
+  { title: '失败', value: 'failed' },
+  { title: '已取消', value: 'canceled' },
+  { title: '已中断', value: 'interrupted' },
+]
+const platformFilterOptions = [{ title: '全部平台', value: '' }, ...PLATFORMS]
 const loading = ref(false)
 const dialog = ref(false)
 const submitting = ref(false)
@@ -44,7 +58,12 @@ onMounted(load)
 async function load() {
   loading.value = true
   try {
-    const data = await tasksApi.list(page.value, size.value)
+    const data = await tasksApi.list({
+      page: page.value,
+      size: size.value,
+      status: filterStatus.value,
+      platform: filterPlatform.value,
+    })
     tasks.value = data.list || []
     total.value = data.total || 0
   } catch (err) {
@@ -52,6 +71,11 @@ async function load() {
   } finally {
     loading.value = false
   }
+}
+
+function onFilter() {
+  page.value = 1
+  load()
 }
 
 function onPage(value) {
@@ -154,6 +178,33 @@ async function createTask() {  submitting.value = true
             新建任务
           </v-btn>
         </div>
+      </v-col>
+    </v-row>
+
+    <v-row align="center" class="mb-2">
+      <v-col cols="12" sm="6" md="3">
+        <v-select
+          v-model="filterStatus"
+          :items="statusOptions"
+          item-title="title"
+          item-value="value"
+          label="状态"
+          density="compact"
+          hide-details
+          @update:model-value="onFilter"
+        />
+      </v-col>
+      <v-col cols="12" sm="6" md="3">
+        <v-select
+          v-model="filterPlatform"
+          :items="platformFilterOptions"
+          item-title="title"
+          item-value="value"
+          label="平台"
+          density="compact"
+          hide-details
+          @update:model-value="onFilter"
+        />
       </v-col>
     </v-row>
 

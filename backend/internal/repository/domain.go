@@ -84,12 +84,18 @@ func (repo *TaskRepository) Get(ctx context.Context, userID, id string) (*model.
 	return &task, nil
 }
 
-func (repo *TaskRepository) ListByUser(ctx context.Context, userID string, limit, offset int) ([]model.Task, int64, error) {
+func (repo *TaskRepository) ListByUser(ctx context.Context, userID, status, platform string, limit, offset int) ([]model.Task, int64, error) {
 	var (
 		tasks []model.Task
 		total int64
 	)
 	q := repo.r.DB(ctx).Model(&model.Task{}).Where("user_id = ?", userID)
+	if status != "" {
+		q = q.Where("status = ?", status)
+	}
+	if platform != "" {
+		q = q.Where("platform = ?", platform)
+	}
 	if err := q.Count(&total).Error; err != nil {
 		return nil, 0, err
 	}

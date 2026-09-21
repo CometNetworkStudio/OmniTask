@@ -54,9 +54,9 @@ func (s *ScriptService) List(ctx context.Context) ([]v1.ScriptResponse, error) {
 	return out, nil
 }
 
-// Install 下载 zip（可带加速前缀）并解压到 scripts_dir/<id>/。
-func (s *ScriptService) Install(ctx context.Context, rawURL string) (*v1.ScriptResponse, error) {
-	zipURL := resolveZipURL(rawURL)
+// Install 下载 zip（可带加速前缀）并解压到 scripts_dir/<id>/。ref 为空则默认分支。
+func (s *ScriptService) Install(ctx context.Context, rawURL, ref string) (*v1.ScriptResponse, error) {
+	zipURL := resolveZipURL(rawURL, ref)
 
 	tmp, err := os.MkdirTemp("", "omnitask-script-")
 	if err != nil {
@@ -118,8 +118,8 @@ func (s *ScriptService) Install(ctx context.Context, rawURL string) (*v1.ScriptR
 }
 
 // resolveZipURL：github.com 仓库链接统一转为 codeload 直链（避开 github.com 主站抖动），
-// 已带加速前缀（如 https://gh-proxy.com/）时保留前缀。
-func resolveZipURL(raw string) string {
+// 已带加速前缀（如 https://gh-proxy.com/）时保留前缀。ref 为空用默认分支 main。
+func resolveZipURL(raw, ref string) string {
 	if strings.HasSuffix(strings.ToLower(strings.SplitN(raw, "?", 2)[0]), ".zip") {
 		return raw
 	}
@@ -127,9 +127,29 @@ func resolveZipURL(raw string) string {
 		prefix := raw[:i]
 		rest := strings.TrimSuffix(raw[i+len("github.com/"):], "/")
 		rest = strings.TrimSuffix(rest, ".git")
-		return prefix + "codeload.github.com/" + rest + "/zip/refs/heads/main"
+		refPath := "refs/heads/main"
+		if ref != "" {
+			if isHexRef(ref) {
+				refPath = ref
+			} else {
+				refPath = "refs/heads/" + ref
+			}
+		}
+		return prefix + "codeload.github.com/" + rest + "/zip/" + refPath
 	}
 	return strings.TrimSuffix(raw, "/") + "/archive/refs/heads/main.zip"
+}
+
+func isHexRef(ref string) bool {
+	if len(ref) < 7 {
+		return false
+	}
+	for _, c := range ref {
+		if !((c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F')) {
+			return false
+		}
+	}
+	return true
 }
 
 func (s *ScriptService) SetEnabled(ctx context.Context, id string, enabled bool) error {

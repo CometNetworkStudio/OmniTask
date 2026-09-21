@@ -30,3 +30,7 @@ backend/config/deploy.yml
 # 构建产物
 /build/
 /storage/
+
+# 构建的稳定产物与日志
+/bin/
+/logs/

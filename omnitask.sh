@@ -11,11 +11,12 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 BUILD="$ROOT/build"
 WEB="$ROOT/backend/internal/server/webdist"
-RUN="${OMNITASK_RUN:-/tmp/opencode}"
-PID_BACKEND="$RUN/omnitask-backend.pid"
-PID_AGENT="$RUN/omnitask-agent.pid"
+BIN="${OMNITASK_BIN:-$ROOT/bin}"
+LOG="${OMNITASK_LOG:-$ROOT/logs}"
+PID_BACKEND="$BIN/backend.pid"
+PID_AGENT="$BIN/agent.pid"
 GOCMD=(go build -trimpath -ldflags "-s -w")   # -s -w 去掉符号表/调试信息，减小体积
-mkdir -p "$BUILD" "$RUN"
+mkdir -p "$BUILD" "$BIN" "$LOG"
 
 # build_frontend [base]
 build_frontend() {
@@ -114,8 +115,8 @@ deploy() {
   echo "==> 部署"
   build_frontend /omnitask/
   echo "==> 编译 backend / agent（原生）"
-  build_native server "$RUN/omnitask-server"
-  build_native agent "$RUN/omnitask-agent"
+  build_native server "$BIN/omnitask-server"
+  build_native agent "$BIN/omnitask-agent"
 
   echo "==> 迁移"
   set -a
@@ -123,15 +124,20 @@ deploy() {
   . "$ROOT/.env"
   set +a
   CONF="$ROOT/backend/config/deploy.yml"
-  ( cd "$ROOT/backend" && "$RUN/omnitask-server" -migrate -conf "$CONF" )
+  ( cd "$ROOT/backend" && "$BIN/omnitask-server" -migrate -conf "$CONF" )
 
-  echo "==> 重启 backend"
-  stop_by_pidfile "$PID_BACKEND"
-  start_bg "$PID_BACKEND" "$RUN/backend.log" "$RUN/omnitask-server" -conf "$CONF"
-
-  echo "==> 重启 agent"
-  stop_by_pidfile "$PID_AGENT"
-  start_bg "$PID_AGENT" "$RUN/agent.log" "$RUN/omnitask-agent" -conf "$CONF"
+  if command -v systemctl >/dev/null 2>&1 && [ -f /etc/systemd/system/omnitask-server.service ]; then
+    echo "==> systemctl restart omnitask-server omnitask-agent"
+    systemctl restart omnitask-server
+    systemctl restart omnitask-agent
+  else
+    echo "==> 重启 backend"
+    stop_by_pidfile "$PID_BACKEND"
+    start_bg "$PID_BACKEND" "$LOG/backend.log" "$BIN/omnitask-server" -conf "$CONF"
+    echo "==> 重启 agent"
+    stop_by_pidfile "$PID_AGENT"
+    start_bg "$PID_AGENT" "$LOG/agent.log" "$BIN/omnitask-agent" -conf "$CONF"
+  fi
 
   sleep 2
   echo "==> 完成"
