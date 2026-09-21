@@ -190,8 +190,8 @@ OmniTask/
 - [x] M2：后端领域层——User/Credential/Task/Question repository + service（bcrypt+JWT、AES-256-GCM 凭据、任务/题库）+ REST（`/api/v1/auth|credentials|tasks|questions`）+ GORM 迁移（MySQL 3380 / Redis 6350）；curl 验收通过，凭据确认为密文
 - [x] M3：通讯层——Go gRPC 客户端（Agent 50051）+ `QuestionBank` gRPC 服务端（9000）+ 任务编排（pending→queued→running→终态、凭据解密、Redis 进度、TaskEvent）+ WebSocket `/api/v1/ws`；端到端联调通过（WebSocket 实时事件、成功/失败终态、题库 gRPC 读写）
 - [x] M4：前端——登录/注册、凭据管理、任务列表+参数表单创建、任务详情（WebSocket 实时进度）、题库；Vuetify 4 + 主题 + Pinia + api/service 层，严格遵循前端 UI 规则（`npm run build` 通过，Vite 代理联调通过）
-- [ ] M5：集成测试与加固
-- [ ] M6：Docker 化部署与文档
+- [x] M5（部分完成）：已有 SDK/加密单测与多次真机联调；**缺**后端 service/handler 测试、CI、E2E 自动化、并发压测
+- [x] M6：部署与文档（单文件内嵌前端、Docker Compose、nginx 反代、lite/full、配置自动生成、TLS 可选、引导脚本）
 
 ### M0 验收命令
 
@@ -285,3 +285,30 @@ cd frontend && npm run build
 - Host：支持 manifest `module`；SDK 运行时支持生成器与装饰器两种。
 - Makefile `proto-py` 输出改到 `sdk/python/omnitask_sdk/gen` 并修正生成文件导入。
 - 文档重写：integration-guide（三范式+走查+Vibecoding Prompt）、script-protocol（module/command/progress_regex）、sdk README。
+
+## 20. 进度盘点与待办（2026-09）
+
+### 里程碑现状
+- M0–M4 ✅；M6 部署 ✅（含单文件/nginx/Docker/lite-full/TLS）。
+- M5 集成与加固 **部分**：有 SDK(17)/加密单测与多轮真机联调；缺后端 service/handler 测试、CI、E2E 自动化。
+- 原里程碑之外已完成：脚本插件化（安装/注册表/Go Host/stdio 协议/SDK）、角色权限(Casbin)、golang-migrate 并并入 server、API 前缀 `/api/v1`、SDK 生态（omnitask_sdk + 装饰器 + CLI 桥）。
+
+### 未解决 / 待办（优先级）
+**P0 稳固**
+- 任务生命周期：无取消/删除/重试接口；server 重启后 `running` 任务成僵尸；无超时。
+- 注册控制（开放注册）、生产禁用 Swagger、收紧 CORS。
+- 基础 CI：`go test ./...` + `npm run build` + SDK 测试一条命令。
+
+**P1 体验/功能**
+- `/api/v1/me`（前端启动刷新角色）；用户管理（admin 改角色/禁用）。
+- 任务列表分页/筛选；脚本安装进度、指定 commit/tag、运行时缺失指引。
+- backend/agent systemd 化（服务器重启自启动）。
+
+**P2 生态/长期**
+- 脚本依赖自动安装（隔离 venv）或明确提示；SDK 多语言示例；新平台（学习通等）。
+- 多机 Agent（已评估，暂不做）。
+
+### 工程卫生
+- 删除 Nunu 遗留 `backend/cmd/task`、`backend/scripts/`。
+- lite(AutoMigrate) 与 full(SQL 迁移) 双机制，注意 schema 漂移。
+- cidaren 11003 风控（运营项，需人工安全验证）。
