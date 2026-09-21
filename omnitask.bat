@@ -10,12 +10,11 @@ set "WEB=%ROOT%\backend\internal\server\webdist"
 :menu
 echo.
 echo ================= OmniTask 工具箱 =================
-echo  1) 部署（构建前端+后端+Host，启动）[Windows]
+echo  1) 部署（构建前端+后端+Host，迁移，启动）[Windows]
 echo  2) 构建后端 server（选择目标平台）
 echo  3) 构建脚本 Host agent（选择目标平台）
-echo  4) 构建迁移工具 migrate（选择目标平台）
-echo  5) 构建前端（dist，可内嵌进后端）
-echo  6) 构建全部（前端+server+agent+migrate，选择目标平台）
+echo  4) 构建前端（dist，可内嵌进后端）
+echo  5) 构建全部（前端+server+agent，选择目标平台）
 echo  0) 退出
 echo =================================================
 set "choice="
@@ -23,9 +22,8 @@ set /p "choice=请输入选项数字: "
 if "%choice%"=="1" ( call :deploy & goto menu )
 if "%choice%"=="2" ( call :ask_target & call :build_go server %TARGET% & goto menu )
 if "%choice%"=="3" ( call :ask_target & call :build_go agent %TARGET% & goto menu )
-if "%choice%"=="4" ( call :ask_target & call :build_go migrate %TARGET% & goto menu )
-if "%choice%"=="5" ( call :build_frontend & goto menu )
-if "%choice%"=="6" ( call :ask_target & call :build_all %TARGET% & goto menu )
+if "%choice%"=="4" ( call :build_frontend & goto menu )
+if "%choice%"=="5" ( call :ask_target & call :build_all %TARGET% & goto menu )
 if "%choice%"=="0" ( echo 再见 & exit /b 0 )
 echo 无效选项，请重新输入。
 goto menu
@@ -42,7 +40,7 @@ if "%t%"=="2" set "TARGET=windows"
 if "%t%"=="3" set "TARGET=both"
 exit /b
 
-rem build_go <server^|agent^|migrate> <linux^|windows^|both>
+rem build_go <server|agent> <linux|windows|both>
 :build_go
 set "GOCMD=%~1"
 set "GT=%~2"
@@ -84,7 +82,6 @@ exit /b
 call :build_frontend
 call :build_go server %1
 call :build_go agent %1
-call :build_go migrate %1
 echo 构建产物目录：%BUILD%
 dir /b "%BUILD%"
 exit /b
@@ -93,7 +90,8 @@ exit /b
 call :build_frontend
 call :build_go server windows
 call :build_go agent windows
-call :build_go migrate windows
+echo ==^> 迁移（lite 自动跳过，full 执行）
+"%BUILD%\omnitask-server-windows-amd64.exe" -migrate -conf config.yaml
 echo 启动 backend 与 agent（首次运行会自动生成 config.yaml）...
 start "OmniTask backend" "%BUILD%\omnitask-server-windows-amd64.exe" -conf config.yaml
 start "OmniTask agent" "%BUILD%\omnitask-agent-windows-amd64.exe" -conf config.yaml

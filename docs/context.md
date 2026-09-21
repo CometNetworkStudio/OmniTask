@@ -121,7 +121,7 @@ OmniTask/
 ├── proto/agent/v1/agent.proto   # gRPC 契约
 ├── backend/               # Go 后端（Nunu，module=backend）
 │   ├── api/agent/v1/      # protoc 生成，gitignore，make proto 重建
-│   ├── cmd/{server,agent,migrate}/   # 主服务 / 脚本 Host / 迁移
+│   ├── cmd/{server,agent}/        # 主服务 / 脚本 Host
 │   ├── config/{local.yml, deploy.yml(gitignore), prod.yml(遗留)}
 │   ├── internal/{agenthost,handler,middleware,model,repository,service,router,server,ws}/
 │   ├── pkg/{config,crypto,authz,jwt,sid,log,server,...}/
@@ -226,7 +226,7 @@ cd frontend && npm run build
 ## 12. 后续决策（M5+）
 
 - **角色/权限**：仅 `admin` / `user` 两角色；后端引入 **Casbin**（RESTful model，`keyMatch2`），按 `(role, route, method)` 鉴权；**首个注册用户自动为 admin**；「脚本」页仅 admin 可见。前端同一套，按角色条件渲染。
-- **数据库迁移**：改用 **golang-migrate**（`cmd/migrate`，`embed` SQL，`multiStatements`），AutoMigrate 仅保留本地快速开发。
+- **数据库迁移**：full 用 **golang-migrate**（`internal/migration`，embed SQL；`server -migrate` 或 `data.db.migrate_on_start`）；lite 用 AutoMigrate。
 - **README**：根目录改为面向 GitHub 的展示型 README；原上下文存档移至 `docs/context.md`；接入文档 `docs/integration-guide.md`。
 - **脚本插件化方向**：`manifest(script.json)` + gRPC 契约（`AgentService.Execute` 已是通用）；仅**管理员**安装、固定 commit、安装前审核；脚本独立仓库、**不入主库并 gitignore**；恶意脚本风险由使用者自辨，平台声明免责。
 - **前端规则**：MD3 圆角（`elevated`+`rounded=xl`，card `elevation=2`）、含输入对话框 `persistent`、统一 `v-snackbar-queue`（见 `AGENTS.md`）。
@@ -254,13 +254,13 @@ cd frontend && npm run build
 
 - **统一配置 `config.yaml`**：`mode: lite|full`，默认 **lite**；仅当使用默认文件名 `config.yaml` 且不存在时自动生成（含随机 `jwt.key` / `master_key`，明文）。
 - **lite**：`github.com/glebarez/sqlite`（纯 Go 无 CGO）+ **无 Redis**（进度走进程内 `ProgressStore`）；启动时 GORM AutoMigrate。
-- **full**：MySQL + Redis；迁移用 golang-migrate（`cmd/migrate`）。
+- **full**：MySQL + Redis；迁移用 golang-migrate（`server -migrate`）。
 - 分层切换：业务代码零改动，仅 `repository.NewDB`（驱动）与 `NewRedis`（是否连接）按 `mode` 分支。
 - 说明：golang-migrate 的 sqlite 驱动依赖 CGO，与“纯 Go”目标冲突，故 lite 采用 AutoMigrate；接受该取舍。
 - ✅ `go:embed` 前端 dist：后端单文件托管 SPA（`internal/server/static.go`），HTTP API 统一前缀 `/api/v1`，`/api/*` 未命中返回 404，其余走 SPA 回退。
 
 ## 16. 引导式构建脚本（2026-09）
-- 新增 `omnitask.sh`（Linux/macOS）与 `omnitask.bat`（Windows）引导式菜单：部署 / 编译 server·agent·migrate（可选 linux-amd64、windows-amd64、两者）/ 构建前端。
+- 新增 `omnitask.sh`（Linux/macOS）与 `omnitask.bat`（Windows）引导式菜单：部署 / 编译 server·agent（可选 linux-amd64、windows-amd64、两者）/ 构建前端。
 - 交叉编译：`CGO_ENABLED=0 GOOS/GOARCH=amd64`（依赖全为纯 Go：glebarez/sqlite、mysql、casbin）；产物在 `build/`（gitignore）。
 - 部署逻辑已并入 `omnitask.sh`（非交互 `./omnitask.sh deploy`）与 `omnitask.bat`；`deploy.sh` 已删除。
 - Makefile 仅为开发辅助（proto 生成/nunu/测试），普通构建不需要。
@@ -271,3 +271,8 @@ cd frontend && npm run build
 - `Makefile`：`proto-py` 输出到 `sdk/python/gen`；`agent-test` 更名为 `sdk-test`。
 - 配置：Host `agent.pythonpath` 默认 `sdk/python`；`local.yml`/`deploy.yml` 同步。
 - 新增 `sdk/python/README.md`（SDK 用法与接入）。
+
+## 18. 迁移并入 server + HTTPS 配置（2026-09）
+- **迁移（方案A）**：删除 `cmd/migrate`，迁移逻辑移入 `internal/migration`（embed SQL）；由 `omnitask-server -migrate` 触发，或配置 `data.db.migrate_on_start: true` 启动时执行。产物由 3 个减为 **2 个**（server + agent）。
+- **HTTPS**：`config.yaml` 新增 `http.tls.{enabled,cert_file,key_file}`，server 可自行终结 TLS（不做自签）。
+- **配置清理**：删除未使用的 `backend/config/prod.yml` 与过期的 `frontend/.env.development`。

@@ -17,12 +17,18 @@ func NewHTTPServer(
 	if deps.Config.GetString("env") == "prod" {
 		gin.SetMode(gin.ReleaseMode)
 	}
-	s := http.NewServer(
-		gin.Default(),
-		deps.Logger,
+	opts := []http.Option{
 		http.WithServerHost(deps.Config.GetString("http.host")),
 		http.WithServerPort(deps.Config.GetInt("http.port")),
-	)
+	}
+	if deps.Config.GetBool("http.tls.enabled") {
+		opts = append(opts, http.WithServerTLS(
+			true,
+			deps.Config.GetString("http.tls.cert_file"),
+			deps.Config.GetString("http.tls.key_file"),
+		))
+	}
+	s := http.NewServer(gin.Default(), deps.Logger, opts...)
 
 	// swagger doc
 	docs.SwaggerInfo.BasePath = "/api/v1"

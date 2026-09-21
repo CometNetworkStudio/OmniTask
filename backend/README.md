@@ -10,15 +10,14 @@ Go + Gin + GORM + gRPC 后端：用户/凭据/任务/题库/脚本注册表与�
 `config.yaml` 首次运行自动生成（含随机密钥，明文存于其中）；仅当路径为默认 `config.yaml` 时自动创建。数据库迁移：
 
 - lite：启动时 GORM AutoMigrate。
-- full：`go run ./cmd/migrate -conf config.yaml`（golang-migrate，见 `cmd/migrate/migrations`）。
+- full：`go run ./cmd/server -migrate -conf config.yaml`（golang-migrate，SQL 见 `internal/migration/migrations`）。
 
 ## 组件
 
 | 入口 | 说明 |
 |------|------|
-| `cmd/server` | HTTP API（前缀 `/api/v1`）+ WebSocket + 任务编排 + `QuestionBank` gRPC；并在 `/` 托管内嵌的前端 dist（`go:embed`，构建时由 `omnitask.sh deploy` 从 `frontend/dist` 拷入 `internal/server/webdist`）|
+| `cmd/server` | HTTP API（前缀 `/api/v1`）+ WebSocket + 任务编排 + `QuestionBank` gRPC；在 `/` 托管内嵌前端 dist；`-migrate` 执行数据库迁移（实现见 `internal/migration`）|
 | `cmd/agent` | Go 脚本 Host：扫描脚本目录，以子进程 + stdio JSON 运行平台脚本 |
-| `cmd/migrate` | 数据库迁移（golang-migrate，full 模式） |
 
 ## 目录
 

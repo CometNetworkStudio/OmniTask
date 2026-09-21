@@ -30,3 +30,4 @@ backend/config/deploy.yml
 
 # 构建产物
 /build/
+/storage/

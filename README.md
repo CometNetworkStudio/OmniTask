@@ -77,7 +77,7 @@ go run ./cmd/agent -conf config.yaml
 
 ```bash
 docker compose -f backend/deploy/docker-compose/docker-compose.yml up -d
-cd backend && go run ./cmd/migrate -conf config/deploy.yml   # 迁移
+cd backend && go run ./cmd/server -migrate -conf config/deploy.yml   # 迁移
 go run ./cmd/server -conf config/deploy.yml
 go run ./cmd/agent  -conf config/deploy.yml
 ```
@@ -89,7 +89,7 @@ go run ./cmd/agent  -conf config/deploy.yml
 - Linux/macOS：`./omnitask.sh`
 - Windows：`omnitask.bat`
 
-运行后是数字菜单：部署、构建后端 server / Host agent / 迁移工具（可选 **linux-amd64 / windows-amd64 / 两者**）、构建前端。产物输出到 `build/`（已 gitignore），命名如 `omnitask-server-linux-amd64`、`omnitask-server-windows-amd64.exe`。
+运行后是数字菜单：部署、构建后端 server / Host agent（可选 **linux-amd64 / windows-amd64 / 两者**）、构建前端。产物输出到 `build/`（已 gitignore），命名如 `omnitask-server-linux-amd64`、`omnitask-server-windows-amd64.exe`。
 
 部署：菜单选项「部署」或非交互 `./omnitask.sh deploy`（构建前端并内嵌 → 编译 → 迁移 → 重启）。
 

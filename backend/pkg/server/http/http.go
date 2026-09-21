@@ -12,10 +12,13 @@ import (
 
 type Server struct {
 	*gin.Engine
-	httpSrv *http.Server
-	host    string
-	port    int
-	logger  *log.Logger
+	httpSrv    *http.Server
+	host       string
+	port       int
+	tlsEnabled bool
+	certFile   string
+	keyFile    string
+	logger     *log.Logger
 }
 type Option func(s *Server)
 
@@ -40,13 +43,28 @@ func WithServerPort(port int) Option {
 	}
 }
 
+// WithServerTLS 启用 HTTPS（直接由本服务终结 TLS，无需反向代理）。
+func WithServerTLS(enabled bool, certFile, keyFile string) Option {
+	return func(s *Server) {
+		s.tlsEnabled = enabled
+		s.certFile = certFile
+		s.keyFile = keyFile
+	}
+}
+
 func (s *Server) Start(ctx context.Context) error {
 	s.httpSrv = &http.Server{
 		Addr:    fmt.Sprintf("%s:%d", s.host, s.port),
 		Handler: s,
 	}
 
-	if err := s.httpSrv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+	var err error
+	if s.tlsEnabled {
+		err = s.httpSrv.ListenAndServeTLS(s.certFile, s.keyFile)
+	} else {
+		err = s.httpSrv.ListenAndServe()
+	}
+	if err != nil && !errors.Is(err, http.ErrServerClosed) {
 		s.logger.Sugar().Fatalf("listen: %s\n", err)
 	}
 

@@ -2,8 +2,8 @@
 # OmniTask 引导式工具箱（Linux/macOS）
 # 用法：
 #   ./omnitask.sh                     # 进入数字菜单
-#   ./omnitask.sh deploy              # 非交互：部署（=旧 deploy.sh）
-#   ./omnitask.sh server|agent|migrate [linux|windows|both]
+#   ./omnitask.sh deploy              # 非交互：部署
+#   ./omnitask.sh server|agent [linux|windows|both]
 #   ./omnitask.sh frontend [base]     # base 默认 /
 #   ./omnitask.sh all [linux|windows|both]
 set -euo pipefail
@@ -27,13 +27,12 @@ build_frontend() {
   cp -r "$ROOT/frontend/dist/." "$WEB/"
 }
 
-# build_go <server|agent|migrate> <linux|windows|both>
+# build_go <server|agent> <linux|windows|both>
 build_go() {
   local cmd="$1" target="$2" out
   case "$cmd" in
     server) out="omnitask-server" ;;
     agent) out="omnitask-agent" ;;
-    migrate) out="omnitask-migrate" ;;
     *) echo "未知命令: $cmd"; return 1 ;;
   esac
   ( cd "$ROOT/backend"
@@ -78,7 +77,6 @@ build_all() {
   build_frontend
   build_go server "$target"
   build_go agent "$target"
-  build_go migrate "$target"
   echo "构建产物目录：$BUILD"
   ls -1 "$BUILD"
 }
@@ -90,6 +88,14 @@ stop_by_pidfile() {
     sleep 1
     rm -f "$f"
   fi
+}
+
+# start_bg <pidfile> <logfile> <cmd...>：在 backend/ 目录下后台启动（相对路径如日志/脚本目录以 backend 为基准）
+start_bg() {
+  local pidf="$1" logf="$2"
+  shift 2
+  ( cd "$ROOT/backend" && exec setsid "$@" < /dev/null > "$logf" 2>&1 ) &
+  echo $! > "$pidf"
 }
 
 # 部署：构建前端(base=/omnitask/) + 后端/Host(原生) + 迁移 + 重启
@@ -105,17 +111,16 @@ deploy() {
   # shellcheck disable=SC1091
   . "$ROOT/.env"
   set +a
-  ( cd "$ROOT/backend" && go run ./cmd/migrate -conf config/deploy.yml )
+  CONF="$ROOT/backend/config/deploy.yml"
+  ( cd "$ROOT/backend" && "$RUN/omnitask-server" -migrate -conf "$CONF" )
 
   echo "==> 重启 backend"
   stop_by_pidfile "$PID_BACKEND"
-  setsid "$RUN/omnitask-server" -conf config/deploy.yml < /dev/null > "$RUN/backend.log" 2>&1 &
-  echo $! > "$PID_BACKEND"
+  start_bg "$PID_BACKEND" "$RUN/backend.log" "$RUN/omnitask-server" -conf "$CONF"
 
   echo "==> 重启 agent"
   stop_by_pidfile "$PID_AGENT"
-  setsid "$RUN/omnitask-agent" -conf config/deploy.yml < /dev/null > "$RUN/agent.log" 2>&1 &
-  echo $! > "$PID_AGENT"
+  start_bg "$PID_AGENT" "$RUN/agent.log" "$RUN/omnitask-agent" -conf "$CONF"
 
   sleep 2
   echo "==> 完成"
@@ -127,9 +132,8 @@ menu() {
   echo " 1) 部署（构建前端+后端+Host，迁移，重启）"
   echo " 2) 构建后端 server（选择目标平台）"
   echo " 3) 构建脚本 Host agent（选择目标平台）"
-  echo " 4) 构建迁移工具 migrate（选择目标平台）"
-  echo " 5) 构建前端（dist，可内嵌进后端）"
-  echo " 6) 构建全部（前端+server+agent+migrate，选择目标平台）"
+  echo " 4) 构建前端（dist，可内嵌进后端）"
+  echo " 5) 构建全部（前端+server+agent，选择目标平台）"
   echo " 0) 退出"
   echo "================================================="
 }
@@ -140,7 +144,6 @@ if [ -n "${1:-}" ]; then
     deploy) deploy ;;
     server) build_go server "${2:-linux}" ;;
     agent) build_go agent "${2:-linux}" ;;
-    migrate) build_go migrate "${2:-linux}" ;;
     frontend) build_frontend "${2:-}" ;;
     all) build_all "${2:-both}" ;;
     *) echo "未知命令: $1"; exit 1 ;;
@@ -156,9 +159,8 @@ while true; do
     1) deploy ;;
     2) build_go server "$(ask_target)" ;;
     3) build_go agent "$(ask_target)" ;;
-    4) build_go migrate "$(ask_target)" ;;
-    5) build_frontend ;;
-    6) build_all "$(ask_target)" ;;
+    4) build_frontend ;;
+    5) build_all "$(ask_target)" ;;
     0) echo "再见"; exit 0 ;;
     *) echo "无效选项，请重新输入。" ;;
   esac

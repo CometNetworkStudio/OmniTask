@@ -18,6 +18,10 @@ mode: lite
 http:
   host: 127.0.0.1
   port: 8080
+  tls:
+    enabled: false
+    cert_file: ""
+    key_file: ""
 grpc:
   host: 127.0.0.1
   port: 9000
@@ -35,6 +39,7 @@ security:
   master_key: ""
 data:
   db:
+    migrate_on_start: false
     user:
       driver: sqlite
       dsn: data/omnitask.db
