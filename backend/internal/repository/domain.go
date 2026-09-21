@@ -219,3 +219,37 @@ func (repo *ScriptRepository) EnabledIDs(ctx context.Context) ([]string, error) 
 	err := repo.r.DB(ctx).Model(&model.Script{}).Where("enabled = ?", true).Pluck("id", &ids).Error
 	return ids, err
 }
+
+// MarkStaleInterrupted 把重启后残留的 running/queued 任务标记为 interrupted。
+func (repo *TaskRepository) MarkStaleInterrupted(ctx context.Context) (int64, error) {
+	res := repo.r.DB(ctx).Model(&model.Task{}).
+		Where("status IN ?", []string{"running", "queued"}).
+		Updates(map[string]interface{}{
+			"status":      "interrupted",
+			"error":       "服务重启导致中断",
+			"finished_at": time.Now(),
+		})
+	return res.RowsAffected, res.Error
+}
+
+func (repo *TaskRepository) Delete(ctx context.Context, userID, id string) (bool, error) {
+	res := repo.r.DB(ctx).Where("id = ? AND user_id = ?", id, userID).Delete(&model.Task{})
+	return res.RowsAffected > 0, res.Error
+}
+
+func (repo *TaskRepository) DeleteEvents(ctx context.Context, taskID string) error {
+	return repo.r.DB(ctx).Where("task_id = ?", taskID).Delete(&model.TaskEvent{}).Error
+}
+
+func (repo *TaskRepository) Reset(ctx context.Context, userID, id string) error {
+	return repo.r.DB(ctx).Model(&model.Task{}).
+		Where("id = ? AND user_id = ?", id, userID).
+		Updates(map[string]interface{}{
+			"status":      "pending",
+			"progress":    0,
+			"result":      "{}",
+			"error":       "",
+			"started_at":  nil,
+			"finished_at": nil,
+		}).Error
+}

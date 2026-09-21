@@ -86,6 +86,44 @@ func (s *TaskService) Get(ctx context.Context, userID, id string) (*v1.TaskRespo
 	return toTaskResponse(task), nil
 }
 
+// Retry 重置失败/取消/中断的任务为待执行，重新排队。
+func (s *TaskService) Retry(ctx context.Context, userID, id string) (*v1.TaskResponse, error) {
+	task, err := s.repo.Get(ctx, userID, id)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, v1.ErrTaskNotFound
+		}
+		return nil, err
+	}
+	switch task.Status {
+	case "failed", "canceled", "interrupted":
+	default:
+		return nil, v1.ErrTaskNotCancelable
+	}
+	if err := s.repo.Reset(ctx, userID, id); err != nil {
+		return nil, err
+	}
+	return s.Get(ctx, userID, id)
+}
+
+// Delete 删除任务及其事件（运行中/排队中需先取消）。
+func (s *TaskService) Delete(ctx context.Context, userID, id string) error {
+	task, err := s.repo.Get(ctx, userID, id)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return v1.ErrTaskNotFound
+		}
+		return err
+	}
+	if task.Status == "running" || task.Status == "queued" {
+		return v1.ErrTaskNotCancelable
+	}
+	if _, err := s.repo.Delete(ctx, userID, id); err != nil {
+		return err
+	}
+	return s.repo.DeleteEvents(ctx, id)
+}
+
 func (s *TaskService) List(ctx context.Context, userID string, page, size int) ([]v1.TaskResponse, int64, error) {
 	if page < 1 {
 		page = 1

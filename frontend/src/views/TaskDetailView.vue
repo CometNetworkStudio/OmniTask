@@ -1,5 +1,5 @@
 <script setup>
-import { onBeforeUnmount, onMounted, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { tasksApi } from '@/api/services/tasks'
 import { platformByValue } from '@/config/platforms'
@@ -14,6 +14,39 @@ const ui = useUiStore()
 const task = ref(null)
 const events = ref([])
 let socket = null
+
+const canCancel = computed(() => ['pending', 'queued', 'running'].includes(task.value?.status))
+const canRetry = computed(() => ['failed', 'canceled', 'interrupted'].includes(task.value?.status))
+const canDelete = computed(() => !['running', 'queued'].includes(task.value?.status))
+
+async function cancelTask() {
+  try {
+    await tasksApi.cancel(route.params.id)
+    if (task.value) task.value.status = 'canceled'
+    ui.notify('已取消')
+  } catch (err) {
+    ui.notify(err.message, 'error')
+  }
+}
+
+async function retryTask() {
+  try {
+    task.value = await tasksApi.retry(route.params.id)
+    ui.notify('已重新排队')
+  } catch (err) {
+    ui.notify(err.message, 'error')
+  }
+}
+
+async function removeTask() {
+  try {
+    await tasksApi.remove(route.params.id)
+    ui.notify('已删除')
+    router.push('/')
+  } catch (err) {
+    ui.notify(err.message, 'error')
+  }
+}
 
 onMounted(async () => {
   try {
@@ -42,6 +75,19 @@ onBeforeUnmount(() => socket?.close())
         <div class="d-flex align-center ga-2">
           <v-btn variant="text" icon="mdi-arrow-left" @click="router.push('/')" />
           <div class="text-h5">任务详情</div>
+        </div>
+      </v-col>
+      <v-col cols="auto">
+        <div class="d-flex align-center ga-2">
+          <v-btn v-if="canCancel" color="warning" prepend-icon="mdi-stop" @click="cancelTask">
+            取消
+          </v-btn>
+          <v-btn v-if="canRetry" color="primary" prepend-icon="mdi-refresh" @click="retryTask">
+            重试
+          </v-btn>
+          <v-btn v-if="canDelete" color="error" variant="tonal" prepend-icon="mdi-delete" @click="removeTask">
+            删除
+          </v-btn>
         </div>
       </v-col>
     </v-row>

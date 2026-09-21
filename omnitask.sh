@@ -81,6 +81,17 @@ build_all() {
   ls -1 "$BUILD"
 }
 
+# 自检：后端 build/vet/test + 前端构建 + SDK 测试
+check() {
+  echo "==> 后端 build/vet/test"
+  ( cd "$ROOT/backend" && go build ./... && go vet ./... && go test ./... )
+  echo "==> 前端 build"
+  ( cd "$ROOT/frontend" && npm run build )
+  echo "==> SDK 测试"
+  ( cd "$ROOT/sdk/python" && ./.venv/bin/python -m unittest discover -s tests -t . )
+  echo "==> 全部检查通过"
+}
+
 stop_by_pidfile() {
   local f="$1"
   if [ -f "$f" ]; then
@@ -134,6 +145,7 @@ menu() {
   echo " 3) 构建脚本 Host agent（选择目标平台）"
   echo " 4) 构建前端（dist，可内嵌进后端）"
   echo " 5) 构建全部（前端+server+agent，选择目标平台）"
+  echo " 6) 自检（后端 build/vet/test + 前端构建 + SDK 测试）"
   echo " 0) 退出"
   echo "================================================="
 }
@@ -146,6 +158,7 @@ if [ -n "${1:-}" ]; then
     agent) build_go agent "${2:-linux}" ;;
     frontend) build_frontend "${2:-}" ;;
     all) build_all "${2:-both}" ;;
+    check) check ;;
     *) echo "未知命令: $1"; exit 1 ;;
   esac
   exit 0
@@ -161,6 +174,7 @@ while true; do
     3) build_go agent "$(ask_target)" ;;
     4) build_frontend ;;
     5) build_all "$(ask_target)" ;;
+    6) check ;;
     0) echo "再见"; exit 0 ;;
     *) echo "无效选项，请重新输入。" ;;
   esac

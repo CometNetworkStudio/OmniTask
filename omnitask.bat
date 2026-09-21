@@ -15,6 +15,7 @@ echo  2) 构建后端 server（选择目标平台）
 echo  3) 构建脚本 Host agent（选择目标平台）
 echo  4) 构建前端（dist，可内嵌进后端）
 echo  5) 构建全部（前端+server+agent，选择目标平台）
+echo  6) 自检（后端 build/vet/test + 前端构建 + SDK 测试）
 echo  0) 退出
 echo =================================================
 set "choice="
@@ -24,6 +25,7 @@ if "%choice%"=="2" ( call :ask_target & call :build_go server %TARGET% & goto me
 if "%choice%"=="3" ( call :ask_target & call :build_go agent %TARGET% & goto menu )
 if "%choice%"=="4" ( call :build_frontend & goto menu )
 if "%choice%"=="5" ( call :ask_target & call :build_all %TARGET% & goto menu )
+if "%choice%"=="6" ( call :check & goto menu )
 if "%choice%"=="0" ( echo 再见 & exit /b 0 )
 echo 无效选项，请重新输入。
 goto menu
@@ -84,6 +86,24 @@ call :build_go server %1
 call :build_go agent %1
 echo 构建产物目录：%BUILD%
 dir /b "%BUILD%"
+exit /b
+
+:check
+echo ==^> 后端 build/vet/test
+pushd "%ROOT%\backend"
+go build ./...
+go vet ./...
+go test ./...
+popd
+echo ==^> 前端 build
+pushd "%ROOT%\frontend"
+call npm run build
+popd
+echo ==^> SDK 测试
+pushd "%ROOT%\sdk\python"
+.venv\Scripts\python -m unittest discover -s tests -t .
+popd
+echo ==^> 全部检查通过
 exit /b
 
 :deploy

@@ -82,11 +82,12 @@ func (h *CredentialHandler) List(ctx *gin.Context) {
 
 type TaskHandler struct {
 	svc    *service.TaskService
+	orch   *service.Orchestrator
 	logger *log.Logger
 }
 
-func NewTaskHandler(svc *service.TaskService, logger *log.Logger) *TaskHandler {
-	return &TaskHandler{svc: svc, logger: logger}
+func NewTaskHandler(svc *service.TaskService, orch *service.Orchestrator, logger *log.Logger) *TaskHandler {
+	return &TaskHandler{svc: svc, orch: orch, logger: logger}
 }
 
 func (h *TaskHandler) Create(ctx *gin.Context) {
@@ -121,6 +122,31 @@ func (h *TaskHandler) Get(ctx *gin.Context) {
 		return
 	}
 	v1.HandleSuccess(ctx, resp)
+}
+
+func (h *TaskHandler) Cancel(ctx *gin.Context) {
+	if err := h.orch.CancelTask(ctx, GetUserIdFromCtx(ctx), ctx.Param("id")); err != nil {
+		v1.HandleError(ctx, statusFor(err), err, nil)
+		return
+	}
+	v1.HandleSuccess(ctx, gin.H{"id": ctx.Param("id"), "status": "canceled"})
+}
+
+func (h *TaskHandler) Retry(ctx *gin.Context) {
+	resp, err := h.svc.Retry(ctx, GetUserIdFromCtx(ctx), ctx.Param("id"))
+	if err != nil {
+		v1.HandleError(ctx, statusFor(err), err, nil)
+		return
+	}
+	v1.HandleSuccess(ctx, resp)
+}
+
+func (h *TaskHandler) Delete(ctx *gin.Context) {
+	if err := h.svc.Delete(ctx, GetUserIdFromCtx(ctx), ctx.Param("id")); err != nil {
+		v1.HandleError(ctx, statusFor(err), err, nil)
+		return
+	}
+	v1.HandleSuccess(ctx, gin.H{"id": ctx.Param("id")})
 }
 
 type QuestionHandler struct {
@@ -179,7 +205,8 @@ func statusFor(err error) int {
 	case errors.Is(err, v1.ErrNotFound), errors.Is(err, v1.ErrTaskNotFound), errors.Is(err, v1.ErrCredentialNotFound):
 		return http.StatusNotFound
 	case errors.Is(err, v1.ErrUserAlreadyExists), errors.Is(err, v1.ErrUnsupportedPlatform),
-		errors.Is(err, v1.ErrBadRequest), errors.Is(err, v1.ErrCredentialEncrypt):
+		errors.Is(err, v1.ErrBadRequest), errors.Is(err, v1.ErrCredentialEncrypt),
+		errors.Is(err, v1.ErrTaskNotCancelable), errors.Is(err, v1.ErrRegistrationClosed):
 		return http.StatusBadRequest
 	default:
 		return http.StatusInternalServerError

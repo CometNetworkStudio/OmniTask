@@ -312,3 +312,10 @@ cd frontend && npm run build
 - 删除 Nunu 遗留 `backend/cmd/task`、`backend/scripts/`。
 - lite(AutoMigrate) 与 full(SQL 迁移) 双机制，注意 schema 漂移。
 - cidaren 11003 风控（运营项，需人工安全验证）。
+
+## 21. P0 加固完成（2026-09）
+- **产品方向：小范围多用户**。P0 已完成，剩余项见 `docs/todo.md`（完成后可清空）。
+- 任务生命周期：`POST /api/v1/tasks/:id/cancel`、`/retry`、`DELETE /api/v1/tasks/:id`；编排器持取消句柄，取消时中断 Host 子进程；启动把 `running/queued` 置 `interrupted`；`agent.task_timeout` 可配超时。
+- 注册控制 `security.registration: open|closed`；生产默认关闭 Swagger（`http.swagger`）；CORS 白名单 `http.cors_origins`（默认同源）。
+- 自检：`./omnitask.sh check`（后端 build/vet/test + 前端 build + SDK 测试）；GitHub Actions `.github/workflows/ci.yml`。
+- 前端：任务详情与列表支持取消/重试/删除。

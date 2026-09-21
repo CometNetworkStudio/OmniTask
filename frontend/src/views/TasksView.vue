@@ -68,8 +68,37 @@ function buildParams() {
   return out
 }
 
-async function createTask() {
-  submitting.value = true
+async function cancelRow(item) {
+  try {
+    await tasksApi.cancel(item.id)
+    ui.notify('已取消')
+    await load()
+  } catch (err) {
+    ui.notify(err.message, 'error')
+  }
+}
+
+async function retryRow(item) {
+  try {
+    await tasksApi.retry(item.id)
+    ui.notify('已重新排队')
+    await load()
+  } catch (err) {
+    ui.notify(err.message, 'error')
+  }
+}
+
+async function removeRow(item) {
+  try {
+    await tasksApi.remove(item.id)
+    ui.notify('已删除')
+    await load()
+  } catch (err) {
+    ui.notify(err.message, 'error')
+  }
+}
+
+async function createTask() {  submitting.value = true
   try {
     const task = await tasksApi.create({
       platform: form.platform,
@@ -144,14 +173,41 @@ async function createTask() {
           {{ formatTime(item.created_at) }}
         </template>
         <template #item.actions="{ item }">
-          <v-btn
-            size="small"
-            variant="text"
-            color="primary"
-            @click.stop="router.push(`/tasks/${item.id}`)"
-          >
-            详情
-          </v-btn>
+          <div class="d-flex align-center justify-end ga-1">
+            <v-btn
+              size="small"
+              variant="text"
+              color="primary"
+              @click.stop="router.push(`/tasks/${item.id}`)"
+            >
+              详情
+            </v-btn>
+            <v-menu location="bottom end">
+              <template #activator="{ props }">
+                <v-btn size="small" variant="text" icon="mdi-dots-vertical" v-bind="props" @click.stop />
+              </template>
+              <v-list density="compact">
+                <v-list-item
+                  v-if="['pending', 'queued', 'running'].includes(item.status)"
+                  title="取消"
+                  prepend-icon="mdi-stop"
+                  @click="cancelRow(item)"
+                />
+                <v-list-item
+                  v-if="['failed', 'canceled', 'interrupted'].includes(item.status)"
+                  title="重试"
+                  prepend-icon="mdi-refresh"
+                  @click="retryRow(item)"
+                />
+                <v-list-item
+                  v-if="!['running', 'queued'].includes(item.status)"
+                  title="删除"
+                  prepend-icon="mdi-delete"
+                  @click="removeRow(item)"
+                />
+              </v-list>
+            </v-menu>
+          </div>
         </template>
         <template #no-data>
           <div class="pa-6 text-medium-emphasis">暂无任务，点击右上角「新建任务」</div>

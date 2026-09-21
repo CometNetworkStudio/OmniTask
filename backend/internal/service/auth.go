@@ -11,6 +11,7 @@ import (
 	"backend/pkg/jwt"
 	"backend/pkg/log"
 	"backend/pkg/sid"
+	"github.com/spf13/viper"
 	"golang.org/x/crypto/bcrypt"
 	"gorm.io/gorm"
 )
@@ -21,14 +22,18 @@ type AuthService struct {
 	userRepo *repository.UserRepository
 	sid      *sid.Sid
 	jwt      *jwt.JWT
+	conf     *viper.Viper
 	logger   *log.Logger
 }
 
-func NewAuthService(userRepo *repository.UserRepository, sid *sid.Sid, jwt *jwt.JWT, logger *log.Logger) *AuthService {
-	return &AuthService{userRepo: userRepo, sid: sid, jwt: jwt, logger: logger}
+func NewAuthService(userRepo *repository.UserRepository, sid *sid.Sid, jwt *jwt.JWT, conf *viper.Viper, logger *log.Logger) *AuthService {
+	return &AuthService{userRepo: userRepo, sid: sid, jwt: jwt, conf: conf, logger: logger}
 }
 
 func (s *AuthService) Register(ctx context.Context, req *v1.RegisterRequest) (*v1.LoginResponse, error) {
+	if s.conf.GetString("security.registration") == "closed" {
+		return nil, v1.ErrRegistrationClosed
+	}
 	if _, err := s.userRepo.GetByUsername(ctx, req.Username); err == nil {
 		return nil, v1.ErrUserAlreadyExists
 	} else if !errors.Is(err, gorm.ErrRecordNotFound) {

@@ -54,6 +54,9 @@ func seed(e *casbin.Enforcer) error {
 		{"user", "/api/v1/tasks", "GET"},
 		{"user", "/api/v1/tasks", "POST"},
 		{"user", "/api/v1/tasks/:id", "GET"},
+		{"user", "/api/v1/tasks/:id", "DELETE"},
+		{"user", "/api/v1/tasks/:id/cancel", "POST"},
+		{"user", "/api/v1/tasks/:id/retry", "POST"},
 		{"user", "/api/v1/questions", "GET"},
 		{"user", "/api/v1/questions/lookup", "GET"},
 	}

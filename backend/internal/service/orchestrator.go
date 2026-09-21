@@ -3,20 +3,23 @@ package service
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"sync"
 	"time"
 
 	agentv1 "backend/api/agent/v1"
+	v1 "backend/api/v1"
 	"backend/internal/model"
 	"backend/internal/repository"
 	"backend/internal/ws"
 	"backend/pkg/log"
 	"backend/pkg/sid"
+	"github.com/spf13/viper"
 	"go.uber.org/zap"
 )
 
 // Orchestrator 轮询 pending 任务，解密凭据后经 gRPC 下发给 Agent，
-// 汇聚事件到 Redis / TaskEvent / WebSocket。
+// 汇聚事件到进度存储 / TaskEvent / WebSocket；支持取消与超时。
 type Orchestrator struct {
 	taskRepo *repository.TaskRepository
 	creds    *CredentialService
@@ -28,8 +31,13 @@ type Orchestrator struct {
 
 	sem      chan struct{}
 	interval time.Duration
-	cancel   context.CancelFunc
-	wg       sync.WaitGroup
+	timeout  time.Duration
+
+	mu      sync.Mutex
+	running map[string]context.CancelFunc
+
+	cancel context.CancelFunc
+	wg     sync.WaitGroup
 }
 
 func NewOrchestrator(
@@ -39,6 +47,7 @@ func NewOrchestrator(
 	progress *ProgressStore,
 	hub *ws.Hub,
 	sid *sid.Sid,
+	conf *viper.Viper,
 	logger *log.Logger,
 ) *Orchestrator {
 	return &Orchestrator{
@@ -51,11 +60,16 @@ func NewOrchestrator(
 		logger:   logger,
 		sem:      make(chan struct{}, 4),
 		interval: 2 * time.Second,
+		timeout:  conf.GetDuration("agent.task_timeout"),
+		running:  map[string]context.CancelFunc{},
 	}
 }
 
 func (o *Orchestrator) Start(ctx context.Context) error {
 	ctx, o.cancel = context.WithCancel(ctx)
+	if n, err := o.taskRepo.MarkStaleInterrupted(ctx); err == nil && n > 0 {
+		o.logger.Info("marked stale tasks interrupted", zap.Int64("count", n))
+	}
 	o.wg.Add(1)
 	go o.loop(ctx)
 	o.logger.Info("orchestrator started", zap.String("agent", "see config agent.addr"))
@@ -107,11 +121,30 @@ func (o *Orchestrator) dispatch(ctx context.Context) {
 	}
 }
 
+func (o *Orchestrator) register(taskID string, cancel context.CancelFunc) {
+	o.mu.Lock()
+	o.running[taskID] = cancel
+	o.mu.Unlock()
+}
+
+func (o *Orchestrator) unregister(taskID string) {
+	o.mu.Lock()
+	delete(o.running, taskID)
+	o.mu.Unlock()
+}
+
 func (o *Orchestrator) run(ctx context.Context, task model.Task) {
-	startedAt := time.Now()
+	runCtx, cancel := context.WithCancel(ctx)
+	if o.timeout > 0 {
+		runCtx, cancel = context.WithTimeout(ctx, o.timeout)
+	}
+	defer cancel()
+	o.register(task.ID, cancel)
+	defer o.unregister(task.ID)
+
 	_ = o.taskRepo.UpdateStatus(ctx, task.ID, map[string]interface{}{
 		"status":     "running",
-		"started_at": startedAt,
+		"started_at": time.Now(),
 	})
 	o.publish(ctx, task.ID, "running", task.Progress, "任务开始", nil)
 
@@ -132,7 +165,7 @@ func (o *Orchestrator) run(ctx context.Context, task model.Task) {
 		Credentials: creds,
 	}
 	terminal := false
-	err = o.agent.Execute(ctx, req, func(ev *agentv1.ExecuteEvent) {
+	err = o.agent.Execute(runCtx, req, func(ev *agentv1.ExecuteEvent) {
 		switch ev.GetType() {
 		case agentv1.EventType_EVENT_TYPE_SUCCEEDED:
 			terminal = true
@@ -145,12 +178,45 @@ func (o *Orchestrator) run(ctx context.Context, task model.Task) {
 		}
 	})
 	if err != nil {
-		o.fail(ctx, task.ID, "agent 通讯失败: "+err.Error())
+		switch {
+		case errors.Is(runCtx.Err(), context.Canceled):
+			// 取消已由 CancelTask 落库并广播，这里不覆盖状态
+		case errors.Is(runCtx.Err(), context.DeadlineExceeded):
+			o.fail(ctx, task.ID, "任务超时")
+		default:
+			o.fail(ctx, task.ID, "agent 通讯失败: "+err.Error())
+		}
 		return
 	}
 	if !terminal {
 		o.fail(ctx, task.ID, "agent 事件流意外结束")
 	}
+}
+
+// CancelTask 取消用户自己的任务：运行中则中断子进程，排队/待执行则直接标记。
+func (o *Orchestrator) CancelTask(ctx context.Context, userID, taskID string) error {
+	task, err := o.taskRepo.Get(ctx, userID, taskID)
+	if err != nil {
+		return v1.ErrTaskNotFound
+	}
+	switch task.Status {
+	case "succeeded", "failed", "canceled", "interrupted":
+		return v1.ErrTaskNotCancelable
+	}
+	o.mu.Lock()
+	cancel, running := o.running[taskID]
+	o.mu.Unlock()
+
+	_ = o.taskRepo.UpdateStatus(ctx, taskID, map[string]interface{}{
+		"status":      "canceled",
+		"error":       "用户取消",
+		"finished_at": time.Now(),
+	})
+	o.publish(ctx, taskID, "canceled", task.Progress, "已取消", nil)
+	if running && cancel != nil {
+		cancel()
+	}
+	return nil
 }
 
 func (o *Orchestrator) publish(ctx context.Context, taskID, status string, percent int, message string, result map[string]string) {

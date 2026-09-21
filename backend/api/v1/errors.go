@@ -20,4 +20,6 @@ var (
 	ErrCredentialDecrypt    = newError(1008, "凭据解密失败")
 	ErrMasterKeyUnavailable = newError(1009, "主密钥未配置")
 	ErrForbidden            = newError(1010, "无权限访问")
+	ErrTaskNotCancelable    = newError(1011, "当前任务不可取消")
+	ErrRegistrationClosed   = newError(1012, "注册已关闭")
 )

@@ -18,6 +18,8 @@ mode: lite
 http:
   host: 127.0.0.1
   port: 8080
+  swagger: false
+  cors_origins: ""
   tls:
     enabled: false
     cert_file: ""
@@ -33,7 +35,9 @@ agent:
   python: python3
   pythonpath: sdk/python
   bank_addr: 127.0.0.1:9000
+  task_timeout: 0s
 security:
+  registration: open
   jwt:
     key: ""
   master_key: ""

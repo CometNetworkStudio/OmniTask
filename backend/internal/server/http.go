@@ -1,6 +1,8 @@
 package server
 
 import (
+	"strings"
+
 	apiV1 "backend/api/v1"
 	"backend/docs"
 	"backend/internal/middleware"
@@ -30,17 +32,24 @@ func NewHTTPServer(
 	}
 	s := http.NewServer(gin.Default(), deps.Logger, opts...)
 
-	// swagger doc
-	docs.SwaggerInfo.BasePath = "/api/v1"
-	s.GET("/swagger/*any", ginSwagger.WrapHandler(
-		swaggerfiles.Handler,
-		//ginSwagger.URL(fmt.Sprintf("http://localhost:%d/swagger/doc.json", deps.Config.GetInt("app.http.port"))),
-		ginSwagger.DefaultModelsExpandDepth(-1),
-		ginSwagger.PersistAuthorization(true),
-	))
+	// swagger doc（生产默认关闭，可用 http.swagger 强制开启）
+	if deps.Config.GetBool("http.swagger") || deps.Config.GetString("env") != "prod" {
+		docs.SwaggerInfo.BasePath = "/api/v1"
+		s.GET("/swagger/*any", ginSwagger.WrapHandler(
+			swaggerfiles.Handler,
+			ginSwagger.DefaultModelsExpandDepth(-1),
+			ginSwagger.PersistAuthorization(true),
+		))
+	}
 
+	origins := make([]string, 0)
+	for _, origin := range strings.Split(deps.Config.GetString("http.cors_origins"), ",") {
+		if trimmed := strings.TrimSpace(origin); trimmed != "" {
+			origins = append(origins, trimmed)
+		}
+	}
 	s.Use(
-		middleware.CORSMiddleware(),
+		middleware.CORSMiddleware(origins),
 		middleware.ResponseLogMiddleware(deps.Logger),
 		middleware.RequestLogMiddleware(deps.Logger),
 		//middleware.SignMiddleware(log),
@@ -68,6 +77,9 @@ func NewHTTPServer(
 		authed.POST("/tasks", deps.TaskHandler.Create)
 		authed.GET("/tasks", deps.TaskHandler.List)
 		authed.GET("/tasks/:id", deps.TaskHandler.Get)
+		authed.POST("/tasks/:id/cancel", deps.TaskHandler.Cancel)
+		authed.POST("/tasks/:id/retry", deps.TaskHandler.Retry)
+		authed.DELETE("/tasks/:id", deps.TaskHandler.Delete)
 		authed.GET("/questions", deps.QuestionHandler.List)
 		authed.POST("/questions", deps.QuestionHandler.Save)
 		authed.GET("/questions/lookup", deps.QuestionHandler.Lookup)

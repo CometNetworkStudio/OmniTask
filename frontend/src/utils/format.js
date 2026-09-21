@@ -11,6 +11,8 @@ export const STATUS_META = {
   running: { text: '执行中', color: 'warning' },
   succeeded: { text: '成功', color: 'success' },
   failed: { text: '失败', color: 'error' },
+  canceled: { text: '已取消', color: 'grey' },
+  interrupted: { text: '已中断', color: 'warning' },
 }
 
 export function statusMeta(status) {
