@@ -101,7 +101,7 @@ func NewDB(conf *viper.Viper, l *log.Logger) *gorm.DB {
 	if driver == "sqlite" {
 		if err := db.AutoMigrate(
 			&model.User{}, &model.Credential{}, &model.Task{},
-			&model.TaskEvent{}, &model.Question{}, &model.Script{},
+			&model.TaskEvent{}, &model.Question{}, &model.Script{}, &model.PlatformCache{},
 		); err != nil {
 			panic(err)
 		}

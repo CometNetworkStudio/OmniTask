@@ -20,21 +20,29 @@ type Action struct {
 	Command []string `json:"command"` // CLI 桥用：该动作要执行的命令（可含 {占位符}）
 }
 
+// Discovery 声明该平台“任务列表/发现”的展示 schema（列表接口返回原始字段，前端按此渲染）。
+type Discovery struct {
+	Label   string   `json:"label"`
+	Columns []Field  `json:"columns"`
+	Actions []string `json:"actions"`
+}
+
 // Manifest 对应脚本目录下的 script.json。
 type Manifest struct {
-	ID            string   `json:"id"`
-	Name          string   `json:"name"`
-	Version       string   `json:"version"`
-	Author        string   `json:"author"`
-	Runtime       string   `json:"runtime"`
-	Entry         string   `json:"entry"`
-	Module        string   `json:"module"` // 与 entry 二选一：用 python -m module 启动
-	Args          []string `json:"args"`
-	Requires      []string `json:"requires"`
-	ProgressRegex string   `json:"progress_regex"` // CLI 桥从输出提取进度的正则（可选）
-	Actions       []Action `json:"actions"`
-	Credentials   []Field  `json:"credentials"`
-	Params        []Field  `json:"params"`
+	ID            string     `json:"id"`
+	Name          string     `json:"name"`
+	Version       string     `json:"version"`
+	Author        string     `json:"author"`
+	Runtime       string     `json:"runtime"`
+	Entry         string     `json:"entry"`
+	Module        string     `json:"module"` // 与 entry 二选一：用 python -m module 启动
+	Args          []string   `json:"args"`
+	Requires      []string   `json:"requires"`
+	ProgressRegex string     `json:"progress_regex"` // CLI 桥从输出提取进度的正则（可选）
+	Actions       []Action   `json:"actions"`
+	Credentials   []Field    `json:"credentials"`
+	Params        []Field    `json:"params"`
+	Discovery     *Discovery `json:"discovery"`
 }
 
 type Script struct {

@@ -79,3 +79,13 @@ type Script struct {
 	InstalledAt time.Time
 	UpdatedAt   time.Time
 }
+
+// PlatformCache 缓存某用户在平台的“任务/条目列表”（原始字段存 JSON，前端按 manifest schema 渲染）。
+type PlatformCache struct {
+	ID          string `gorm:"primaryKey;size:32"`
+	UserID      string `gorm:"uniqueIndex:uk_platform_cache;size:32;not null"`
+	Platform    string `gorm:"uniqueIndex:uk_platform_cache;size:32;not null"`
+	Items       string `gorm:"type:json"`
+	RefreshedAt time.Time
+	UpdatedAt   time.Time
+}

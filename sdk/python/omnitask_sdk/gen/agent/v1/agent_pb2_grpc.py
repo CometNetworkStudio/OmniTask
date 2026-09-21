@@ -46,6 +46,11 @@ class AgentServiceStub:
                 request_serializer=agent_dot_v1_dot_agent__pb2.ExecuteRequest.SerializeToString,
                 response_deserializer=agent_dot_v1_dot_agent__pb2.ExecuteEvent.FromString,
                 _registered_method=True)
+        self.Discover = channel.unary_unary(
+                '/agent.v1.AgentService/Discover',
+                request_serializer=agent_dot_v1_dot_agent__pb2.DiscoverRequest.SerializeToString,
+                response_deserializer=agent_dot_v1_dot_agent__pb2.DiscoverResponse.FromString,
+                _registered_method=True)
 
 
 class AgentServiceServicer:
@@ -65,6 +70,13 @@ class AgentServiceServicer:
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
+    def Discover(self, request, context):
+        """Discover 列出该账号在平台上的条目（课程/任务等），用于前端选择。
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
 
 def add_AgentServiceServicer_to_server(servicer, server):
     rpc_method_handlers = {
@@ -77,6 +89,11 @@ def add_AgentServiceServicer_to_server(servicer, server):
                     servicer.Execute,
                     request_deserializer=agent_dot_v1_dot_agent__pb2.ExecuteRequest.FromString,
                     response_serializer=agent_dot_v1_dot_agent__pb2.ExecuteEvent.SerializeToString,
+            ),
+            'Discover': grpc.unary_unary_rpc_method_handler(
+                    servicer.Discover,
+                    request_deserializer=agent_dot_v1_dot_agent__pb2.DiscoverRequest.FromString,
+                    response_serializer=agent_dot_v1_dot_agent__pb2.DiscoverResponse.SerializeToString,
             ),
     }
     generic_handler = grpc.method_handlers_generic_handler(
@@ -135,6 +152,33 @@ class AgentService:
             '/agent.v1.AgentService/Execute',
             agent_dot_v1_dot_agent__pb2.ExecuteRequest.SerializeToString,
             agent_dot_v1_dot_agent__pb2.ExecuteEvent.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def Discover(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/agent.v1.AgentService/Discover',
+            agent_dot_v1_dot_agent__pb2.DiscoverRequest.SerializeToString,
+            agent_dot_v1_dot_agent__pb2.DiscoverResponse.FromString,
             options,
             channel_credentials,
             insecure,

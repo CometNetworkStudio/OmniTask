@@ -357,3 +357,11 @@ cd frontend && npm run build
 - 验证：OmniTask 脚本页安装成功；Host `Health` 识别 `chaoxing`；任务链路 后端→Host→适配器→main.py 正常（因未装 chaoxing 依赖按预期 `failed`）。
 - 实机运行需：`agent.auto_install_deps: true`（安装其较重依赖，含 ddddocr）或手动装；建议 Python 3.13。
 - 许可：该仓库整体仍 GPL-3.0；上游“禁止盈利/闭源商用”声明继续有效；本项目/its SDK 保持 MIT，仅进程边界协作。
+
+
+## 27. 平台发现（Discovery）与平台 schema 上后端（2026-09）
+- **proto**：`AgentService.Discover(DiscoverRequest) → DiscoverResponse{items[key,fields]}`；SDK 新增 `@listing()`；Host 新增 `Discover`（子进程发送 `type:discover`，收集 `type:items`）。
+- **后端**：`platform_caches` 表（迁移 000004，items 存 JSON、刷新人限流 `discovery.min_interval` 默认 60s）；`DiscoverService`；接口 `GET /api/v1/platforms`（完整 manifest schema，任意登录用户）、`GET /api/v1/platforms/:id/items`、`POST /api/v1/platforms/:id/discover`；Casbin 放行 user。
+- **脚本**：cidaren/welearn/chaoxing 均新增 `@listing` 与 manifest `discovery`（已推送三个脚本仓库）。
+- **说明**：注册表里的 manifest 是**安装时**快照，新增 discovery 后需**重新安装**脚本以刷新；已在部署环境重装并验证 `/platforms` 返回三平台 schema。
+- **待办**：前端改为从 `/platforms` 动态获取（删除写死 platforms.js）、发现列表 UI、Home/引导/名句。

@@ -9,6 +9,24 @@ option go_package = "backend/api/agent/v1;agentv1";
 service AgentService {
   rpc Health(HealthRequest) returns (HealthResponse);
   rpc Execute(ExecuteRequest) returns (stream ExecuteEvent);
+  // Discover 列出该账号在平台上的条目（课程/任务等），用于前端选择。
+  rpc Discover(DiscoverRequest) returns (DiscoverResponse);
+}
+
+message DiscoverRequest {
+  string platform = 1;
+  map<string, string> params = 2;
+  // 已由后端解密后下发的凭据，Agent 不得持久化。
+  map<string, string> credentials = 3;
+}
+
+message DiscoverItem {
+  string key = 1;                 // 唯一标识（如课程 ID）
+  map<string, string> fields = 2; // 展示字段，key 对应 manifest 的 discovery.columns[].key
+}
+
+message DiscoverResponse {
+  repeated DiscoverItem items = 1;
 }
 
 message HealthRequest {}

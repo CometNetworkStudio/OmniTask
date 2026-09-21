@@ -14,6 +14,12 @@
 ## P0 补充
 - [ ] 启用 GitHub Actions：把 `docs/github-actions-ci.yml` 复制到 `.github/workflows/ci.yml` 提交（需 token 具备 `workflow` 权限，或在 GitHub 网页添加）。
 
+## 前端（下一批）
+- [ ] 用 Pinia `platforms` store 取代写死的 `frontend/src/config/platforms.js`（改从 `GET /api/v1/platforms` 取）；安装/卸载/启停脚本后刷新。
+- [ ] 新建任务：先选平台→（有 discovery 时）刷新/选择条目→仅填“执行参数”创建。
+- [ ] Home 仪表盘 + 新手引导（localStorage）+ 古文名句。
+- [ ] 根路径重定向到 `/home`。
+
 ## P1 体验 / 功能
 ### 已完成
 - [x] `/api/v1/me`：返回当前用户与角色；前端启动 `fetchMe` 刷新。

@@ -56,6 +56,8 @@ data:
 pagination:
   default: 100
   max: 1000
+discovery:
+  min_interval: 60
 log:
   log_level: info
   mode: both

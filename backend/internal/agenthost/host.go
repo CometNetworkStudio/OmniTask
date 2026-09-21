@@ -16,6 +16,8 @@ import (
 	"backend/pkg/log"
 	"github.com/spf13/viper"
 	"go.uber.org/zap"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 
 const Version = "agent-go/0.1.0"
@@ -156,15 +158,7 @@ func (h *Host) Execute(req *agentv1.ExecuteRequest, stream agentv1.AgentService_
 	if !ok {
 		return h.fail(stream, taskID, "platform unavailable: "+req.GetPlatform())
 	}
-
-	args := make([]string, 0, len(script.Manifest.Args)+2)
-	if script.Manifest.Module != "" {
-		args = append(args, "-m", script.Manifest.Module)
-	} else {
-		args = append(args, script.Manifest.Entry)
-	}
-	args = append(args, script.Manifest.Args...)
-	cmd := exec.CommandContext(stream.Context(), runtimePath, args...)
+	cmd := exec.CommandContext(stream.Context(), runtimePath, commandArgs(script.Manifest)...)
 	cmd.Dir = script.Dir
 	env := os.Environ()
 	if h.sdkDir != "" {
@@ -246,6 +240,92 @@ func (h *Host) Execute(req *agentv1.ExecuteRequest, stream agentv1.AgentService_
 		return h.fail(stream, taskID, msg)
 	}
 	return nil
+}
+
+func commandArgs(m Manifest) []string {
+	args := make([]string, 0, len(m.Args)+2)
+	if m.Module != "" {
+		args = append(args, "-m", m.Module)
+	} else {
+		args = append(args, m.Entry)
+	}
+	return append(args, m.Args...)
+}
+
+type discoverRequest struct {
+	Type        string            `json:"type"`
+	Platform    string            `json:"platform"`
+	Params      map[string]string `json:"params"`
+	Credentials map[string]string `json:"credentials"`
+}
+
+// Discover 让脚本列出该账号在平台上的条目（@listing）。
+func (h *Host) Discover(ctx context.Context, req *agentv1.DiscoverRequest) (*agentv1.DiscoverResponse, error) {
+	h.reload()
+	script, runtimePath, ok := h.lookup(req.GetPlatform())
+	if !ok {
+		return nil, status.Error(codes.Unavailable, "platform unavailable: "+req.GetPlatform())
+	}
+
+	cmd := exec.CommandContext(ctx, runtimePath, commandArgs(script.Manifest)...)
+	cmd.Dir = script.Dir
+	env := os.Environ()
+	if h.sdkDir != "" {
+		env = append(env, "OMNITASK_SDK="+h.sdkDir, "PYTHONPATH="+h.sdkDir)
+	}
+	if h.bankAddr != "" {
+		env = append(env, "OMNITASK_BANK_ADDR="+h.bankAddr, "OMNITASK_BANK_MODE=grpc")
+	}
+	cmd.Env = env
+
+	stdin, err := cmd.StdinPipe()
+	if err != nil {
+		return nil, status.Error(codes.Internal, err.Error())
+	}
+	stdout, err := cmd.StdoutPipe()
+	if err != nil {
+		return nil, status.Error(codes.Internal, err.Error())
+	}
+	var stderr strings.Builder
+	cmd.Stderr = &stderr
+	if err := cmd.Start(); err != nil {
+		return nil, status.Error(codes.Internal, err.Error())
+	}
+	payload, _ := json.Marshal(discoverRequest{
+		Type:        "discover",
+		Platform:    req.GetPlatform(),
+		Params:      req.GetParams(),
+		Credentials: req.GetCredentials(),
+	})
+	_, _ = stdin.Write(append(payload, '\n'))
+	_ = stdin.Close()
+
+	var message struct {
+		Type  string `json:"type"`
+		Items []struct {
+			Key    string            `json:"key"`
+			Fields map[string]string `json:"fields"`
+		} `json:"items"`
+	}
+	scanner := bufio.NewScanner(stdout)
+	scanner.Buffer(make([]byte, 0, 64*1024), 4*1024*1024)
+	for scanner.Scan() {
+		line := strings.TrimSpace(scanner.Text())
+		if line == "" {
+			continue
+		}
+		if err := json.Unmarshal([]byte(line), &message); err != nil || message.Type != "items" {
+			continue
+		}
+		resp := &agentv1.DiscoverResponse{}
+		for _, item := range message.Items {
+			resp.Items = append(resp.Items, &agentv1.DiscoverItem{Key: item.Key, Fields: item.Fields})
+		}
+		_ = cmd.Wait()
+		return resp, nil
+	}
+	_ = cmd.Wait()
+	return nil, status.Error(codes.Internal, "discover 未返回条目: "+lastLine(stderr.String()))
 }
 
 func (h *Host) fail(stream agentv1.AgentService_ExecuteServer, taskID, message string) error {

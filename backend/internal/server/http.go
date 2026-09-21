@@ -95,6 +95,10 @@ func NewHTTPServer(
 		authed.POST("/users/:id/role", deps.UserHandler.UpdateRole)
 		authed.POST("/users/:id/enable", deps.UserHandler.SetEnabled)
 
+		authed.GET("/platforms", deps.PlatformHandler.List)
+		authed.GET("/platforms/:id/items", deps.PlatformHandler.Items)
+		authed.POST("/platforms/:id/discover", deps.PlatformHandler.Refresh)
+
 		ws := v1Group.Group("/ws")
 		ws.Use(middleware.NoStrictAuth(deps.JWT, deps.Logger))
 		ws.GET("", deps.WSHandler.Handle)

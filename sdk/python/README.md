@@ -72,6 +72,7 @@ serve(run)
 | `omnitask_sdk.runtime` | `serve(target=None)`：stdio JSON 运行时 |
 | `omnitask_sdk.decorator` | `action(name)` / `registered_actions()` |
 | `omnitask_sdk.context` | `AdapterContext`：`params`/`credentials`/`progress()`/`log()`/`result` |
+| `omnitask_sdk.listing` | `listing()`：发现（列出平台条目，供 OmniTask 选择） |
 | `omnitask_sdk.bridge` | CLI 桥 |
 | `omnitask_sdk.http` | requests 会话（重试/超时/Brotli/代理） |
 | `omnitask_sdk.ratelimit` | 平台并发 + 同账号串行 + 随机间隔 |

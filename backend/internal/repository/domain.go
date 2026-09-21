@@ -284,3 +284,24 @@ func (repo *UserRepository) SetEnabled(ctx context.Context, id string, enabled b
 	return repo.r.DB(ctx).Model(&model.User{}).Where("id = ?", id).
 		Updates(map[string]interface{}{"enabled": enabled, "updated_at": time.Now()}).Error
 }
+
+type PlatformCacheRepository struct{ r *Repository }
+
+func NewPlatformCacheRepository(r *Repository) *PlatformCacheRepository {
+	return &PlatformCacheRepository{r: r}
+}
+
+func (repo *PlatformCacheRepository) Get(ctx context.Context, userID, platform string) (*model.PlatformCache, error) {
+	var cache model.PlatformCache
+	if err := repo.r.DB(ctx).Where("user_id = ? AND platform = ?", userID, platform).First(&cache).Error; err != nil {
+		return nil, err
+	}
+	return &cache, nil
+}
+
+func (repo *PlatformCacheRepository) Upsert(ctx context.Context, cache *model.PlatformCache) error {
+	return repo.r.DB(ctx).Clauses(clause.OnConflict{
+		Columns:   []clause.Column{{Name: "user_id"}, {Name: "platform"}},
+		DoUpdates: clause.AssignmentColumns([]string{"items", "refreshed_at", "updated_at"}),
+	}).Create(cache).Error
+}

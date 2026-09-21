@@ -144,3 +144,17 @@ python main.py --cli --action time --param cid=2416 --credential username=u --cr
 
 - 脚本以宿主权限运行，恶意脚本可窃取凭据/攻击主机；仅安装可信来源并固定 commit。
 - 平台不背书脚本内容，责任由脚本作者与安装者承担。
+
+
+## 9. 发现（Discover / @listing）
+
+除 `Execute` 外，Agent 还提供 `Discover`：列出账号在平台上的条目（课程/任务），供前端选择。
+
+- 请求：`DiscoverRequest{platform, params, credentials}`；Host 以子进程发送 `{"type":"discover",...}`。
+- 脚本（Python SDK）：用 `@listing()` 注册发现函数，返回条目列表；运行时归一化后输出
+  `{"type":"items","items":[{"key":"...","fields":{...}}]}`。
+- manifest 用 `discovery` 声明展示 schema（不新增平台也无需改前端）：
+  ```json
+  "discovery": { "label": "课程", "columns": [{"key":"cid","label":"课程ID","type":"text"}], "actions": ["time","progress"] }
+  ```
+- 后端缓存每个用户在平台的条目，并按 `discovery.min_interval`（默认 60s）限流刷新。

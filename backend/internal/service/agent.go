@@ -56,3 +56,13 @@ func (c *AgentClient) Execute(ctx context.Context, req *agentv1.ExecuteRequest, 
 		onEvent(event)
 	}
 }
+
+// Discover 列出该账号在平台上的条目（脚本用 @listing 实现）。
+func (c *AgentClient) Discover(ctx context.Context, req *agentv1.DiscoverRequest) (*agentv1.DiscoverResponse, error) {
+	conn, err := c.dial()
+	if err != nil {
+		return nil, err
+	}
+	defer conn.Close()
+	return agentv1.NewAgentServiceClient(conn).Discover(ctx, req)
+}

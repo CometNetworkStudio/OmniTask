@@ -23,15 +23,17 @@ import sys
 
 from .context import AdapterContext
 from .decorator import registered_actions
+from .listing import registered_listings
 
 
 def serve(target=None) -> None:
-    """从 stdin 读一条 execute 请求并执行，事件写 stdout（一行一个 JSON）。
+    """从 stdin 读一条请求（execute 或 discover）并处理，结果写 stdout。
 
     target：可选。传入 ``run(action, params, credentials)`` 生成器即旧式；
-    不传则使用 ``@action`` 注册的动作。
+    不传则使用 ``@action`` 注册的动作。discover 使用 ``@listing`` 注册的函数。
     """
     handlers = None if callable(target) else registered_actions()
+    listers = registered_listings()
     for line in sys.stdin:
         line = line.strip()
         if not line:
@@ -41,7 +43,14 @@ def serve(target=None) -> None:
         except Exception:
             _raw_error("", "invalid request json")
             return
-        if request.get("type") != "execute":
+        request_type = request.get("type")
+        if request_type == "discover":
+            try:
+                _run_discover(listers, request)
+            except Exception as exc:  # noqa: BLE001
+                _raw_error("", f"{type(exc).__name__}: {exc}")
+            return
+        if request_type != "execute":
             continue
         task_id = request.get("task_id", "")
         action_id = request.get("action", "")
@@ -84,6 +93,41 @@ def _run_action(handlers, action_id, params, credentials, task_id) -> dict:
         for event in outcome:
             _emit_progress(task_id, event if isinstance(event, dict) else {"message": str(event)})
     return ctx.result
+
+
+def _run_discover(listers, request) -> None:
+    platform = request.get("platform", "")
+    params = request.get("params") or {}
+    credentials = request.get("credentials") or {}
+    func = listers.get("default") or next(iter(listers.values()), None)
+    if func is None:
+        raise RuntimeError("未注册发现函数（请用 @listing 注册）")
+    ctx = AdapterContext(params, credentials, lambda _ev: None, action="discover")
+    outcome = func(ctx)
+    if isinstance(outcome, dict) and "items" in outcome:
+        raw_items = outcome["items"]
+    elif hasattr(outcome, "__iter__") and not isinstance(outcome, (dict, str, bytes)):
+        raw_items = list(outcome)
+    else:
+        raw_items = outcome or []
+    items = [_normalize_item(item) for item in raw_items]
+    _emit({"type": "items", "platform": platform, "items": items})
+
+
+def _normalize_item(item) -> dict:
+    if not isinstance(item, dict):
+        return {"key": str(item), "fields": {"value": str(item)}}
+    if isinstance(item.get("fields"), dict):
+        key = str(item.get("key") or item.get("id") or "")
+        fields = {str(k): _str(v) for k, v in item["fields"].items()}
+        return {"key": key, "fields": fields}
+    key = str(item.get("key") or item.get("id") or item.get("course_id") or "")
+    fields = {str(k): _str(v) for k, v in item.items() if k != "key"}
+    return {"key": key, "fields": fields}
+
+
+def _str(value) -> str:
+    return "" if value is None else str(value)
 
 
 def _emit_progress(task_id: str, event: dict) -> None:
