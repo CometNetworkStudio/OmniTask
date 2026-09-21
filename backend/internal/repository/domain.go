@@ -253,3 +253,28 @@ func (repo *TaskRepository) Reset(ctx context.Context, userID, id string) error 
 			"finished_at": nil,
 		}).Error
 }
+
+func (repo *UserRepository) List(ctx context.Context, limit, offset int) ([]model.User, int64, error) {
+	var (
+		users []model.User
+		total int64
+	)
+	q := repo.r.DB(ctx).Model(&model.User{})
+	if err := q.Count(&total).Error; err != nil {
+		return nil, 0, err
+	}
+	if err := q.Order("created_at ASC").Limit(limit).Offset(offset).Find(&users).Error; err != nil {
+		return nil, 0, err
+	}
+	return users, total, nil
+}
+
+func (repo *UserRepository) UpdateRole(ctx context.Context, id, role string) error {
+	return repo.r.DB(ctx).Model(&model.User{}).Where("id = ?", id).
+		Updates(map[string]interface{}{"role": role, "updated_at": time.Now()}).Error
+}
+
+func (repo *UserRepository) SetEnabled(ctx context.Context, id string, enabled bool) error {
+	return repo.r.DB(ctx).Model(&model.User{}).Where("id = ?", id).
+		Updates(map[string]interface{}{"enabled": enabled, "updated_at": time.Now()}).Error
+}

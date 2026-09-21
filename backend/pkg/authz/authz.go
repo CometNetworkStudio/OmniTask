@@ -59,6 +59,7 @@ func seed(e *casbin.Enforcer) error {
 		{"user", "/api/v1/tasks/:id/retry", "POST"},
 		{"user", "/api/v1/questions", "GET"},
 		{"user", "/api/v1/questions/lookup", "GET"},
+		{"user", "/api/v1/me", "GET"},
 	}
 	for _, p := range policies {
 		if _, err := e.AddPolicy(p[0], p[1], p[2]); err != nil {

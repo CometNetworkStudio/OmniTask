@@ -10,6 +10,7 @@ import (
 	"backend/internal/repository"
 	"backend/pkg/log"
 	"backend/pkg/sid"
+	"github.com/spf13/viper"
 	"gorm.io/gorm"
 )
 
@@ -21,11 +22,12 @@ type TaskService struct {
 	repo       *repository.TaskRepository
 	scriptRepo *repository.ScriptRepository
 	sid        *sid.Sid
+	conf       *viper.Viper
 	logger     *log.Logger
 }
 
-func NewTaskService(repo *repository.TaskRepository, scriptRepo *repository.ScriptRepository, sid *sid.Sid, logger *log.Logger) *TaskService {
-	return &TaskService{repo: repo, scriptRepo: scriptRepo, sid: sid, logger: logger}
+func NewTaskService(repo *repository.TaskRepository, scriptRepo *repository.ScriptRepository, sid *sid.Sid, conf *viper.Viper, logger *log.Logger) *TaskService {
+	return &TaskService{repo: repo, scriptRepo: scriptRepo, sid: sid, conf: conf, logger: logger}
 }
 
 func (s *TaskService) allowedPlatform(ctx context.Context, platform string) bool {
@@ -125,12 +127,7 @@ func (s *TaskService) Delete(ctx context.Context, userID, id string) error {
 }
 
 func (s *TaskService) List(ctx context.Context, userID string, page, size int) ([]v1.TaskResponse, int64, error) {
-	if page < 1 {
-		page = 1
-	}
-	if size < 1 || size > 100 {
-		size = 20
-	}
+	page, size = normalizePage(s.conf, page, size)
 	tasks, total, err := s.repo.ListByUser(ctx, userID, size, (page-1)*size)
 	if err != nil {
 		return nil, 0, err

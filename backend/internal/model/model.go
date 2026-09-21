@@ -13,6 +13,7 @@ type User struct {
 	Username     string `gorm:"uniqueIndex;size:64;not null"`
 	PasswordHash string `gorm:"size:255;not null"`
 	Role         string `gorm:"size:32;not null;default:user"`
+	Enabled      bool   `gorm:"not null;default:true"`
 	CreatedAt    time.Time
 	UpdatedAt    time.Time
 }

@@ -8,6 +8,7 @@ const routes = [
   { path: '/credentials', name: 'credentials', component: () => import('@/views/CredentialsView.vue') },
   { path: '/questions', name: 'questions', component: () => import('@/views/QuestionsView.vue') },
   { path: '/scripts', name: 'scripts', component: () => import('@/views/ScriptsView.vue'), meta: { requiresAdmin: true } },
+  { path: '/users', name: 'users', component: () => import('@/views/UsersView.vue'), meta: { requiresAdmin: true } },
   { path: '/:pathMatch(.*)*', redirect: '/' },
 ]
 

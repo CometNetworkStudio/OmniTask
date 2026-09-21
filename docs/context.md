@@ -319,3 +319,10 @@ cd frontend && npm run build
 - 注册控制 `security.registration: open|closed`；生产默认关闭 Swagger（`http.swagger`）；CORS 白名单 `http.cors_origins`（默认同源）。
 - 自检：`./omnitask.sh check`（后端 build/vet/test + 前端 build + SDK 测试）；GitHub Actions `.github/workflows/ci.yml`。
 - 前端：任务详情与列表支持取消/重试/删除。
+
+## 22. P1（部分）完成（2026-09）
+- `/api/v1/me`；用户管理（admin）：`GET /users`、改角色、启用/禁用；前端「用户」页（admin 路由）。
+- 分页：`pagination.default|max` 配置；前端 `components/DataTable.vue` 统一封装（MD3 风格 + 自研分页页脚）。
+- 布局：抽屉分组导航 + append 底部账号/退出/版权；顶栏头像用 `v-btn` 包装 + `me-2` 修复裁剪；移动端临时抽屉。全程无自定义 CSS（合规）。
+- 用户禁用：登录返回 `1013 账号已被禁用`。
+- 剩余 P1（筛选、脚本页体验、systemd）见 `docs/todo.md`。

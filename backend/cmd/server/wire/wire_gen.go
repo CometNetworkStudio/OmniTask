@@ -48,7 +48,7 @@ func NewWire(viperViper *viper.Viper, logger *log.Logger) (*app.App, func(), err
 	credentialHandler := handler.NewCredentialHandler(credentialService, logger)
 	taskRepository := repository.NewTaskRepository(repositoryRepository)
 	scriptRepository := repository.NewScriptRepository(repositoryRepository)
-	taskService := service.NewTaskService(taskRepository, scriptRepository, sidSid, logger)
+	taskService := service.NewTaskService(taskRepository, scriptRepository, sidSid, viperViper, logger)
 	agentClient := service.NewAgentClient(viperViper, logger)
 	client := repository.NewRedis(viperViper)
 	progressStore := service.NewProgressStore(client)
@@ -56,10 +56,12 @@ func NewWire(viperViper *viper.Viper, logger *log.Logger) (*app.App, func(), err
 	orchestrator := service.NewOrchestrator(taskRepository, credentialService, agentClient, progressStore, hub, sidSid, viperViper, logger)
 	taskHandler := handler.NewTaskHandler(taskService, orchestrator, logger)
 	questionRepository := repository.NewQuestionRepository(repositoryRepository)
-	questionService := service.NewQuestionService(questionRepository, sidSid, logger)
+	questionService := service.NewQuestionService(questionRepository, sidSid, viperViper, logger)
 	questionHandler := handler.NewQuestionHandler(questionService, logger)
 	scriptService := service.NewScriptService(scriptRepository, viperViper, sidSid, logger)
 	scriptHandler := handler.NewScriptHandler(scriptService, logger)
+	userService := service.NewUserService(userRepository, viperViper, logger)
+	userHandler := handler.NewUserHandler(userService, logger)
 	wsHandler := handler.NewWSHandler(hub, progressStore, logger)
 	routerDeps := router.RouterDeps{
 		Logger:            logger,
@@ -71,6 +73,7 @@ func NewWire(viperViper *viper.Viper, logger *log.Logger) (*app.App, func(), err
 		TaskHandler:       taskHandler,
 		QuestionHandler:   questionHandler,
 		ScriptHandler:     scriptHandler,
+		UserHandler:       userHandler,
 		WSHandler:         wsHandler,
 	}
 	httpServer := server.NewHTTPServer(routerDeps)
@@ -85,9 +88,9 @@ func NewWire(viperViper *viper.Viper, logger *log.Logger) (*app.App, func(), err
 
 var repositorySet = wire.NewSet(repository.NewDB, repository.NewRedis, repository.NewRepository, repository.NewUserRepository, repository.NewCredentialRepository, repository.NewTaskRepository, repository.NewQuestionRepository, repository.NewScriptRepository)
 
-var serviceSet = wire.NewSet(sid.NewSid, jwt.NewJwt, crypto.FromConfig, authz.NewEnforcer, ws.NewHub, service.NewAuthService, service.NewCredentialService, service.NewTaskService, service.NewQuestionService, service.NewScriptService, service.NewAgentClient, service.NewProgressStore, service.NewOrchestrator)
+var serviceSet = wire.NewSet(sid.NewSid, jwt.NewJwt, crypto.FromConfig, authz.NewEnforcer, ws.NewHub, service.NewAuthService, service.NewCredentialService, service.NewTaskService, service.NewQuestionService, service.NewScriptService, service.NewUserService, service.NewAgentClient, service.NewProgressStore, service.NewOrchestrator)
 
-var handlerSet = wire.NewSet(handler.NewAuthHandler, handler.NewCredentialHandler, handler.NewTaskHandler, handler.NewQuestionHandler, handler.NewScriptHandler, handler.NewWSHandler)
+var handlerSet = wire.NewSet(handler.NewAuthHandler, handler.NewCredentialHandler, handler.NewTaskHandler, handler.NewQuestionHandler, handler.NewScriptHandler, handler.NewUserHandler, handler.NewWSHandler)
 
 // build App
 func newApp(

@@ -22,4 +22,5 @@ var (
 	ErrForbidden            = newError(1010, "无权限访问")
 	ErrTaskNotCancelable    = newError(1011, "当前任务不可取消")
 	ErrRegistrationClosed   = newError(1012, "注册已关闭")
+	ErrAccountDisabled      = newError(1013, "账号已被禁用")
 )

@@ -4,6 +4,7 @@ import { credentialsApi } from '@/api/services/credentials'
 import { PLATFORMS, platformByValue } from '@/config/platforms'
 import { useUiStore } from '@/stores/ui'
 import { formatTime } from '@/utils/format'
+import DataTable from '@/components/DataTable.vue'
 
 const ui = useUiStore()
 const credentials = ref([])
@@ -75,7 +76,7 @@ async function save() {
     </v-row>
 
     <v-card>
-      <v-data-table :headers="headers" :items="credentials" :loading="loading" item-value="id">
+      <DataTable :headers="headers" :items="credentials" :loading="loading" :paginated="false" item-value="id">
         <template #item.platform="{ item }">
           <v-chip size="small" variant="tonal" :prepend-icon="platformByValue(item.platform)?.icon">
             {{ platformByValue(item.platform)?.title || item.platform }}
@@ -92,7 +93,7 @@ async function save() {
         <template #no-data>
           <div class="pa-6 text-medium-emphasis">暂无凭据</div>
         </template>
-      </v-data-table>
+      </DataTable>
     </v-card>
 
     <v-dialog v-model="dialog" max-width="520" persistent>

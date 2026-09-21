@@ -6,12 +6,16 @@ import { PLATFORMS, defaultParams, platformByValue } from '@/config/platforms'
 import { useAuthStore } from '@/stores/auth'
 import { useUiStore } from '@/stores/ui'
 import { formatTime, statusMeta } from '@/utils/format'
+import DataTable from '@/components/DataTable.vue'
 
 const router = useRouter()
 const auth = useAuthStore()
 const ui = useUiStore()
 
 const tasks = ref([])
+const total = ref(0)
+const page = ref(1)
+const size = ref(100)
 const loading = ref(false)
 const dialog = ref(false)
 const submitting = ref(false)
@@ -40,13 +44,25 @@ onMounted(load)
 async function load() {
   loading.value = true
   try {
-    const data = await tasksApi.list(1, 100)
+    const data = await tasksApi.list(page.value, size.value)
     tasks.value = data.list || []
+    total.value = data.total || 0
   } catch (err) {
     ui.notify(err.message, 'error')
   } finally {
     loading.value = false
   }
+}
+
+function onPage(value) {
+  page.value = value
+  load()
+}
+
+function onSize(value) {
+  size.value = value
+  page.value = 1
+  load()
 }
 
 function onPlatformChange() {
@@ -142,12 +158,16 @@ async function createTask() {  submitting.value = true
     </v-row>
 
     <v-card>
-      <v-data-table
+      <DataTable
         :headers="headers"
         :items="tasks"
         :loading="loading"
+        :total="total"
+        :page="page"
+        :size="size"
         item-value="id"
-        hover
+        @update:page="onPage"
+        @update:size="onSize"
         @click:row="(_, { item }) => router.push(`/tasks/${item.id}`)"
       >
         <template #item.platform="{ item }">
@@ -212,7 +232,7 @@ async function createTask() {  submitting.value = true
         <template #no-data>
           <div class="pa-6 text-medium-emphasis">暂无任务，点击右上角「新建任务」</div>
         </template>
-      </v-data-table>
+      </DataTable>
     </v-card>
 
     <v-dialog v-model="dialog" max-width="640" persistent>

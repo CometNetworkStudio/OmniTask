@@ -47,7 +47,7 @@ func (s *AuthService) Register(ctx context.Context, req *v1.RegisterRequest) (*v
 	if err != nil {
 		return nil, err
 	}
-	user := &model.User{ID: id, Username: req.Username, PasswordHash: string(hash), Role: "user"}
+	user := &model.User{ID: id, Username: req.Username, PasswordHash: string(hash), Role: "user", Enabled: true}
 	if total, err := s.userRepo.Count(ctx); err == nil && total == 0 {
 		user.Role = "admin" // 首个注册用户为管理员
 	}
@@ -67,6 +67,9 @@ func (s *AuthService) Login(ctx context.Context, req *v1.LoginRequest) (*v1.Logi
 	}
 	if bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(req.Password)) != nil {
 		return nil, v1.ErrInvalidCredentials
+	}
+	if !user.Enabled {
+		return nil, v1.ErrAccountDisabled
 	}
 	return s.issue(user)
 }

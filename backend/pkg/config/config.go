@@ -51,6 +51,9 @@ data:
     addr: 127.0.0.1:6350
     password: ""
     db: 0
+pagination:
+  default: 100
+  max: 1000
 log:
   log_level: info
   mode: both

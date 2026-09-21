@@ -2,6 +2,7 @@
 import { onMounted, reactive, ref } from 'vue'
 import { scriptsApi } from '@/api/services/scripts'
 import { useUiStore } from '@/stores/ui'
+import DataTable from '@/components/DataTable.vue'
 
 const ui = useUiStore()
 const scripts = ref([])
@@ -107,7 +108,13 @@ function statusColor(status) {
     </v-row>
 
     <v-card>
-      <v-data-table :headers="headers" :items="scripts" :loading="loading" item-value="id">
+      <DataTable
+        :headers="headers"
+        :items="scripts"
+        :loading="loading"
+        :paginated="false"
+        item-value="id"
+      >
         <template #item.status="{ item }">
           <v-chip size="small" :color="statusColor(item.status)" variant="tonal">
             {{ item.status === 'installed' ? '可用' : '缺少运行时' }}
@@ -128,7 +135,7 @@ function statusColor(status) {
         <template #no-data>
           <div class="pa-6 text-medium-emphasis">暂无脚本，点击右上角「从 GitHub 安装」</div>
         </template>
-      </v-data-table>
+      </DataTable>
     </v-card>
 
     <v-dialog v-model="dialog" max-width="640" persistent>

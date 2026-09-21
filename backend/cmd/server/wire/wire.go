@@ -44,6 +44,7 @@ var serviceSet = wire.NewSet(
 	service.NewTaskService,
 	service.NewQuestionService,
 	service.NewScriptService,
+	service.NewUserService,
 	service.NewAgentClient,
 	service.NewProgressStore,
 	service.NewOrchestrator,
@@ -55,6 +56,7 @@ var handlerSet = wire.NewSet(
 	handler.NewTaskHandler,
 	handler.NewQuestionHandler,
 	handler.NewScriptHandler,
+	handler.NewUserHandler,
 	handler.NewWSHandler,
 )
 

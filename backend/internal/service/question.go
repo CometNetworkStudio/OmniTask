@@ -8,16 +8,18 @@ import (
 	"backend/internal/repository"
 	"backend/pkg/log"
 	"backend/pkg/sid"
+	"github.com/spf13/viper"
 )
 
 type QuestionService struct {
 	repo   *repository.QuestionRepository
 	sid    *sid.Sid
+	conf   *viper.Viper
 	logger *log.Logger
 }
 
-func NewQuestionService(repo *repository.QuestionRepository, sid *sid.Sid, logger *log.Logger) *QuestionService {
-	return &QuestionService{repo: repo, sid: sid, logger: logger}
+func NewQuestionService(repo *repository.QuestionRepository, sid *sid.Sid, conf *viper.Viper, logger *log.Logger) *QuestionService {
+	return &QuestionService{repo: repo, sid: sid, conf: conf, logger: logger}
 }
 
 func (s *QuestionService) Lookup(ctx context.Context, platform, questionKey string) (*v1.QuestionResponse, error) {
@@ -72,12 +74,7 @@ func (s *QuestionService) Save(ctx context.Context, req *v1.QuestionSaveRequest)
 }
 
 func (s *QuestionService) List(ctx context.Context, platform string, page, size int) ([]v1.QuestionResponse, int64, error) {
-	if page < 1 {
-		page = 1
-	}
-	if size < 1 || size > 100 {
-		size = 20
-	}
+	page, size = normalizePage(s.conf, page, size)
 	questions, total, err := s.repo.List(ctx, platform, size, (page-1)*size)
 	if err != nil {
 		return nil, 0, err

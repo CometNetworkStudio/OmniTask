@@ -18,5 +18,6 @@ type RouterDeps struct {
 	TaskHandler       *handler.TaskHandler
 	QuestionHandler   *handler.QuestionHandler
 	ScriptHandler     *handler.ScriptHandler
+	UserHandler       *handler.UserHandler
 	WSHandler         *handler.WSHandler
 }
