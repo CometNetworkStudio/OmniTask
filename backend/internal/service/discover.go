@@ -153,7 +153,7 @@ func toPlatformResponse(script *model.Script) v1.PlatformResponse {
 		resp.Credentials = append(resp.Credentials, toPlatformField(c))
 	}
 	if m.Discovery != nil {
-		disc := &v1.PlatformDiscovery{Label: m.Discovery.Label, Actions: m.Discovery.Actions}
+		disc := &v1.PlatformDiscovery{Label: m.Discovery.Label, Actions: m.Discovery.Actions, ParamMap: m.Discovery.ParamMap}
 		for _, col := range m.Discovery.Columns {
 			disc.Columns = append(disc.Columns, toPlatformField(col))
 		}

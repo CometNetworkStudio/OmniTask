@@ -15,9 +15,10 @@ type PlatformAction struct {
 }
 
 type PlatformDiscovery struct {
-	Label   string          `json:"label"`
-	Columns []PlatformField `json:"columns"`
-	Actions []string        `json:"actions"`
+	Label    string            `json:"label"`
+	Columns  []PlatformField   `json:"columns"`
+	Actions  []string          `json:"actions"`
+	ParamMap map[string]string `json:"param_map"`
 }
 
 // PlatformResponse 是脚本 manifest 的完整对外 schema，供前端生成表单/筛选/展示。

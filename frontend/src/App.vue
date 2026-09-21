@@ -30,7 +30,13 @@ const navGroups = computed(() => {
     {
       title: '概览',
       items: [
-        { title: '任务', to: '/', icon: 'mdi-clipboard-list-outline' },
+        { title: '首页', to: '/home', icon: 'mdi-home-outline' },
+      ],
+    },
+    {
+      title: '任务',
+      items: [
+        { title: '任务', to: '/tasks', icon: 'mdi-clipboard-list-outline' },
         { title: '凭据', to: '/credentials', icon: 'mdi-key-variant' },
         { title: '题库', to: '/questions', icon: 'mdi-database-outline' },
       ],
@@ -49,6 +55,7 @@ const navGroups = computed(() => {
 })
 
 const PAGE_TITLES = {
+  home: '首页',
   tasks: '任务',
   'task-detail': '任务详情',
   credentials: '凭据',

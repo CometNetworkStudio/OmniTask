@@ -22,9 +22,10 @@ type Action struct {
 
 // Discovery 声明该平台“任务列表/发现”的展示 schema（列表接口返回原始字段，前端按此渲染）。
 type Discovery struct {
-	Label   string   `json:"label"`
-	Columns []Field  `json:"columns"`
-	Actions []string `json:"actions"`
+	Label    string            `json:"label"`
+	Columns  []Field           `json:"columns"`
+	Actions  []string          `json:"actions"`
+	ParamMap map[string]string `json:"param_map"` // 执行参数 key -> 条目字段 key
 }
 
 // Manifest 对应脚本目录下的 script.json。

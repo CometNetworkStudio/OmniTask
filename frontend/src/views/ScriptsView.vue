@@ -1,10 +1,12 @@
 <script setup>
 import { onMounted, reactive, ref } from 'vue'
 import { scriptsApi } from '@/api/services/scripts'
+import { usePlatformsStore } from '@/stores/platforms'
 import { useUiStore } from '@/stores/ui'
 import DataTable from '@/components/DataTable.vue'
 
 const ui = useUiStore()
+const platforms = usePlatformsStore()
 const scripts = ref([])
 const loading = ref(false)
 const dialog = ref(false)
@@ -67,6 +69,7 @@ async function install() {
     form.ref = ''
     form.accel = ''
     await load()
+    await platforms.refresh()
   } catch (err) {
     ui.notify(err.message, 'error')
   } finally {
@@ -90,6 +93,7 @@ async function toggle(item) {
   try {
     await scriptsApi.toggle(item.id, item.enabled)
     ui.notify(item.enabled ? '已启用' : '已停用')
+    platforms.refresh().catch(() => {})
   } catch (err) {
     item.enabled = !item.enabled
     ui.notify(err.message, 'error')
@@ -101,6 +105,7 @@ async function uninstall(item) {
     await scriptsApi.uninstall(item.id)
     ui.notify('已卸载')
     await load()
+    await platforms.refresh()
   } catch (err) {
     ui.notify(err.message, 'error')
   }

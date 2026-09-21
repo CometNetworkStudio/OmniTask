@@ -2,7 +2,7 @@
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { tasksApi } from '@/api/services/tasks'
-import { platformByValue } from '@/config/platforms'
+import { usePlatformsStore } from '@/stores/platforms'
 import { useUiStore } from '@/stores/ui'
 import { formatTime, statusMeta } from '@/utils/format'
 import { connectTaskSocket } from '@/ws/taskSocket'
@@ -10,6 +10,7 @@ import { connectTaskSocket } from '@/ws/taskSocket'
 const route = useRoute()
 const router = useRouter()
 const ui = useUiStore()
+const platforms = usePlatformsStore()
 
 const task = ref(null)
 const events = ref([])
@@ -49,6 +50,7 @@ async function removeTask() {
 }
 
 onMounted(async () => {
+  platforms.load().catch(() => {})
   try {
     task.value = await tasksApi.get(route.params.id)
   } catch (err) {
@@ -97,7 +99,7 @@ onBeforeUnmount(() => socket?.close())
         <v-row>
           <v-col cols="12" md="6">
             <div class="text-caption text-medium-emphasis">平台</div>
-            <div>{{ platformByValue(task.platform)?.title || task.platform }}</div>
+            <div>{{ platforms.name(task.platform) }}</div>
           </v-col>
           <v-col cols="12" md="6">
             <div class="text-caption text-medium-emphasis">动作</div>

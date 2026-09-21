@@ -1,12 +1,13 @@
 <script setup>
-import { onMounted, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { questionsApi } from '@/api/services/questions'
-import { PLATFORMS, platformByValue } from '@/config/platforms'
+import { usePlatformsStore } from '@/stores/platforms'
 import { useUiStore } from '@/stores/ui'
 import { formatTime } from '@/utils/format'
 import DataTable from '@/components/DataTable.vue'
 
 const ui = useUiStore()
+const platforms = usePlatformsStore()
 const platform = ref('')
 const questions = ref([])
 const total = ref(0)
@@ -14,7 +15,7 @@ const page = ref(1)
 const size = ref(100)
 const loading = ref(false)
 
-const platformOptions = [{ title: '全部平台', value: '' }, ...PLATFORMS]
+const platformOptions = computed(() => [{ title: '全部平台', value: '' }, ...platforms.options])
 
 const headers = [
   { title: '平台', key: 'platform' },
@@ -25,7 +26,10 @@ const headers = [
   { title: '更新时间', key: 'updated_at' },
 ]
 
-onMounted(load)
+onMounted(async () => {
+  await platforms.load()
+  load()
+})
 
 async function load() {
   loading.value = true
@@ -96,9 +100,7 @@ function onSize(value) {
         @update:size="onSize"
       >
         <template #item.platform="{ item }">
-          <v-chip size="small" variant="tonal" :prepend-icon="platformByValue(item.platform)?.icon">
-            {{ platformByValue(item.platform)?.title || item.platform }}
-          </v-chip>
+          <v-chip size="small" variant="tonal">{{ platforms.name(item.platform) }}</v-chip>
         </template>
         <template #item.stem="{ item }">
           <span class="text-truncate">{{ (item.stem || '').slice(0, 60) }}</span>

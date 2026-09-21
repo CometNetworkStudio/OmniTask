@@ -1,20 +1,22 @@
 <script setup>
 import { computed, onMounted, reactive, ref } from 'vue'
 import { credentialsApi } from '@/api/services/credentials'
-import { PLATFORMS, platformByValue } from '@/config/platforms'
+import { usePlatformsStore } from '@/stores/platforms'
 import { useUiStore } from '@/stores/ui'
 import { formatTime } from '@/utils/format'
 import DataTable from '@/components/DataTable.vue'
 
+const platforms = usePlatformsStore()
 const ui = useUiStore()
+
 const credentials = ref([])
 const loading = ref(false)
 const dialog = ref(false)
 const saving = ref(false)
 
-const form = reactive({ platform: PLATFORMS[0].value, data: {} })
-const platform = computed(() => platformByValue(form.platform))
-const fields = computed(() => platform.value?.credentialFields || [])
+const form = reactive({ platform: '', data: {} })
+const platform = computed(() => platforms.platform(form.platform))
+const fields = computed(() => platform.value?.credentials || [])
 
 const headers = [
   { title: '平台', key: 'platform' },
@@ -22,7 +24,10 @@ const headers = [
   { title: '', key: 'actions', sortable: false, align: 'end' },
 ]
 
-onMounted(load)
+onMounted(async () => {
+  await platforms.load()
+  load()
+})
 
 async function load() {
   loading.value = true
@@ -37,13 +42,13 @@ async function load() {
 
 function resetData() {
   form.data = {}
-  fields.value.forEach((field) => {
+  for (const field of fields.value) {
     form.data[field.key] = ''
-  })
+  }
 }
 
 function openDialog(platformValue) {
-  form.platform = platformValue || PLATFORMS[0].value
+  form.platform = platformValue || platforms.list[0]?.id || ''
   resetData()
   dialog.value = true
 }
@@ -78,17 +83,11 @@ async function save() {
     <v-card>
       <DataTable :headers="headers" :items="credentials" :loading="loading" :paginated="false" item-value="id">
         <template #item.platform="{ item }">
-          <v-chip size="small" variant="tonal" :prepend-icon="platformByValue(item.platform)?.icon">
-            {{ platformByValue(item.platform)?.title || item.platform }}
-          </v-chip>
+          <v-chip size="small" variant="tonal">{{ platforms.name(item.platform) }}</v-chip>
         </template>
-        <template #item.updated_at="{ item }">
-          {{ formatTime(item.updated_at) }}
-        </template>
+        <template #item.updated_at="{ item }">{{ formatTime(item.updated_at) }}</template>
         <template #item.actions="{ item }">
-          <v-btn size="small" variant="text" color="primary" @click="openDialog(item.platform)">
-            更新
-          </v-btn>
+          <v-btn size="small" variant="text" color="primary" @click="openDialog(item.platform)">更新</v-btn>
         </template>
         <template #no-data>
           <div class="pa-6 text-medium-emphasis">暂无凭据</div>
@@ -105,7 +104,7 @@ async function save() {
           <v-form @submit.prevent="save">
             <v-select
               v-model="form.platform"
-              :items="PLATFORMS"
+              :items="platforms.options"
               item-title="title"
               item-value="value"
               label="平台"
