@@ -86,6 +86,7 @@ func NewHTTPServer(
 
 		authed.GET("/scripts", deps.ScriptHandler.List)
 		authed.POST("/scripts/install", deps.ScriptHandler.Install)
+		authed.GET("/scripts/install/:job", deps.ScriptHandler.InstallJob)
 		authed.POST("/scripts/:id/enable", deps.ScriptHandler.Toggle)
 		authed.DELETE("/scripts/:id", deps.ScriptHandler.Uninstall)
 

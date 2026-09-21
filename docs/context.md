@@ -342,3 +342,10 @@ cd frontend && npm run build
 - 依赖自动安装：安装脚本时若含 `requirements.txt` 且有 `agent.auto_install_deps: true`，在脚本目录建独立 `.venv` 并 pip 安装（`agent.pip_index_url` 可配加速源）；Host **优先使用脚本自带 `.venv` 的解释器**。
 - 脚本页安装增加 indeterminate 进度条与步骤文案；安装请求超时放宽到 10 分钟。
 - 抽屉宽度改回 Vuetify 默认（移除 `width="280"`）。
+
+## 25. 脚本安装真实进度（2026-09）
+- 安装改为**异步任务**：`POST /scripts/install` 立即返回 `job_id`；`GET /scripts/install/:job` 轮询进度。
+- 进度来源真实：下载按字节百分比（1–59%）→ 解压 60% → 写入 68% → 依赖安装（流式读取 pip 输出，74–97%）→ 注册 98% → 完成 100%。
+- 安装任务内存态（单实例），15 分钟超时；失败返回 `error`。
+- 前端：脚本页显示 determinate 进度条 + 阶段文案，轮询 700ms；安装请求超时 30s（后续轮询），整体最长 15 分钟。
+- 验证：真机 job `download 1% → done 100%`，安装成功。

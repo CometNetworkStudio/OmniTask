@@ -10,6 +10,11 @@ const loading = ref(false)
 const dialog = ref(false)
 const installing = ref(false)
 const helpDialog = ref(false)
+const installPercent = ref(0)
+const installStage = ref('')
+const installMessage = ref('')
+
+const STAGE_LABELS = { queued: '排队', download: '下载', extract: '解压', copy: '写入', deps: '安装依赖', register: '注册', done: '完成' }
 
 const ACCEL = [
   { title: '不使用加速', value: '' },
@@ -49,9 +54,13 @@ async function load() {
 
 async function install() {
   installing.value = true
+  installPercent.value = 0
+  installStage.value = 'queued'
+  installMessage.value = ''
   try {
     const url = form.accel ? `${form.accel}${form.url}` : form.url
-    await scriptsApi.install(url, form.ref)
+    const { job_id } = await scriptsApi.install(url, form.ref)
+    await pollJob(job_id)
     ui.notify('脚本安装成功')
     dialog.value = false
     form.url = ''
@@ -62,6 +71,18 @@ async function install() {
     ui.notify(err.message, 'error')
   } finally {
     installing.value = false
+  }
+}
+
+async function pollJob(jobId) {
+  for (;;) {
+    const state = await scriptsApi.installStatus(jobId)
+    installPercent.value = state.percent || 0
+    installStage.value = STAGE_LABELS[state.stage] || state.stage || ''
+    installMessage.value = state.message || ''
+    if (state.status === 'succeeded') return
+    if (state.status === 'failed') throw new Error(state.error || '安装失败')
+    await new Promise((resolve) => setTimeout(resolve, 700))
   }
 }
 
@@ -148,10 +169,12 @@ function statusColor(status) {
           <v-card-subtitle>填写符合规范的脚本仓库地址（zip 由后端下载）</v-card-subtitle>
         </v-card-item>
         <v-card-text>
-          <v-progress-linear v-if="installing" indeterminate color="primary" class="mb-2" />
-          <div v-if="installing" class="text-caption text-medium-emphasis mb-2">
-            安装中：下载 → 解压 → 安装依赖（可能较慢）…
-          </div>
+          <template v-if="installing">
+            <v-progress-linear :model-value="installPercent" color="primary" height="8" rounded class="mb-1" />
+            <div class="text-caption text-medium-emphasis mb-2">
+              {{ installStage }} {{ installPercent }}% · {{ installMessage }}
+            </div>
+          </template>
           <v-form @submit.prevent="install">
             <div class="d-flex flex-wrap ga-2 mb-4">
               <v-btn

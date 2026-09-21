@@ -2,6 +2,7 @@ package service
 
 import (
 	"archive/zip"
+	"bufio"
 	"context"
 	"encoding/json"
 	"errors"
@@ -13,6 +14,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
+	"sync"
 	"time"
 
 	v1 "backend/api/v1"
@@ -24,6 +26,17 @@ import (
 	"github.com/spf13/viper"
 )
 
+// InstallJob 记录一次脚本安装的进度（内存态，单实例）。
+type InstallJob struct {
+	ID      string
+	Status  string // running | succeeded | failed
+	Stage   string
+	Percent int
+	Message string
+	Error   string
+	Script  *v1.ScriptResponse
+}
+
 // ScriptService 负责平台脚本的安装（GitHub zip）、注册表与启停。
 type ScriptService struct {
 	repo        *repository.ScriptRepository
@@ -33,6 +46,9 @@ type ScriptService struct {
 	pipIndex    string
 	sid         *sid.Sid
 	logger      *log.Logger
+
+	jobsMu sync.Mutex
+	jobs   map[string]*InstallJob
 }
 
 func NewScriptService(repo *repository.ScriptRepository, conf *viper.Viper, sid *sid.Sid, logger *log.Logger) *ScriptService {
@@ -44,6 +60,7 @@ func NewScriptService(repo *repository.ScriptRepository, conf *viper.Viper, sid 
 		pipIndex:    conf.GetString("agent.pip_index_url"),
 		sid:         sid,
 		logger:      logger,
+		jobs:        map[string]*InstallJob{},
 	}
 }
 
@@ -59,9 +76,65 @@ func (s *ScriptService) List(ctx context.Context) ([]v1.ScriptResponse, error) {
 	return out, nil
 }
 
-// Install 下载 zip（可带加速前缀）并解压到 scripts_dir/<id>/。ref 为空则默认分支。
-func (s *ScriptService) Install(ctx context.Context, rawURL, ref string) (*v1.ScriptResponse, error) {
+// InstallAsync 启动一次异步安装，立即返回 jobID；进度用 Job 查询。
+func (s *ScriptService) InstallAsync(rawURL, ref string) (string, error) {
+	if strings.TrimSpace(rawURL) == "" {
+		return "", v1.ErrBadRequest
+	}
+	id, err := s.sid.GenString()
+	if err != nil {
+		return "", err
+	}
+	job := &InstallJob{ID: id, Status: "running", Stage: "queued", Message: "排队中"}
+	s.jobsMu.Lock()
+	s.jobs[id] = job
+	s.jobsMu.Unlock()
+
+	go func() {
+		ctx, cancel := context.WithTimeout(context.Background(), 15*time.Minute)
+		defer cancel()
+		report := func(percent int, stage, message string) {
+			s.jobsMu.Lock()
+			job.Percent = percent
+			job.Stage = stage
+			job.Message = message
+			s.jobsMu.Unlock()
+		}
+		resp, err := s.install(ctx, rawURL, ref, report)
+		s.jobsMu.Lock()
+		defer s.jobsMu.Unlock()
+		if err != nil {
+			job.Status = "failed"
+			job.Percent = 100
+			job.Message = "安装失败"
+			job.Error = err.Error()
+			return
+		}
+		job.Status = "succeeded"
+		job.Percent = 100
+		job.Stage = "done"
+		job.Message = "安装完成"
+		job.Script = resp
+	}()
+	return id, nil
+}
+
+// Job 返回安装任务状态（副本）。
+func (s *ScriptService) Job(id string) (*InstallJob, bool) {
+	s.jobsMu.Lock()
+	defer s.jobsMu.Unlock()
+	job, ok := s.jobs[id]
+	if !ok {
+		return nil, false
+	}
+	copied := *job
+	return &copied, true
+}
+
+// install 同步执行安装；report(percent, stage, message) 上报进度。
+func (s *ScriptService) install(ctx context.Context, rawURL, ref string, report func(int, string, string)) (*v1.ScriptResponse, error) {
 	zipURL := resolveZipURL(rawURL, ref)
+	report(1, "download", "准备下载")
 
 	tmp, err := os.MkdirTemp("", "omnitask-script-")
 	if err != nil {
@@ -70,9 +143,12 @@ func (s *ScriptService) Install(ctx context.Context, rawURL, ref string) (*v1.Sc
 	defer os.RemoveAll(tmp)
 
 	zipPath := filepath.Join(tmp, "script.zip")
-	if err := downloadFile(ctx, zipURL, zipPath); err != nil {
+	if err := downloadFile(ctx, zipURL, zipPath, func(pct int) {
+		report(1+pct*58/100, "download", fmt.Sprintf("下载中 %d%%", pct))
+	}); err != nil {
 		return nil, err
 	}
+	report(60, "extract", "解压中")
 	extractDir := filepath.Join(tmp, "extracted")
 	if err := unzip(zipPath, extractDir); err != nil {
 		return nil, err
@@ -89,10 +165,11 @@ func (s *ScriptService) Install(ctx context.Context, rawURL, ref string) (*v1.Sc
 	if err := json.Unmarshal(buf, &manifest); err != nil {
 		return nil, fmt.Errorf("解析 script.json 失败: %w", err)
 	}
-	if manifest.ID == "" || manifest.Entry == "" {
-		return nil, errors.New("script.json 缺少 id 或 entry")
+	if manifest.ID == "" || (manifest.Entry == "" && manifest.Module == "") {
+		return nil, errors.New("script.json 缺少 id 或 entry/module")
 	}
 
+	report(68, "copy", "写入脚本目录")
 	if err := os.MkdirAll(s.scriptsDir, 0o755); err != nil {
 		return nil, err
 	}
@@ -105,11 +182,14 @@ func (s *ScriptService) Install(ctx context.Context, rawURL, ref string) (*v1.Sc
 	}
 
 	if s.autoInstall {
-		if err := s.installDeps(ctx, dest); err != nil {
+		if err := s.installDeps(ctx, dest, func(pct int, msg string) {
+			report(74+pct*23/100, "deps", msg)
+		}); err != nil {
 			return nil, err
 		}
 	}
 
+	report(98, "register", "写入注册表")
 	status := "installed"
 	if _, err := exec.LookPath(s.runtimeFor(manifest)); err != nil {
 		status = "missing_runtime"
@@ -187,8 +267,8 @@ func (s *ScriptService) EnabledPlatforms(ctx context.Context) []string {
 	return ids
 }
 
-// installDeps 在脚本目录内建独立 venv 并安装 requirements.txt（可选）。
-func (s *ScriptService) installDeps(ctx context.Context, dir string) error {
+// installDeps 在脚本目录内建独立 venv 并安装 requirements.txt（可选）；report(percent, message)。
+func (s *ScriptService) installDeps(ctx context.Context, dir string, report func(int, string)) error {
 	req := filepath.Join(dir, "requirements.txt")
 	if _, err := os.Stat(req); err != nil {
 		return nil
@@ -201,28 +281,51 @@ func (s *ScriptService) installDeps(ctx context.Context, dir string) error {
 		s.logger.Warn("skip dependency install: python not found")
 		return nil
 	}
+	cctx, cancel := context.WithTimeout(ctx, 10*time.Minute)
+	defer cancel()
+
+	report(5, "创建虚拟环境")
 	venv := filepath.Join(dir, ".venv")
-	run := func(name string, args ...string) error {
-		cctx, cancel := context.WithTimeout(ctx, 10*time.Minute)
-		defer cancel()
-		out, err := exec.CommandContext(cctx, name, args...).CombinedOutput()
-		if err != nil {
-			return fmt.Errorf("%s %s 失败: %v: %s", name, strings.Join(args, " "), err, lastLines(string(out), 3))
-		}
-		return nil
+	if out, err := exec.CommandContext(cctx, python, "-m", "venv", venv).CombinedOutput(); err != nil {
+		return fmt.Errorf("创建 venv 失败: %v: %s", err, lastLines(string(out), 3))
 	}
-	if err := run(python, "-m", "venv", venv); err != nil {
-		return err
-	}
+
 	pip := filepath.Join(venv, "bin", "pip")
 	if runtime.GOOS == "windows" {
 		pip = filepath.Join(venv, "Scripts", "pip.exe")
 	}
-	args := []string{"install", "-q", "-r", req}
+	args := []string{"install", "-r", req}
 	if s.pipIndex != "" {
 		args = append(args, "-i", s.pipIndex)
 	}
-	return run(pip, args...)
+	cmd := exec.CommandContext(cctx, pip, args...)
+	stdout, err := cmd.StdoutPipe()
+	if err != nil {
+		return err
+	}
+	cmd.Stderr = cmd.Stdout
+	if err := cmd.Start(); err != nil {
+		return err
+	}
+	report(20, "安装依赖")
+	percent := 20
+	scanner := bufio.NewScanner(stdout)
+	scanner.Buffer(make([]byte, 0, 64*1024), 1024*1024)
+	for scanner.Scan() {
+		line := strings.TrimSpace(scanner.Text())
+		if line == "" {
+			continue
+		}
+		if percent < 92 {
+			percent += 3
+		}
+		report(percent, line)
+	}
+	if err := cmd.Wait(); err != nil {
+		return fmt.Errorf("安装依赖失败: %v", err)
+	}
+	report(100, "依赖安装完成")
+	return nil
 }
 
 func lastLines(text string, n int) string {
@@ -256,12 +359,12 @@ func toScriptResponse(script *model.Script) *v1.ScriptResponse {
 	return resp
 }
 
-func downloadFile(ctx context.Context, url, dest string) error {
+func downloadFile(ctx context.Context, url, dest string, onProgress func(int)) error {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
 		return err
 	}
-	client := &http.Client{Timeout: 120 * time.Second}
+	client := &http.Client{Timeout: 15 * time.Minute}
 	resp, err := client.Do(req)
 	if err != nil {
 		return fmt.Errorf("下载失败: %w", err)
@@ -275,8 +378,25 @@ func downloadFile(ctx context.Context, url, dest string) error {
 		return err
 	}
 	defer out.Close()
-	_, err = io.Copy(out, resp.Body)
+	writer := &progressWriter{writer: out, total: resp.ContentLength, onProgress: onProgress}
+	_, err = io.Copy(writer, resp.Body)
 	return err
+}
+
+type progressWriter struct {
+	writer     io.Writer
+	written    int64
+	total      int64
+	onProgress func(int)
+}
+
+func (w *progressWriter) Write(p []byte) (int, error) {
+	n, err := w.writer.Write(p)
+	w.written += int64(n)
+	if w.total > 0 && w.onProgress != nil {
+		w.onProgress(int(w.written * 100 / w.total))
+	}
+	return n, err
 }
 
 func unzip(src, dest string) error {

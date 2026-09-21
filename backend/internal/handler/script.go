@@ -33,10 +33,29 @@ func (h *ScriptHandler) Install(ctx *gin.Context) {
 		v1.HandleError(ctx, http.StatusBadRequest, v1.ErrBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	resp, err := h.svc.Install(ctx, req.URL, req.Ref)
+	jobID, err := h.svc.InstallAsync(req.URL, req.Ref)
 	if err != nil {
-		v1.HandleError(ctx, http.StatusBadRequest, v1.ErrBadRequest, gin.H{"error": err.Error()})
+		v1.HandleError(ctx, statusFor(err), err, nil)
 		return
+	}
+	v1.HandleSuccess(ctx, gin.H{"job_id": jobID})
+}
+
+func (h *ScriptHandler) InstallJob(ctx *gin.Context) {
+	job, ok := h.svc.Job(ctx.Param("job"))
+	if !ok {
+		v1.HandleError(ctx, http.StatusNotFound, v1.ErrNotFound, nil)
+		return
+	}
+	resp := gin.H{
+		"status":  job.Status,
+		"stage":   job.Stage,
+		"percent": job.Percent,
+		"message": job.Message,
+		"error":   job.Error,
+	}
+	if job.Script != nil {
+		resp["script"] = job.Script
 	}
 	v1.HandleSuccess(ctx, resp)
 }

@@ -22,8 +22,7 @@
 - [x] 布局：抽屉分组导航 + 底部账号/退出/版权；顶栏头像不再被裁剪。
 
 ### 待做
-- [ ] 脚本安装的**真实进度**（当前为 indeterminate 进度条 + 步骤文案）。
-- [ ] 后端 service/handler 测试继续补充（已加 pagination/user/authz）。
+- [ ] 后端 handler 层测试继续补充（已加 pagination/user/authz）。
 
 ### 本轮已完成（P1 剩余）
 - [x] 任务列表按状态/平台筛选（后端查询参数 + 前端下拉）。
