@@ -11,6 +11,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"time"
 
@@ -25,20 +26,24 @@ import (
 
 // ScriptService 负责平台脚本的安装（GitHub zip）、注册表与启停。
 type ScriptService struct {
-	repo       *repository.ScriptRepository
-	scriptsDir string
-	python     string
-	sid        *sid.Sid
-	logger     *log.Logger
+	repo        *repository.ScriptRepository
+	scriptsDir  string
+	python      string
+	autoInstall bool
+	pipIndex    string
+	sid         *sid.Sid
+	logger      *log.Logger
 }
 
 func NewScriptService(repo *repository.ScriptRepository, conf *viper.Viper, sid *sid.Sid, logger *log.Logger) *ScriptService {
 	return &ScriptService{
-		repo:       repo,
-		scriptsDir: conf.GetString("agent.scripts_dir"),
-		python:     conf.GetString("agent.python"),
-		sid:        sid,
-		logger:     logger,
+		repo:        repo,
+		scriptsDir:  conf.GetString("agent.scripts_dir"),
+		python:      conf.GetString("agent.python"),
+		autoInstall: conf.GetBool("agent.auto_install_deps"),
+		pipIndex:    conf.GetString("agent.pip_index_url"),
+		sid:         sid,
+		logger:      logger,
 	}
 }
 
@@ -97,6 +102,12 @@ func (s *ScriptService) Install(ctx context.Context, rawURL, ref string) (*v1.Sc
 	}
 	if err := copyDir(filepath.Dir(manifestPath), dest); err != nil {
 		return nil, err
+	}
+
+	if s.autoInstall {
+		if err := s.installDeps(ctx, dest); err != nil {
+			return nil, err
+		}
 	}
 
 	status := "installed"
@@ -174,6 +185,52 @@ func (s *ScriptService) EnabledPlatforms(ctx context.Context) []string {
 		return nil
 	}
 	return ids
+}
+
+// installDeps 在脚本目录内建独立 venv 并安装 requirements.txt（可选）。
+func (s *ScriptService) installDeps(ctx context.Context, dir string) error {
+	req := filepath.Join(dir, "requirements.txt")
+	if _, err := os.Stat(req); err != nil {
+		return nil
+	}
+	python := s.python
+	if python == "" {
+		python = "python3"
+	}
+	if _, err := exec.LookPath(python); err != nil {
+		s.logger.Warn("skip dependency install: python not found")
+		return nil
+	}
+	venv := filepath.Join(dir, ".venv")
+	run := func(name string, args ...string) error {
+		cctx, cancel := context.WithTimeout(ctx, 10*time.Minute)
+		defer cancel()
+		out, err := exec.CommandContext(cctx, name, args...).CombinedOutput()
+		if err != nil {
+			return fmt.Errorf("%s %s 失败: %v: %s", name, strings.Join(args, " "), err, lastLines(string(out), 3))
+		}
+		return nil
+	}
+	if err := run(python, "-m", "venv", venv); err != nil {
+		return err
+	}
+	pip := filepath.Join(venv, "bin", "pip")
+	if runtime.GOOS == "windows" {
+		pip = filepath.Join(venv, "Scripts", "pip.exe")
+	}
+	args := []string{"install", "-q", "-r", req}
+	if s.pipIndex != "" {
+		args = append(args, "-i", s.pipIndex)
+	}
+	return run(pip, args...)
+}
+
+func lastLines(text string, n int) string {
+	lines := strings.Split(strings.TrimSpace(text), "\n")
+	if len(lines) > n {
+		lines = lines[len(lines)-n:]
+	}
+	return strings.Join(lines, " | ")
 }
 
 func (s *ScriptService) runtimeFor(m agenthost.Manifest) string {

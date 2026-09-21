@@ -1,35 +1,18 @@
-.PHONY: init
-init:
-	go install github.com/google/wire/cmd/wire@latest
-	go install github.com/golang/mock/mockgen@latest
-	go install github.com/swaggo/swag/cmd/swag@latest
+.PHONY: build test run-server run-agent
 
-.PHONY: bootstrap
-bootstrap:
-	cd ./deploy/docker-compose && docker compose up -d && cd ../../
-	go run ./cmd/migration
-	nunu run ./cmd/server
-
-.PHONY: mock
-mock:
-	mockgen -source=internal/service/user.go -destination test/mocks/service/user.go
-	mockgen -source=internal/repository/user.go -destination test/mocks/repository/user.go
-	mockgen -source=internal/repository/repository.go -destination test/mocks/repository/repository.go
-
-.PHONY: test
-test:
-	go test -coverpkg=./internal/handler,./internal/service,./internal/repository -coverprofile=./coverage.out ./test/server/...
-	go tool cover -html=./coverage.out -o coverage.html
-
-.PHONY: build
+# 构建后端与脚本 Host 到仓库 bin/
 build:
-	go build -ldflags="-s -w" -o ./bin/server ./cmd/server
+	go build -trimpath -ldflags "-s -w" -o ../bin/omnitask-server ./cmd/server
+	go build -trimpath -ldflags "-s -w" -o ../bin/omnitask-agent ./cmd/agent
 
-.PHONY: docker
-docker:
-	docker build -f deploy/build/Dockerfile --build-arg APP_RELATIVE_PATH=./cmd/task -t 1.1.1.1:5000/demo-task:v1 .
-	docker run --rm -i 1.1.1.1:5000/demo-task:v1
+# 自检（与 omnitask.sh check 的后端部分一致）
+test:
+	go build ./...
+	go vet ./...
+	go test ./...
 
-.PHONY: swag
-swag:
-	swag init  -g cmd/server/main.go -o ./docs
+run-server:
+	go run ./cmd/server -conf config.yaml
+
+run-agent:
+	go run ./cmd/agent -conf config.yaml

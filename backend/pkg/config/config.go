@@ -36,6 +36,8 @@ agent:
   pythonpath: sdk/python
   bank_addr: 127.0.0.1:9000
   task_timeout: 0s
+  auto_install_deps: false
+  pip_index_url: ""
 security:
   registration: open
   jwt:

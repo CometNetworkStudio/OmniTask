@@ -116,7 +116,7 @@
 - 迁移接入 5 张表；配置切到 MySQL(3380) `omnitask` + Redis(6350)；wire 重新生成。
 
 **验收记录**
-- `docker compose up -d` 起 MySQL/Redis；`cmd/migration` AutoMigrate 建表成功（users/credentials/tasks/task_events/questions）。
+- `docker compose up -d` 起 MySQL/Redis；`omnitask-server -migrate` 建表成功（users/credentials/tasks/task_events/questions）。
 - curl 全链路：注册 → 登录 → 凭据入库 → 建任务 → 查任务 → 题库存/查；未带 token 返回 401。
 - 凭据密文验证：`credentials.cipher` 48B、`nonce` 12B，库中无明文。
 - `go build/vet/test` 通过；新增 `pkg/crypto` 单测（往返、错误密钥、坏 nonce）。
@@ -130,7 +130,7 @@
 - `task`：增删查、状态机。
 - `question`：Lookup/Save、去重（`platform+question_key` 唯一）。
 **handler/router**：`/api/v1/auth/*`、`/api/v1/credentials`、`/api/v1/tasks`、`/api/v1/questions`。
-**迁移**：`cmd/migration` 接入全部模型；配置切到 MySQL(3380)+Redis(6350)，用 `backend/deploy/docker-compose`。
+**迁移**：`internal/migration`（`server -migrate`）；配置切到 MySQL(3380)+Redis(6350)，用 `backend/deploy/docker-compose`。
 
 **验收**：curl 完成注册/登录/建任务/查任务/题库增查；数据库确认凭据为密文；`make` 迁移成功。
 

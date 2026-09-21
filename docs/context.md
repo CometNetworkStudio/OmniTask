@@ -309,7 +309,7 @@ cd frontend && npm run build
 - 多机 Agent（已评估，暂不做）。
 
 ### 工程卫生
-- 删除 Nunu 遗留 `backend/cmd/task`、`backend/scripts/`。
+- 已删除 Nunu 遗留 `backend/cmd/{task,migration}`、`backend/scripts/`；`backend/Makefile` 精简。
 - lite(AutoMigrate) 与 full(SQL 迁移) 双机制，注意 schema 漂移。
 - cidaren 11003 风控（运营项，需人工安全验证）。
 
@@ -335,3 +335,10 @@ cd frontend && npm run build
 - 抽屉仿 `AppLayout.vue`：去掉顶部 hero、分组导航、底部 append（主题/退出）、版权；`v-list-item` 加 `rounded="xl"`；允许必要 scoped CSS（滚动/隐藏滚动条/spacer/禁选）。
 - 剩余（见 `docs/todo.md`）：真实安装进度、脚本依赖自动安装。
 - 说明：ID 维持现状（Sonyflake），不做 UUIDv7 改动。
+
+## 24. 清理与依赖自动安装（2026-09）
+- 删除 Nunu 遗留：`backend/cmd/task`、`backend/cmd/migration`、`backend/scripts/`；精简 `backend/Makefile`。
+- 补测试：`internal/service`（pagination/user，in-memory SQLite）、`pkg/authz`（Casbin RBAC）。
+- 依赖自动安装：安装脚本时若含 `requirements.txt` 且有 `agent.auto_install_deps: true`，在脚本目录建独立 `.venv` 并 pip 安装（`agent.pip_index_url` 可配加速源）；Host **优先使用脚本自带 `.venv` 的解释器**。
+- 脚本页安装增加 indeterminate 进度条与步骤文案；安装请求超时放宽到 10 分钟。
+- 抽屉宽度改回 Vuetify 默认（移除 `width="280"`）。

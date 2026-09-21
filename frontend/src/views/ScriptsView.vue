@@ -148,6 +148,10 @@ function statusColor(status) {
           <v-card-subtitle>填写符合规范的脚本仓库地址（zip 由后端下载）</v-card-subtitle>
         </v-card-item>
         <v-card-text>
+          <v-progress-linear v-if="installing" indeterminate color="primary" class="mb-2" />
+          <div v-if="installing" class="text-caption text-medium-emphasis mb-2">
+            安装中：下载 → 解压 → 安装依赖（可能较慢）…
+          </div>
           <v-form @submit.prevent="install">
             <div class="d-flex flex-wrap ga-2 mb-4">
               <v-btn

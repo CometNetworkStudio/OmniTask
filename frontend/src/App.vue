@@ -92,7 +92,6 @@ onMounted(() => {
         v-model="drawer"
         :temporary="mobile"
         :permanent="!mobile"
-        width="280"
         color="surface"
         class="app-drawer"
       >

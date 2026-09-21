@@ -65,7 +65,7 @@ func (h *Host) reload() {
 	runtimes := map[string]string{}
 	for _, s := range loaded {
 		scripts[s.Manifest.ID] = s
-		runtimePath, err := h.resolveRuntime(s.Manifest)
+		runtimePath, err := h.resolveRuntime(s.Manifest, s.Dir)
 		if err != nil {
 			h.logger.Warn("script runtime not found",
 				zap.String("script", s.Manifest.ID), zap.String("runtime", s.Manifest.Runtime))
@@ -80,10 +80,21 @@ func (h *Host) reload() {
 	h.mu.Unlock()
 }
 
-func (h *Host) resolveRuntime(m Manifest) (string, error) {
+func (h *Host) resolveRuntime(m Manifest, dir string) (string, error) {
 	name := m.Runtime
-	if h.python != "" && strings.HasPrefix(name, "python") {
-		name = h.python
+	if strings.HasPrefix(name, "python") {
+		// 优先使用脚本自带 venv（依赖自动安装生成）
+		for _, candidate := range []string{
+			filepath.Join(dir, ".venv", "bin", "python"),
+			filepath.Join(dir, ".venv", "Scripts", "python.exe"),
+		} {
+			if info, err := os.Stat(candidate); err == nil && !info.IsDir() {
+				return candidate, nil
+			}
+		}
+		if h.python != "" {
+			name = h.python
+		}
 	}
 	path, err := exec.LookPath(name)
 	if err != nil {

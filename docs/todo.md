@@ -22,8 +22,8 @@
 - [x] 布局：抽屉分组导航 + 底部账号/退出/版权；顶栏头像不再被裁剪。
 
 ### 待做
-- [ ] 脚本页：**安装进度条**（当前为按钮 loading，非真实进度）。
-- [ ] 脚本安装的依赖自动安装（隔离 venv）。
+- [ ] 脚本安装的**真实进度**（当前为 indeterminate 进度条 + 步骤文案）。
+- [ ] 后端 service/handler 测试继续补充（已加 pagination/user/authz）。
 
 ### 本轮已完成（P1 剩余）
 - [x] 任务列表按状态/平台筛选（后端查询参数 + 前端下拉）。
@@ -38,8 +38,8 @@
 - [ ] 脚本安装固定 commit/tag + 签名/白名单（供应链安全）。
 
 ## 工程卫生 / 运维
-- [ ] 删除 Nunu 遗留：`backend/cmd/task`、`backend/scripts/`。
-- [ ] 补充后端 service/handler 测试（当前仅 `pkg/crypto` 有测试）。
+- [x] 删除 Nunu 遗留：`backend/cmd/{task,migration}`、`backend/scripts/`。
+- [x] 后端测试：`pkg/crypto`、`internal/service`（pagination/user）、`pkg/authz`。
 - [ ] lite(AutoMigrate) 与 full(SQL 迁移) 双机制的 schema 漂移检查。
 - [ ] 日志轮转/清理策略核对；健康探针。
 - [ ] 凭据主密钥轮换方案（当前明文存 config.yaml）。

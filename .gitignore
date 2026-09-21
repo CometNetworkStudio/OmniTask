@@ -34,3 +34,6 @@ backend/config/deploy.yml
 # 构建的稳定产物与日志
 /bin/
 /logs/
+/backend/data/
+/backend/logs/
+/backend/scripts/
