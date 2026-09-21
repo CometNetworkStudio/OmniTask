@@ -349,3 +349,11 @@ cd frontend && npm run build
 - 安装任务内存态（单实例），15 分钟超时；失败返回 `error`。
 - 前端：脚本页显示 determinate 进度条 + 阶段文案，轮询 700ms；安装请求超时 30s（后续轮询），整体最长 15 分钟。
 - 验证：真机 job `download 1% → done 100%`，安装成功。
+
+## 26. 接入学习通（chaoxing，GPL-3.0，隔离）(2026-09)
+- 选用**方案 A（GPL 隔离）**：`CometNetworkStudio/chaoxing`（fork 自 `Samueli924/chaoxing`，GPL-3.0）作为**独立脚本仓库**，不并入 MIT 主库；通过进程边界接入。
+- 该 fork 新增：`omnitask_entry.py`（stdio 适配器，生成临时 config.ini 调 main.py、合并 stderr、解析 `NN%` 进度）、`script.json`（manifest：动作 study/learning_count、凭据账号密码、参数 course_list/speed/jobs/…）；`requirements.txt` 追加 `omnitask-sdk`。已推送。
+- 关键适配点：该工具日志/进度走 **stderr**（loguru+tqdm）→ 适配器 `stderr=STDOUT` 捕获；`course_list` 为空会交互式 `input()` → 适配器传 `all` 规避。
+- 验证：OmniTask 脚本页安装成功；Host `Health` 识别 `chaoxing`；任务链路 后端→Host→适配器→main.py 正常（因未装 chaoxing 依赖按预期 `failed`）。
+- 实机运行需：`agent.auto_install_deps: true`（安装其较重依赖，含 ddddocr）或手动装；建议 Python 3.13。
+- 许可：该仓库整体仍 GPL-3.0；上游“禁止盈利/闭源商用”声明继续有效；本项目/its SDK 保持 MIT，仅进程边界协作。
