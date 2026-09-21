@@ -12,7 +12,7 @@ agent:
   host: 127.0.0.1
   port: 50051
   scripts_dir: ../scripts
-  python: ../agent/.venv/bin/python
+  python: ../sdk/python/.venv/bin/python
   pythonpath: ../sdk/python
   bank_addr: 127.0.0.1:9000
 security:

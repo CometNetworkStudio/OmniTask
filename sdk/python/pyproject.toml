@@ -1,0 +1,19 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "omnitask-sdk"
+version = "0.1.0"
+description = "OmniTask platform script SDK (stdio runtime + http/ratelimit/question-bank)"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+  "grpcio>=1.60",
+  "protobuf>=4",
+  "requests>=2.28",
+  "brotli>=1.1",
+]
+
+[tool.setuptools.packages.find]
+include = ["omnitask_sdk*"]

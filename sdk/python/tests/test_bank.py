@@ -4,10 +4,9 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
-sys.path.insert(0, str(ROOT / "gen"))
 
-from agent.v1 import agent_pb2  # noqa: E402
-from core.bank import GrpcBank  # noqa: E402
+from omnitask_sdk.gen.agent.v1 import agent_pb2  # noqa: E402
+from omnitask_sdk.bank import GrpcBank  # noqa: E402
 
 
 class FakeStub:

@@ -1,6 +1,5 @@
 # generated protobuf (run: make proto)
 /backend/api/agent/
-/sdk/python/gen/
 
 # python
 sdk/python/.venv/

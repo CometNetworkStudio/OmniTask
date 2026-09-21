@@ -7,12 +7,12 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from core import events  # noqa: E402
-from core.bank import LocalBank  # noqa: E402
-from core.config import Config, load_dotenv  # noqa: E402
-from core.http import new_session  # noqa: E402
-from core.params import resolve  # noqa: E402
-from core.ratelimit import RateLimiter  # noqa: E402
+from omnitask_sdk import events  # noqa: E402
+from omnitask_sdk.bank import LocalBank  # noqa: E402
+from omnitask_sdk.config import Config, load_dotenv  # noqa: E402
+from omnitask_sdk.http import new_session  # noqa: E402
+from omnitask_sdk.params import resolve  # noqa: E402
+from omnitask_sdk.ratelimit import RateLimiter  # noqa: E402
 
 
 class ParamsTest(unittest.TestCase):

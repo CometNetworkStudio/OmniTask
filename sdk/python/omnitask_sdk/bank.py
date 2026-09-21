@@ -136,12 +136,7 @@ class GrpcBank(QuestionBank):
     def _ensure(self) -> None:
         if self._stub is not None:
             return
-        import sys
-
-        gen = Path(__file__).resolve().parents[1] / "gen"
-        if str(gen) not in sys.path:
-            sys.path.insert(0, str(gen))
-        from agent.v1 import agent_pb2, agent_pb2_grpc
+        from .gen.agent.v1 import agent_pb2, agent_pb2_grpc
 
         self._pb2 = agent_pb2
         self._channel = grpc.insecure_channel(self.addr)

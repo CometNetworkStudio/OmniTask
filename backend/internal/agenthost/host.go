@@ -146,7 +146,14 @@ func (h *Host) Execute(req *agentv1.ExecuteRequest, stream agentv1.AgentService_
 		return h.fail(stream, taskID, "platform unavailable: "+req.GetPlatform())
 	}
 
-	cmd := exec.CommandContext(stream.Context(), runtimePath, append([]string{script.Manifest.Entry}, script.Manifest.Args...)...)
+	args := make([]string, 0, len(script.Manifest.Args)+2)
+	if script.Manifest.Module != "" {
+		args = append(args, "-m", script.Manifest.Module)
+	} else {
+		args = append(args, script.Manifest.Entry)
+	}
+	args = append(args, script.Manifest.Args...)
+	cmd := exec.CommandContext(stream.Context(), runtimePath, args...)
 	cmd.Dir = script.Dir
 	env := os.Environ()
 	if h.sdkDir != "" {

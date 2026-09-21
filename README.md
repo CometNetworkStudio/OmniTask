@@ -99,15 +99,20 @@ go run ./cmd/agent  -conf config/deploy.yml
 
 ## 脚本生态：开发与接入
 
-平台能力全部来自**可插拔脚本**。官方脚本已独立开源：
+平台能力全部来自**可插拔脚本**。脚本是独立项目，**不改文件名、不必改造既有项目**，三种接入方式任选：
 
-- 词达人：https://github.com/CometNetworkStudio/cidaren
-- WeLearn：https://github.com/CometNetworkStudio/welearn
+- **包装仓**：已有项目零改动，加一个 `adapter.py` 映射 action。
+- **装饰器**：`from omnitask_sdk import action, serve`，几行接入。
+- **CLI 桥**：已有命令行工具，**零代码**，只写 `script.json`。
 
-想支持新平台？按规范写一个带 stdio JSON/CLI 的脚本即可被本平台安装调用。
+```bash
+pip install "git+https://github.com/CometNetworkStudio/OmniTask.git#subdirectory=sdk/python"
+```
+
+官方脚本（可作模板）：[cidaren](https://github.com/CometNetworkStudio/cidaren) ｜ [welearn](https://github.com/CometNetworkStudio/welearn)
 
 👉 **接入与开发文档（含 Vibecoding Prompt）：[docs/integration-guide.md](docs/integration-guide.md)**
-👉 **脚本协议（Host ↔ 脚本）：[docs/script-protocol.md](docs/script-protocol.md)**
+👉 **脚本协议：[docs/script-protocol.md](docs/script-protocol.md)** ｜ **SDK：[sdk/python/README.md](sdk/python/README.md)**
 
 ## 免责声明
 

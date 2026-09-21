@@ -36,11 +36,13 @@
   "author": "CometNetworkStudio",
   "runtime": "python3",
   "entry": "main.py",
+  "module": "",
   "args": [],
   "requires": ["requests"],
+  "progress_regex": "",
   "actions": [
     { "id": "time", "name": "挂时长" },
-    { "id": "progress", "name": "提交进度" }
+    { "id": "progress", "name": "提交进度", "command": ["mycli", "progress", "--cid", "{cid}"] }
   ],
   "credentials": [
     { "key": "username", "label": "账号", "type": "text" },
@@ -54,8 +56,15 @@
 ```
 
 - `runtime`：可执行名（`python3`、`node`、或脚本自带二进制路径）。
-- `entry`：相对脚本目录的入口；Host 以 `runtime entry args...` 启动，`cwd` 为脚本目录。
+- `entry` / `module`：**二选一，均不限定文件名**。
+  - `entry`：相对脚本目录的入口文件，Host 以 `runtime <entry> args...` 启动；
+  - `module`：Host 以 `runtime -m <module> args...` 启动（Python 模块）。
+  - **你不需要把文件叫 `runner.py`/`main.py`**——那只是官方脚本的示例。
+- `args`：附加命令行参数。
 - `requires`：运行时依赖说明，Host 只用于展示/预检提示（不自动安装）。
+- `progress_regex`：CLI 桥提取进度的正则（捕获组 1=百分比，2=消息），可空。
+- `actions[].command`：**仅 CLI 桥**使用；该动作要执行的命令（支持 `{占位符}`）。
+- 用 `@action` 装饰器或生成器接入时无需 `module`/`command`，见 `sdk/python/README.md`。
 
 ## 3. 运行协议（NDJSON）
 

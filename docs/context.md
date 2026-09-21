@@ -276,3 +276,12 @@ cd frontend && npm run build
 - **迁移（方案A）**：删除 `cmd/migrate`，迁移逻辑移入 `internal/migration`（embed SQL）；由 `omnitask-server -migrate` 触发，或配置 `data.db.migrate_on_start: true` 启动时执行。产物由 3 个减为 **2 个**（server + agent）。
 - **HTTPS**：`config.yaml` 新增 `http.tls.{enabled,cert_file,key_file}`，server 可自行终结 TLS（不做自签）。
 - **配置清理**：删除未使用的 `backend/config/prod.yml` 与过期的 `frontend/.env.development`。
+
+## 19. 脚本生态：SDK 正式化 + 三种接入（2026-09）
+- 不强制文件名：manifest 支持 `entry`（文件）或 `module`（`python -m`），二者均任意。
+- Python SDK 正式化：`sdk/python` 包名 `omnitask_sdk`，`pyproject.toml` 可 `pip install git+...#subdirectory=sdk/python`；protobuf 生成物随包提交（`omnitask_sdk/gen`）。
+- 三种接入：A 包装仓（`adapter.py`，原项目零改）、B 装饰器 `@action`+`serve`、C CLI 桥（仅 `script.json`，`module: omnitask_sdk.bridge` + `actions[].command` + `progress_regex`）。
+- 新增 `AdapterContext`（params/credentials/progress/log/result）。
+- Host：支持 manifest `module`；SDK 运行时支持生成器与装饰器两种。
+- Makefile `proto-py` 输出改到 `sdk/python/omnitask_sdk/gen` 并修正生成文件导入。
+- 文档重写：integration-guide（三范式+走查+Vibecoding Prompt）、script-protocol（module/command/progress_regex）、sdk README。

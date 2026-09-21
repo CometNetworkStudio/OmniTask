@@ -1,5 +1,5 @@
 .venv/
-gen/
 .cache/
 __pycache__/
 *.pyc
+# 注意：omnitask_sdk/gen/ 为 protobuf 生成物，随 SDK 分发，需提交
