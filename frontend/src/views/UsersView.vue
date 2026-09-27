@@ -79,7 +79,7 @@ async function setEnabled(item, enabled) {
   <v-container>
     <v-row align="center" class="mb-2">
       <v-col>
-        <div class="text-h5">用户</div>
+        <div class="text-headline-small">用户</div>
         <div class="text-medium-emphasis">管理员管理用户角色与状态</div>
       </v-col>
       <v-col cols="auto">

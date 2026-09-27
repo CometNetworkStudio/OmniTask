@@ -34,7 +34,7 @@ async function submit() {
       <v-col cols="12" sm="8" md="5" lg="4">
         <v-card>
           <v-card-item>
-            <v-card-title class="text-h6">登录 OmniTask</v-card-title>
+            <v-card-title class="text-title-large">登录 OmniTask</v-card-title>
             <v-card-subtitle>一处托管，万务自达</v-card-subtitle>
           </v-card-item>
           <v-card-text>

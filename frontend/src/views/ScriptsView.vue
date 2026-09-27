@@ -120,7 +120,7 @@ function statusColor(status) {
   <v-container>
     <v-row align="center" class="mb-2">
       <v-col>
-        <div class="text-h5">脚本</div>
+        <div class="text-headline-small">脚本</div>
         <div class="text-medium-emphasis">安装与管理平台脚本（仅管理员）</div>
       </v-col>
       <v-col cols="auto">
@@ -170,13 +170,13 @@ function statusColor(status) {
     <v-dialog v-model="dialog" max-width="640" persistent>
       <v-card>
         <v-card-item>
-          <v-card-title class="text-h6">安装脚本</v-card-title>
+          <v-card-title class="text-title-large">安装脚本</v-card-title>
           <v-card-subtitle>填写符合规范的脚本仓库地址（zip 由后端下载）</v-card-subtitle>
         </v-card-item>
         <v-card-text>
           <template v-if="installing">
             <v-progress-linear :model-value="installPercent" color="primary" height="8" rounded class="mb-1" />
-            <div class="text-caption text-medium-emphasis mb-2">
+            <div class="text-body-small text-medium-emphasis mb-2">
               {{ installStage }} {{ installPercent }}% · {{ installMessage }}
             </div>
           </template>
@@ -221,9 +221,9 @@ function statusColor(status) {
     <v-dialog v-model="helpDialog" max-width="560">
       <v-card>
         <v-card-item>
-          <v-card-title class="text-h6">脚本运行时说明</v-card-title>
+          <v-card-title class="text-title-large">脚本运行时说明</v-card-title>
         </v-card-item>
-        <v-card-text class="text-body-2">
+        <v-card-text class="text-body-medium">
           <p class="mb-2">脚本需要对应的运行时才能执行。状态显示「缺少运行时」时，请在服务器上安装：</p>
           <ul class="ps-4">
             <li>Python 脚本：安装 <code>python3</code> 与依赖（<code>pip install -r requirements.txt</code>）</li>

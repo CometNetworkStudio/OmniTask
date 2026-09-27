@@ -1,6 +1,7 @@
 package server
 
 import (
+	"context"
 	"strings"
 
 	apiV1 "backend/api/v1"
@@ -16,6 +17,9 @@ import (
 func NewHTTPServer(
 	deps router.RouterDeps,
 ) *http.Server {
+	// 启动时按已安装脚本补齐平台默认配置。
+	deps.PlatformConfig.Bootstrap(context.Background())
+
 	if deps.Config.GetString("env") == "prod" {
 		gin.SetMode(gin.ReleaseMode)
 	}
@@ -72,8 +76,11 @@ func NewHTTPServer(
 			middleware.StrictAuth(deps.JWT, deps.Logger),
 			middleware.Authorize(deps.Casbin, deps.Logger),
 		)
-		authed.POST("/credentials", deps.CredentialHandler.Upsert)
+		authed.POST("/credentials", deps.CredentialHandler.Create)
+		authed.PUT("/credentials/:id", deps.CredentialHandler.Update)
+		authed.DELETE("/credentials/:id", deps.CredentialHandler.Archive)
 		authed.GET("/credentials", deps.CredentialHandler.List)
+		authed.GET("/credentials/access-logs", deps.CredentialHandler.AccessLogs)
 		authed.POST("/tasks", deps.TaskHandler.Create)
 		authed.GET("/tasks", deps.TaskHandler.List)
 		authed.GET("/tasks/:id", deps.TaskHandler.Get)

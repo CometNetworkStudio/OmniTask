@@ -65,7 +65,7 @@ function onSize(value) {
   <v-container>
     <v-row align="center" class="mb-2">
       <v-col>
-        <div class="text-h5">题库</div>
+        <div class="text-headline-small">题库</div>
         <div class="text-medium-emphasis">{{ total }} 条</div>
       </v-col>
       <v-col cols="auto">

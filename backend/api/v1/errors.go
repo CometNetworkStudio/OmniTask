@@ -23,4 +23,5 @@ var (
 	ErrTaskNotCancelable    = newError(1011, "当前任务不可取消")
 	ErrRegistrationClosed   = newError(1012, "注册已关闭")
 	ErrAccountDisabled      = newError(1013, "账号已被禁用")
+	ErrCredentialLimit      = newError(1014, "该平台凭据数量已达上限")
 )

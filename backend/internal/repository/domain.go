@@ -45,27 +45,105 @@ func NewCredentialRepository(r *Repository) *CredentialRepository {
 	return &CredentialRepository{r: r}
 }
 
-func (repo *CredentialRepository) Upsert(ctx context.Context, cred *model.Credential) error {
-	return repo.r.DB(ctx).Clauses(clause.OnConflict{
-		Columns:   []clause.Column{{Name: "user_id"}, {Name: "platform"}},
-		DoUpdates: clause.AssignmentColumns([]string{"cipher", "nonce", "updated_at"}),
-	}).Create(cred).Error
+func (repo *CredentialRepository) Create(ctx context.Context, cred *model.Credential) error {
+	return repo.r.DB(ctx).Create(cred).Error
 }
 
-func (repo *CredentialRepository) Get(ctx context.Context, userID, platform string) (*model.Credential, error) {
+func (repo *CredentialRepository) Update(ctx context.Context, cred *model.Credential) error {
+	return repo.r.DB(ctx).Model(&model.Credential{}).Where("id = ? AND user_id = ?", cred.ID, cred.UserID).
+		Updates(map[string]interface{}{
+			"label":      cred.Label,
+			"preview":    cred.Preview,
+			"is_default": cred.IsDefault,
+			"cipher":     cred.Cipher,
+			"nonce":      cred.Nonce,
+			"updated_at": time.Now(),
+		}).Error
+}
+
+func (repo *CredentialRepository) GetByID(ctx context.Context, userID, id string) (*model.Credential, error) {
 	var cred model.Credential
-	if err := repo.r.DB(ctx).Where("user_id = ? AND platform = ?", userID, platform).First(&cred).Error; err != nil {
+	if err := repo.r.DB(ctx).Where("id = ? AND user_id = ?", id, userID).First(&cred).Error; err != nil {
 		return nil, err
 	}
 	return &cred, nil
 }
 
+// ListByUser 返回未归档的凭据。
 func (repo *CredentialRepository) ListByUser(ctx context.Context, userID string) ([]model.Credential, error) {
 	var creds []model.Credential
-	if err := repo.r.DB(ctx).Where("user_id = ?", userID).Order("platform").Find(&creds).Error; err != nil {
+	if err := repo.r.DB(ctx).Where("user_id = ? AND archived_at IS NULL", userID).
+		Order("platform, is_default DESC, created_at").Find(&creds).Error; err != nil {
 		return nil, err
 	}
 	return creds, nil
+}
+
+// ListArchivedByPlatform 返回某平台已归档的凭据（用于清理）。
+func (repo *CredentialRepository) ListArchivedByPlatform(ctx context.Context, userID, platform string) ([]model.Credential, error) {
+	var creds []model.Credential
+	if err := repo.r.DB(ctx).Where("user_id = ? AND platform = ? AND archived_at IS NOT NULL", userID, platform).
+		Find(&creds).Error; err != nil {
+		return nil, err
+	}
+	return creds, nil
+}
+
+func (repo *CredentialRepository) CountActive(ctx context.Context, userID, platform string) (int64, error) {
+	var n int64
+	err := repo.r.DB(ctx).Model(&model.Credential{}).
+		Where("user_id = ? AND platform = ? AND archived_at IS NULL", userID, platform).Count(&n).Error
+	return n, err
+}
+
+// GetDefault 取某平台默认凭据；无默认时若仅有一条则返回该条。
+func (repo *CredentialRepository) GetDefault(ctx context.Context, userID, platform string) (*model.Credential, error) {
+	var creds []model.Credential
+	if err := repo.r.DB(ctx).Where("user_id = ? AND platform = ? AND archived_at IS NULL", userID, platform).
+		Order("is_default DESC, created_at").Find(&creds).Error; err != nil {
+		return nil, err
+	}
+	if len(creds) == 0 {
+		return nil, gorm.ErrRecordNotFound
+	}
+	return &creds[0], nil
+}
+
+func (repo *CredentialRepository) ClearDefault(ctx context.Context, userID, platform string) error {
+	return repo.r.DB(ctx).Model(&model.Credential{}).
+		Where("user_id = ? AND platform = ?", userID, platform).
+		Update("is_default", false).Error
+}
+
+func (repo *CredentialRepository) SetArchived(ctx context.Context, id string, at time.Time) error {
+	return repo.r.DB(ctx).Model(&model.Credential{}).Where("id = ?", id).
+		Updates(map[string]interface{}{"archived_at": at, "is_default": false, "updated_at": time.Now()}).Error
+}
+
+func (repo *CredentialRepository) Delete(ctx context.Context, id string) error {
+	return repo.r.DB(ctx).Where("id = ?", id).Delete(&model.Credential{}).Error
+}
+
+type CredentialAccessLogRepository struct{ r *Repository }
+
+func NewCredentialAccessLogRepository(r *Repository) *CredentialAccessLogRepository {
+	return &CredentialAccessLogRepository{r: r}
+}
+
+func (repo *CredentialAccessLogRepository) Create(ctx context.Context, entry *model.CredentialAccessLog) error {
+	return repo.r.DB(ctx).Create(entry).Error
+}
+
+func (repo *CredentialAccessLogRepository) ListByUser(ctx context.Context, userID string, limit int) ([]model.CredentialAccessLog, error) {
+	if limit <= 0 || limit > 200 {
+		limit = 50
+	}
+	var logs []model.CredentialAccessLog
+	if err := repo.r.DB(ctx).Where("user_id = ?", userID).
+		Order("created_at DESC").Limit(limit).Find(&logs).Error; err != nil {
+		return nil, err
+	}
+	return logs, nil
 }
 
 type TaskRepository struct{ r *Repository }
@@ -247,6 +325,12 @@ func (repo *TaskRepository) DeleteEvents(ctx context.Context, taskID string) err
 	return repo.r.DB(ctx).Where("task_id = ?", taskID).Delete(&model.TaskEvent{}).Error
 }
 
+func (repo *TaskRepository) CountByCredential(ctx context.Context, credentialID string) (int64, error) {
+	var n int64
+	err := repo.r.DB(ctx).Model(&model.Task{}).Where("credential_id = ?", credentialID).Count(&n).Error
+	return n, err
+}
+
 func (repo *TaskRepository) Reset(ctx context.Context, userID, id string) error {
 	return repo.r.DB(ctx).Model(&model.Task{}).
 		Where("id = ? AND user_id = ?", id, userID).
@@ -291,9 +375,11 @@ func NewPlatformCacheRepository(r *Repository) *PlatformCacheRepository {
 	return &PlatformCacheRepository{r: r}
 }
 
-func (repo *PlatformCacheRepository) Get(ctx context.Context, userID, platform string) (*model.PlatformCache, error) {
+func (repo *PlatformCacheRepository) Get(ctx context.Context, userID, platform, credentialID string) (*model.PlatformCache, error) {
 	var cache model.PlatformCache
-	if err := repo.r.DB(ctx).Where("user_id = ? AND platform = ?", userID, platform).First(&cache).Error; err != nil {
+	if err := repo.r.DB(ctx).
+		Where("user_id = ? AND platform = ? AND credential_id = ?", userID, platform, credentialID).
+		First(&cache).Error; err != nil {
 		return nil, err
 	}
 	return &cache, nil
@@ -301,7 +387,37 @@ func (repo *PlatformCacheRepository) Get(ctx context.Context, userID, platform s
 
 func (repo *PlatformCacheRepository) Upsert(ctx context.Context, cache *model.PlatformCache) error {
 	return repo.r.DB(ctx).Clauses(clause.OnConflict{
-		Columns:   []clause.Column{{Name: "user_id"}, {Name: "platform"}},
+		Columns:   []clause.Column{{Name: "user_id"}, {Name: "platform"}, {Name: "credential_id"}},
 		DoUpdates: clause.AssignmentColumns([]string{"items", "refreshed_at", "updated_at"}),
 	}).Create(cache).Error
+}
+
+func (repo *PlatformCacheRepository) DeleteByCredential(ctx context.Context, credentialID string) error {
+	return repo.r.DB(ctx).Where("credential_id = ?", credentialID).Delete(&model.PlatformCache{}).Error
+}
+
+type PlatformConfigRepository struct{ r *Repository }
+
+func NewPlatformConfigRepository(r *Repository) *PlatformConfigRepository {
+	return &PlatformConfigRepository{r: r}
+}
+
+func (repo *PlatformConfigRepository) Get(ctx context.Context, platformID string) (*model.PlatformConfig, error) {
+	var cfg model.PlatformConfig
+	if err := repo.r.DB(ctx).Where("platform_id = ?", platformID).First(&cfg).Error; err != nil {
+		return nil, err
+	}
+	return &cfg, nil
+}
+
+func (repo *PlatformConfigRepository) Create(ctx context.Context, cfg *model.PlatformConfig) error {
+	return repo.r.DB(ctx).Create(cfg).Error
+}
+
+func (repo *PlatformConfigRepository) List(ctx context.Context) ([]model.PlatformConfig, error) {
+	var cfgs []model.PlatformConfig
+	if err := repo.r.DB(ctx).Order("platform_id").Find(&cfgs).Error; err != nil {
+		return nil, err
+	}
+	return cfgs, nil
 }

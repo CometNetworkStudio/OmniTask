@@ -20,6 +20,7 @@ const vuetify = createVuetify({
       light: {
         colors: {
           primary: '#1867C0',
+          'primary-light': '#E3F0FC',
           secondary: '#5CBBF6',
           surface: '#FFFFFF',
           background: '#F4F6F8',
@@ -32,6 +33,7 @@ const vuetify = createVuetify({
       dark: {
         colors: {
           primary: '#5CBBF6',
+          'primary-light': '#0E2A44',
           secondary: '#1867C0',
           surface: '#1E1E1E',
           background: '#121212',
@@ -46,6 +48,8 @@ const vuetify = createVuetify({
     VTextField: { variant: 'outlined', density: 'comfortable', rounded: 'xl' },
     VSelect: { variant: 'outlined', density: 'comfortable', rounded: 'xl' },
     VList: { rounded: 'xl' },
+    VListItem: { rounded: 'xl' },
+    VSwitch: { inset: 'material' },
   },
 })
 

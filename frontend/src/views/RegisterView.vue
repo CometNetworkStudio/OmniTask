@@ -37,7 +37,7 @@ async function submit() {
       <v-col cols="12" sm="8" md="5" lg="4">
         <v-card>
           <v-card-item>
-            <v-card-title class="text-h6">注册 OmniTask</v-card-title>
+            <v-card-title class="text-title-large">注册 OmniTask</v-card-title>
           </v-card-item>
           <v-card-text>
             <v-alert v-if="error" type="error" variant="tonal" class="mb-4">{{ error }}</v-alert>

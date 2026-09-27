@@ -148,7 +148,7 @@ func (o *Orchestrator) run(ctx context.Context, task model.Task) {
 	})
 	o.publish(ctx, task.ID, "running", task.Progress, "任务开始", nil)
 
-	creds, err := o.creds.Decrypted(ctx, task.UserID, task.Platform)
+	creds, err := o.creds.Decrypted(ctx, task.UserID, task.CredentialID, task.Platform, CredentialAccess{Purpose: "task", RefID: task.ID})
 	if err != nil {
 		o.fail(ctx, task.ID, err.Error())
 		return

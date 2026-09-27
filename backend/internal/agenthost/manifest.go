@@ -26,6 +26,7 @@ type Discovery struct {
 	Columns  []Field           `json:"columns"`
 	Actions  []string          `json:"actions"`
 	ParamMap map[string]string `json:"param_map"` // 执行参数 key -> 条目字段 key
+	Primary  string            `json:"primary"`   // 卡片视图主字段（列 key），缺省用第一列
 }
 
 // Manifest 对应脚本目录下的 script.json。
@@ -34,6 +35,7 @@ type Manifest struct {
 	Name          string     `json:"name"`
 	Version       string     `json:"version"`
 	Author        string     `json:"author"`
+	Icon          string     `json:"icon"` // 可选 MDI 图标名，前端缺省兜底
 	Runtime       string     `json:"runtime"`
 	Entry         string     `json:"entry"`
 	Module        string     `json:"module"` // 与 entry 二选一：用 python -m module 启动

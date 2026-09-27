@@ -55,7 +55,18 @@ func (s *DiscoverService) Platforms(ctx context.Context) ([]v1.PlatformResponse,
 	return out, nil
 }
 
-func (s *DiscoverService) Items(ctx context.Context, userID, platform string) (*v1.DiscoveryResponse, error) {
+// resolveCredentialID 指定则原样返回，否则回退到平台默认凭据（无凭据则返回空串）。
+func (s *DiscoverService) resolveCredentialID(ctx context.Context, userID, platform, credentialID string) string {
+	if credentialID != "" {
+		return credentialID
+	}
+	if cred, err := s.creds.ResolveDefault(ctx, userID, platform); err == nil {
+		return cred.ID
+	}
+	return ""
+}
+
+func (s *DiscoverService) Items(ctx context.Context, userID, platform, credentialID string) (*v1.DiscoveryResponse, error) {
 	manifest := s.manifest(ctx, platform)
 	resp := &v1.DiscoveryResponse{Platform: platform}
 	if manifest != nil && manifest.Discovery != nil {
@@ -65,7 +76,7 @@ func (s *DiscoverService) Items(ctx context.Context, userID, platform string) (*
 			resp.Columns = append(resp.Columns, toPlatformField(col))
 		}
 	}
-	cache, err := s.cacheRepo.Get(ctx, userID, platform)
+	cache, err := s.cacheRepo.Get(ctx, userID, platform, s.resolveCredentialID(ctx, userID, platform, credentialID))
 	if err == nil {
 		_ = json.Unmarshal([]byte(cache.Items), &resp.Items)
 		refreshed := cache.RefreshedAt
@@ -78,22 +89,23 @@ func (s *DiscoverService) Items(ctx context.Context, userID, platform string) (*
 }
 
 // Refresh 触发一次发现（受 discovery.min_interval 限流），并写入缓存。
-func (s *DiscoverService) Refresh(ctx context.Context, userID, platform string) (*v1.DiscoveryResponse, error) {
+func (s *DiscoverService) Refresh(ctx context.Context, userID, platform, credentialID string) (*v1.DiscoveryResponse, error) {
 	manifest := s.manifest(ctx, platform)
 	if manifest == nil {
 		return nil, v1.ErrUnsupportedPlatform
 	}
+	credID := s.resolveCredentialID(ctx, userID, platform, credentialID)
 	interval := s.conf.GetInt("discovery.min_interval")
 	if interval <= 0 {
 		interval = 60
 	}
-	if cache, err := s.cacheRepo.Get(ctx, userID, platform); err == nil {
+	if cache, err := s.cacheRepo.Get(ctx, userID, platform, credID); err == nil {
 		if time.Since(cache.RefreshedAt) < time.Duration(interval)*time.Second {
-			return s.Items(ctx, userID, platform) // 距上次刷新过近，直接返回缓存
+			return s.Items(ctx, userID, platform, credID) // 距上次刷新过近，直接返回缓存
 		}
 	}
 
-	creds, err := s.creds.Decrypted(ctx, userID, platform)
+	creds, err := s.creds.Decrypted(ctx, userID, credID, platform, CredentialAccess{Purpose: "discover"})
 	if err != nil {
 		return nil, err
 	}
@@ -112,12 +124,12 @@ func (s *DiscoverService) Refresh(ctx context.Context, userID, platform string) 
 	}
 	now := time.Now()
 	if err := s.cacheRepo.Upsert(ctx, &model.PlatformCache{
-		ID: id, UserID: userID, Platform: platform, Items: string(buf),
+		ID: id, UserID: userID, Platform: platform, CredentialID: credID, Items: string(buf),
 		RefreshedAt: now, UpdatedAt: now,
 	}); err != nil {
 		return nil, err
 	}
-	return s.Items(ctx, userID, platform)
+	return s.Items(ctx, userID, platform, credID)
 }
 
 func (s *DiscoverService) manifest(ctx context.Context, platform string) *agenthost.Manifest {
@@ -143,6 +155,7 @@ func toPlatformResponse(script *model.Script) v1.PlatformResponse {
 		return resp
 	}
 	resp.Runtime = m.Runtime
+	resp.Icon = m.Icon
 	for _, a := range m.Actions {
 		resp.Actions = append(resp.Actions, v1.PlatformAction{ID: a.ID, Name: a.Name})
 	}
@@ -153,7 +166,7 @@ func toPlatformResponse(script *model.Script) v1.PlatformResponse {
 		resp.Credentials = append(resp.Credentials, toPlatformField(c))
 	}
 	if m.Discovery != nil {
-		disc := &v1.PlatformDiscovery{Label: m.Discovery.Label, Actions: m.Discovery.Actions, ParamMap: m.Discovery.ParamMap}
+		disc := &v1.PlatformDiscovery{Label: m.Discovery.Label, Actions: m.Discovery.Actions, ParamMap: m.Discovery.ParamMap, Primary: m.Discovery.Primary}
 		for _, col := range m.Discovery.Columns {
 			disc.Columns = append(disc.Columns, toPlatformField(col))
 		}

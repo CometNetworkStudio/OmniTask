@@ -19,6 +19,7 @@ type PlatformDiscovery struct {
 	Columns  []PlatformField   `json:"columns"`
 	Actions  []string          `json:"actions"`
 	ParamMap map[string]string `json:"param_map"`
+	Primary  string            `json:"primary"` // 卡片视图主字段（列 key），缺省用第一列
 }
 
 // PlatformResponse 是脚本 manifest 的完整对外 schema，供前端生成表单/筛选/展示。
@@ -26,6 +27,7 @@ type PlatformResponse struct {
 	ID          string             `json:"id"`
 	Name        string             `json:"name"`
 	Version     string             `json:"version"`
+	Icon        string             `json:"icon"`
 	Runtime     string             `json:"runtime"`
 	Status      string             `json:"status"`
 	Actions     []PlatformAction   `json:"actions"`

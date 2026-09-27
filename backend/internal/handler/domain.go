@@ -57,13 +57,13 @@ func NewCredentialHandler(svc *service.CredentialService, logger *log.Logger) *C
 	return &CredentialHandler{svc: svc, logger: logger}
 }
 
-func (h *CredentialHandler) Upsert(ctx *gin.Context) {
-	var req v1.CredentialUpsertRequest
+func (h *CredentialHandler) Create(ctx *gin.Context) {
+	var req v1.CredentialCreateRequest
 	if err := ctx.ShouldBindJSON(&req); err != nil {
 		v1.HandleError(ctx, http.StatusBadRequest, v1.ErrBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	resp, err := h.svc.Upsert(ctx, GetUserIdFromCtx(ctx), &req)
+	resp, err := h.svc.Create(ctx, GetUserIdFromCtx(ctx), &req)
 	if err != nil {
 		v1.HandleError(ctx, statusFor(err), err, nil)
 		return
@@ -71,8 +71,40 @@ func (h *CredentialHandler) Upsert(ctx *gin.Context) {
 	v1.HandleSuccess(ctx, resp)
 }
 
+func (h *CredentialHandler) Update(ctx *gin.Context) {
+	var req v1.CredentialUpdateRequest
+	if err := ctx.ShouldBindJSON(&req); err != nil {
+		v1.HandleError(ctx, http.StatusBadRequest, v1.ErrBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	resp, err := h.svc.Update(ctx, GetUserIdFromCtx(ctx), ctx.Param("id"), &req)
+	if err != nil {
+		v1.HandleError(ctx, statusFor(err), err, nil)
+		return
+	}
+	v1.HandleSuccess(ctx, resp)
+}
+
+func (h *CredentialHandler) Archive(ctx *gin.Context) {
+	if err := h.svc.Archive(ctx, GetUserIdFromCtx(ctx), ctx.Param("id")); err != nil {
+		v1.HandleError(ctx, statusFor(err), err, nil)
+		return
+	}
+	v1.HandleSuccess(ctx, nil)
+}
+
 func (h *CredentialHandler) List(ctx *gin.Context) {
 	list, err := h.svc.List(ctx, GetUserIdFromCtx(ctx))
+	if err != nil {
+		v1.HandleError(ctx, statusFor(err), err, nil)
+		return
+	}
+	v1.HandleSuccess(ctx, list)
+}
+
+func (h *CredentialHandler) AccessLogs(ctx *gin.Context) {
+	limit, _ := strconv.Atoi(ctx.DefaultQuery("limit", "50"))
+	list, err := h.svc.ListAccessLogs(ctx, GetUserIdFromCtx(ctx), limit)
 	if err != nil {
 		v1.HandleError(ctx, statusFor(err), err, nil)
 		return

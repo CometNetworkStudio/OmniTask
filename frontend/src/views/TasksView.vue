@@ -2,10 +2,10 @@
 import { computed, onMounted, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { tasksApi } from '@/api/services/tasks'
-import { platformsApi } from '@/api/services/platforms'
 import { usePlatformsStore } from '@/stores/platforms'
 import { useUiStore } from '@/stores/ui'
-import { formatAgo, formatTime, statusMeta } from '@/utils/format'
+import { statusMeta, formatTime } from '@/utils/format'
+import { buildParams } from '@/utils/taskParams'
 import DataTable from '@/components/DataTable.vue'
 
 const router = useRouter()
@@ -21,9 +21,6 @@ const filterPlatform = ref('')
 const loading = ref(false)
 const dialog = ref(false)
 const submitting = ref(false)
-const discovering = ref(false)
-const discoveryItems = ref([])
-const discoveryRefreshedAt = ref(null)
 
 const statusOptions = [
   { title: '全部状态', value: '' },
@@ -37,11 +34,10 @@ const statusOptions = [
 ]
 const platformFilterOptions = computed(() => [{ title: '全部平台', value: '' }, ...platforms.options])
 
-const form = reactive({ platform: '', action: '', params: {}, selectedKey: '' })
+const form = reactive({ platform: '', action: '', params: {} })
 const platform = computed(() => platforms.platform(form.platform))
 const actionOptions = computed(() => platform.value?.actions || [])
 const paramSchema = computed(() => platform.value?.params || [])
-const discovery = computed(() => platform.value?.discovery || null)
 
 const headers = [
   { title: '平台', key: 'platform' },
@@ -51,10 +47,6 @@ const headers = [
   { title: '创建时间', key: 'created_at' },
   { title: '', key: 'actions', sortable: false, align: 'end' },
 ]
-const discoveryHeaders = computed(() => {
-  const cols = (discovery.value?.columns || []).map((c) => ({ title: c.label, key: `f_${c.key}` }))
-  return [{ title: '', key: 'select', sortable: false, width: 48 }, ...cols]
-})
 
 onMounted(async () => {
   await platforms.load()
@@ -106,76 +98,15 @@ function onPlatformChange() {
   for (const field of current?.params || []) {
     form.params[field.key] = field.default
   }
-  form.selectedKey = ''
-  discoveryItems.value = []
-  discoveryRefreshedAt.value = null
-  if (discovery.value) {
-    loadCachedItems()
-  }
-}
-
-async function loadCachedItems() {
-  try {
-    const data = await platformsApi.items(platform.value.id)
-    discoveryItems.value = data.items || []
-    discoveryRefreshedAt.value = data.refreshed_at || null
-  } catch {
-    // 忽略
-  }
-}
-
-async function refreshDiscovery() {
-  discovering.value = true
-  try {
-    const data = await platformsApi.discover(platform.value.id)
-    discoveryItems.value = data.items || []
-    discoveryRefreshedAt.value = data.refreshed_at || null
-    ui.notify(`已刷新：${discoveryItems.value.length} 条`)
-  } catch (err) {
-    ui.notify(err.message, 'error')
-  } finally {
-    discovering.value = false
-  }
-}
-
-function fieldSlot(key) {
-  return `item.f_${key}`
-}
-
-function buildParams() {
-  const out = {}
-  for (const field of paramSchema.value) {
-    const value = form.params[field.key]
-    if (field.type === 'switch') {
-      if (value) out[field.key] = 'true'
-      continue
-    }
-    if (value === '' || value === null || value === undefined) continue
-    out[field.key] = String(value)
-  }
-  if (discovery.value && form.selectedKey) {
-    const item = discoveryItems.value.find((it) => it.key === form.selectedKey)
-    if (item) {
-      for (const [paramKey, fieldKey] of Object.entries(discovery.value.param_map || {})) {
-        const value = item.fields[fieldKey]
-        if (value !== undefined && value !== null) out[paramKey] = String(value)
-      }
-    }
-  }
-  return out
 }
 
 async function createTask() {
-  if (discovery.value && !form.selectedKey) {
-    ui.notify('请先刷新并选择一条任务/课程', 'warning')
-    return
-  }
   submitting.value = true
   try {
     const task = await tasksApi.create({
       platform: form.platform,
       action: form.action,
-      params: buildParams(),
+      params: buildParams(paramSchema.value, form.params),
     })
     dialog.value = false
     ui.notify('任务已创建')
@@ -221,7 +152,7 @@ async function removeRow(item) {
   <v-container>
     <v-row align="center" class="mb-2">
       <v-col>
-        <div class="text-h5">任务</div>
+        <div class="text-headline-small">任务</div>
         <div class="text-medium-emphasis">创建并查看自动任务</div>
       </v-col>
       <v-col cols="auto">
@@ -331,7 +262,8 @@ async function removeRow(item) {
     <v-dialog v-model="dialog" max-width="720" persistent>
       <v-card>
         <v-card-item>
-          <v-card-title class="text-h6">新建任务</v-card-title>
+          <v-card-title class="text-title-large">新建任务</v-card-title>
+          <v-card-subtitle>高级模式：直接填写平台参数。一般使用请从左侧平台页选择要处理的条目</v-card-subtitle>
         </v-card-item>
         <v-card-text>
           <v-form @submit.prevent="createTask">
@@ -351,44 +283,8 @@ async function removeRow(item) {
               label="动作"
             />
 
-            <template v-if="discovery">
-              <v-divider class="my-4" />
-              <div class="d-flex align-center ga-2 mb-2">
-                <div class="text-subtitle-2">{{ discovery.label }}（选择要处理的一项）</div>
-                <v-spacer />
-                <span v-if="discoveryRefreshedAt" class="text-caption text-medium-emphasis">
-                  刷新于 {{ formatAgo(discoveryRefreshedAt) }}
-                </span>
-                <v-btn size="small" variant="tonal" :loading="discovering" @click="refreshDiscovery">
-                  刷新列表
-                </v-btn>
-              </div>
-              <DataTable
-                :headers="discoveryHeaders"
-                :items="discoveryItems"
-                :paginated="false"
-                item-value="key"
-              >
-                <template #item.select="{ item }">
-                  <v-radio
-                    :model-value="form.selectedKey"
-                    :value="item.key"
-                    color="primary"
-                    hide-details
-                    @update:model-value="form.selectedKey = item.key"
-                  />
-                </template>
-                <template v-for="col in discovery.columns" #[fieldSlot(col.key)]="{ item }" :key="col.key">
-                  <span>{{ item.fields[col.key] }}</span>
-                </template>
-                <template #no-data>
-                  <div class="pa-4 text-medium-emphasis">暂无数据，点击「刷新列表」获取</div>
-                </template>
-              </DataTable>
-            </template>
-
             <v-divider class="my-4" />
-            <div class="text-subtitle-2 mb-2">执行参数</div>
+            <div class="text-title-small mb-2">执行参数</div>
             <template v-for="field in paramSchema" :key="field.key">
               <v-switch
                 v-if="field.type === 'switch'"
@@ -396,7 +292,6 @@ async function removeRow(item) {
                 :label="field.label"
                 color="primary"
                 hide-details
-                inset
               />
               <v-text-field
                 v-else

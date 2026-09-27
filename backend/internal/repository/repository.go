@@ -99,9 +99,23 @@ func NewDB(conf *viper.Viper, l *log.Logger) *gorm.DB {
 		panic(err)
 	}
 	if driver == "sqlite" {
+		// AutoMigrate 不会删除旧索引：多凭据改造前先移除旧的唯一索引，交由新结构重建。
+		mig := db.Migrator()
+		for _, idx := range []struct {
+			model any
+			name  string
+		}{
+			{&model.Credential{}, "uk_credential_user_platform"},
+			{&model.PlatformCache{}, "uk_platform_cache"},
+		} {
+			if mig.HasIndex(idx.model, idx.name) {
+				_ = mig.DropIndex(idx.model, idx.name)
+			}
+		}
 		if err := db.AutoMigrate(
 			&model.User{}, &model.Credential{}, &model.Task{},
 			&model.TaskEvent{}, &model.Question{}, &model.Script{}, &model.PlatformCache{},
+			&model.CredentialAccessLog{}, &model.PlatformConfig{},
 		); err != nil {
 			panic(err)
 		}

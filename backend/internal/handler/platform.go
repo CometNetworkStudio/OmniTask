@@ -26,7 +26,7 @@ func (h *PlatformHandler) List(ctx *gin.Context) {
 }
 
 func (h *PlatformHandler) Items(ctx *gin.Context) {
-	resp, err := h.svc.Items(ctx, GetUserIdFromCtx(ctx), ctx.Param("id"))
+	resp, err := h.svc.Items(ctx, GetUserIdFromCtx(ctx), ctx.Param("id"), ctx.Query("credential_id"))
 	if err != nil {
 		v1.HandleError(ctx, statusFor(err), err, nil)
 		return
@@ -35,7 +35,14 @@ func (h *PlatformHandler) Items(ctx *gin.Context) {
 }
 
 func (h *PlatformHandler) Refresh(ctx *gin.Context) {
-	resp, err := h.svc.Refresh(ctx, GetUserIdFromCtx(ctx), ctx.Param("id"))
+	var body struct {
+		CredentialID string `json:"credential_id"`
+	}
+	_ = ctx.ShouldBindJSON(&body)
+	if body.CredentialID == "" {
+		body.CredentialID = ctx.Query("credential_id")
+	}
+	resp, err := h.svc.Refresh(ctx, GetUserIdFromCtx(ctx), ctx.Param("id"), body.CredentialID)
 	if err != nil {
 		v1.HandleError(ctx, statusFor(err), err, nil)
 		return

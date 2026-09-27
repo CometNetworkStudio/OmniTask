@@ -1,11 +1,13 @@
 <script setup>
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useDisplay, useTheme } from 'vuetify'
 import { useAuthStore } from '@/stores/auth'
+import { usePlatformsStore } from '@/stores/platforms'
 import { useUiStore } from '@/stores/ui'
 
 const auth = useAuthStore()
+const platforms = usePlatformsStore()
 const ui = useUiStore()
 const router = useRouter()
 const route = useRoute()
@@ -14,6 +16,11 @@ const { mobile } = useDisplay()
 
 const drawer = ref(!mobile.value)
 const userMenu = ref(false)
+const openGroups = reactive({ '/tasks': false })
+
+function toggleGroup(key) {
+  openGroups[key] = !openGroups[key]
+}
 
 watch(mobile, (isMobile) => {
   drawer.value = !isMobile
@@ -36,7 +43,16 @@ const navGroups = computed(() => {
     {
       title: '任务',
       items: [
-        { title: '任务', to: '/tasks', icon: 'mdi-clipboard-list-outline' },
+        {
+          title: '任务',
+          to: '/tasks',
+          icon: 'mdi-clipboard-list-outline',
+          children: platforms.list.map((p) => ({
+            title: p.name,
+            to: `/platforms/${p.id}`,
+            icon: p.icon || 'mdi-puzzle-outline',
+          })),
+        },
         { title: '凭据', to: '/credentials', icon: 'mdi-key-variant' },
         { title: '题库', to: '/questions', icon: 'mdi-database-outline' },
       ],
@@ -58,10 +74,12 @@ const PAGE_TITLES = {
   home: '首页',
   tasks: '任务',
   'task-detail': '任务详情',
+  platform: '平台',
   credentials: '凭据',
   questions: '题库',
   scripts: '脚本',
   users: '用户',
+  settings: '设置',
 }
 const currentTitle = computed(() => PAGE_TITLES[route.name] || 'OmniTask')
 const avatarLetter = computed(() => (auth.username || '?').charAt(0).toUpperCase())
@@ -88,8 +106,21 @@ function go(path) {
 onMounted(() => {
   if (auth.isAuthenticated) {
     auth.fetchMe().catch(() => {})
+    platforms.load().catch(() => {})
   }
 })
+
+watch(
+  () => route.path,
+  (path) => {
+    if (path.startsWith('/platforms')) {
+      openGroups['/tasks'] = true
+    } else if (path !== '/tasks') {
+      openGroups['/tasks'] = false
+    }
+  },
+  { immediate: true },
+)
 </script>
 
 <template>
@@ -106,25 +137,58 @@ onMounted(() => {
           <v-list nav bg-color="transparent" class="px-2 pt-3 app-drawer__nav">
             <template v-for="(group, gi) in navGroups" :key="group.title">
               <v-divider v-if="gi > 0" class="my-2" />
-              <v-list-subheader class="text-caption text-medium-emphasis px-3">
+              <v-list-subheader class="text-body-small text-medium-emphasis px-3">
                 {{ group.title }}
               </v-list-subheader>
-              <v-list-item
-                v-for="item in group.items"
-                :key="item.to"
-                :to="item.to"
-                :prepend-icon="item.icon"
-                :title="item.title"
-                :value="item.to"
-                color="primary"
-                rounded="xl"
-              />
+              <template v-for="item in group.items" :key="item.to">
+                <template v-if="item.children">
+                  <v-list-item
+                    :to="item.to"
+                    :prepend-icon="item.icon"
+                    :title="item.title"
+                    :value="item.to"
+                    color="primary"
+                    rounded="xl"
+                    @click="toggleGroup(item.to)"
+                  >
+                    <template #append>
+                      <v-icon
+                        :icon="openGroups[item.to] ? 'mdi-chevron-up' : 'mdi-chevron-down'"
+                        size="small"
+                      />
+                    </template>
+                  </v-list-item>
+                  <v-expand-transition>
+                    <div v-show="openGroups[item.to]">
+                      <v-list-item
+                        v-for="child in item.children"
+                        :key="child.to"
+                        :to="child.to"
+                        :prepend-icon="child.icon"
+                        :title="child.title"
+                        color="primary"
+                        rounded="xl"
+                        class="ps-8"
+                      />
+                    </div>
+                  </v-expand-transition>
+                </template>
+                <v-list-item
+                  v-else
+                  :to="item.to"
+                  :prepend-icon="item.icon"
+                  :title="item.title"
+                  :value="item.to"
+                  color="primary"
+                  rounded="xl"
+                />
+              </template>
             </template>
           </v-list>
 
           <div class="drawer-legal-spacer" aria-hidden="true" />
 
-          <div class="px-4 pb-8 pt-4 text-caption text-medium-emphasis drawer-legal">
+          <div class="px-4 pb-8 pt-4 text-body-small text-medium-emphasis drawer-legal">
             <div>© CometNetworkStudio</div>
           </div>
         </div>
@@ -133,11 +197,11 @@ onMounted(() => {
           <v-divider />
           <v-list nav bg-color="transparent" class="px-2 py-2 flex-shrink-0 app-drawer__nav">
             <v-list-item
-              :prepend-icon="isDark ? 'mdi-weather-sunny' : 'mdi-weather-night'"
-              :title="isDark ? '浅色模式' : '深色模式'"
+              prepend-icon="mdi-cog-outline"
+              title="设置"
+              to="/settings"
               color="primary"
               rounded="xl"
-              @click="toggleTheme"
             />
             <v-list-item
               prepend-icon="mdi-logout"
@@ -152,7 +216,7 @@ onMounted(() => {
 
       <v-app-bar flat :height="64" color="surface">
         <v-app-bar-nav-icon @click="drawer = !drawer" />
-        <v-app-bar-title class="text-body-1 font-weight-medium text-truncate">
+        <v-app-bar-title class="text-body-large font-weight-medium text-truncate">
           {{ currentTitle }}
         </v-app-bar-title>
         <v-spacer />
@@ -165,7 +229,7 @@ onMounted(() => {
           <template #activator="{ props }">
             <v-btn icon variant="text" v-bind="props" class="me-2" aria-label="用户菜单">
               <v-avatar color="primary" size="36">
-                <span class="text-body-2 font-weight-medium">{{ avatarLetter }}</span>
+                <span class="text-body-medium font-weight-medium">{{ avatarLetter }}</span>
               </v-avatar>
             </v-btn>
           </template>
@@ -189,9 +253,12 @@ onMounted(() => {
       timeout="3000"
       total-visible="4"
       transition="bouncy-slide-auto"
-      closable
       contained
-    />
+    >
+      <template #actions="{ props }">
+        <v-btn icon="mdi-close" variant="text" size="small" aria-label="关闭" v-bind="props" />
+      </template>
+    </v-snackbar-queue>
   </v-app>
 </template>
 

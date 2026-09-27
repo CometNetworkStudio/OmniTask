@@ -37,7 +37,7 @@ const pageCount = computed(() => Math.max(1, Math.ceil((props.total || 0) / (pro
   </v-data-table>
 
   <v-row v-if="paginated && total > 0" align="center" justify="end" class="ma-0 pa-2">
-    <v-col cols="auto" class="text-body-2 text-medium-emphasis">共 {{ total }} 条</v-col>
+    <v-col cols="auto" class="text-body-medium text-medium-emphasis">共 {{ total }} 条</v-col>
     <v-col cols="auto">
       <v-select
         :model-value="size"
@@ -54,6 +54,7 @@ const pageCount = computed(() => Math.max(1, Math.ceil((props.total || 0) / (pro
         :length="pageCount"
         :total-visible="5"
         density="compact"
+        rounded="circle"
         @update:model-value="emit('update:page', $event)"
       />
     </v-col>

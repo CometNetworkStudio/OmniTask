@@ -158,3 +158,11 @@ python main.py --cli --action time --param cid=2416 --credential username=u --cr
   "discovery": { "label": "课程", "columns": [{"key":"cid","label":"课程ID","type":"text"}], "actions": ["time","progress"] }
   ```
 - 后端缓存每个用户在平台的条目，并按 `discovery.min_interval`（默认 60s）限流刷新。
+- manifest 顶层可选 `"icon": "mdi-xxx"`，用于前端侧栏/平台页图标；缺省用 `mdi-puzzle-outline` 兜底。
+- `discovery.primary` 可选，指定卡片视图的主字段（列 key），缺省用第一列。
+- `columns[].type` 建议取值（前端据此渲染，值仍是字符串）：
+  - `text`（默认）、`number`、`date`
+  - `progress`：值为 `60%` 或 `0.6` → 进度条
+  - `chip`：值为 `"已完成:success"`（冒号后为可选颜色）→ 彩色标签
+  - `sparkline`：值为逗号分隔数字（如 `"1,2,3,5,4"`）→ 迷你折线图
+- 平台页会为每条条目按 `discovery.actions` 渲染执行按钮；未列出的动作不显示。

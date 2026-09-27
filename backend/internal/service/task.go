@@ -21,13 +21,14 @@ func IsPlatformSupported(platform string) bool { return SupportedPlatforms[platf
 type TaskService struct {
 	repo       *repository.TaskRepository
 	scriptRepo *repository.ScriptRepository
+	creds      *CredentialService
 	sid        *sid.Sid
 	conf       *viper.Viper
 	logger     *log.Logger
 }
 
-func NewTaskService(repo *repository.TaskRepository, scriptRepo *repository.ScriptRepository, sid *sid.Sid, conf *viper.Viper, logger *log.Logger) *TaskService {
-	return &TaskService{repo: repo, scriptRepo: scriptRepo, sid: sid, conf: conf, logger: logger}
+func NewTaskService(repo *repository.TaskRepository, scriptRepo *repository.ScriptRepository, creds *CredentialService, sid *sid.Sid, conf *viper.Viper, logger *log.Logger) *TaskService {
+	return &TaskService{repo: repo, scriptRepo: scriptRepo, creds: creds, sid: sid, conf: conf, logger: logger}
 }
 
 func (s *TaskService) allowedPlatform(ctx context.Context, platform string) bool {
@@ -58,18 +59,28 @@ func (s *TaskService) Create(ctx context.Context, userID string, req *v1.TaskCre
 	if paramsStr == "" || paramsStr == "null" {
 		paramsStr = "{}"
 	}
+	// 解析使用的凭据：显式指定则校验归属，否则用平台默认；都没有则留空由脚本自行处理。
+	credentialID := req.CredentialID
+	if credentialID != "" {
+		if _, err := s.creds.GetOwned(ctx, userID, credentialID); err != nil {
+			return nil, err
+		}
+	} else if cred, err := s.creds.ResolveDefault(ctx, userID, req.Platform); err == nil {
+		credentialID = cred.ID
+	}
 	id, err := s.sid.GenString()
 	if err != nil {
 		return nil, err
 	}
 	task := &model.Task{
-		ID:       id,
-		UserID:   userID,
-		Platform: req.Platform,
-		Action:   req.Action,
-		Params:   paramsStr,
-		Status:   "pending",
-		Result:   "{}",
+		ID:           id,
+		UserID:       userID,
+		Platform:     req.Platform,
+		Action:       req.Action,
+		CredentialID: credentialID,
+		Params:       paramsStr,
+		Status:       "pending",
+		Result:       "{}",
 	}
 	if err := s.repo.Create(ctx, task); err != nil {
 		return nil, err
@@ -123,7 +134,12 @@ func (s *TaskService) Delete(ctx context.Context, userID, id string) error {
 	if _, err := s.repo.Delete(ctx, userID, id); err != nil {
 		return err
 	}
-	return s.repo.DeleteEvents(ctx, id)
+	if err := s.repo.DeleteEvents(ctx, id); err != nil {
+		return err
+	}
+	// 删除任务后，若某归档凭据已无任何任务，则真正清除。
+	s.creds.PurgeArchived(ctx, userID, task.Platform)
+	return nil
 }
 
 func (s *TaskService) List(ctx context.Context, userID, status, platform string, page, size int) ([]v1.TaskResponse, int64, error) {
@@ -141,18 +157,19 @@ func (s *TaskService) List(ctx context.Context, userID, status, platform string,
 
 func toTaskResponse(task *model.Task) *v1.TaskResponse {
 	resp := &v1.TaskResponse{
-		ID:         task.ID,
-		Platform:   task.Platform,
-		Action:     task.Action,
-		Status:     task.Status,
-		Progress:   task.Progress,
-		Error:      task.Error,
-		StartedAt:  task.StartedAt,
-		FinishedAt: task.FinishedAt,
-		CreatedAt:  task.CreatedAt,
-		UpdatedAt:  task.UpdatedAt,
-		Params:     map[string]string{},
-		Result:     map[string]string{},
+		ID:           task.ID,
+		Platform:     task.Platform,
+		Action:       task.Action,
+		CredentialID: task.CredentialID,
+		Status:       task.Status,
+		Progress:     task.Progress,
+		Error:        task.Error,
+		StartedAt:    task.StartedAt,
+		FinishedAt:   task.FinishedAt,
+		CreatedAt:    task.CreatedAt,
+		UpdatedAt:    task.UpdatedAt,
+		Params:       map[string]string{},
+		Result:       map[string]string{},
 	}
 	if task.Params != "" {
 		_ = json.Unmarshal([]byte(task.Params), &resp.Params)

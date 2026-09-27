@@ -76,7 +76,7 @@ onBeforeUnmount(() => socket?.close())
       <v-col>
         <div class="d-flex align-center ga-2">
           <v-btn variant="text" icon="mdi-arrow-left" @click="router.push('/')" />
-          <div class="text-h5">任务详情</div>
+          <div class="text-headline-small">任务详情</div>
         </div>
       </v-col>
       <v-col cols="auto">
@@ -98,21 +98,21 @@ onBeforeUnmount(() => socket?.close())
       <v-card-text>
         <v-row>
           <v-col cols="12" md="6">
-            <div class="text-caption text-medium-emphasis">平台</div>
+            <div class="text-body-small text-medium-emphasis">平台</div>
             <div>{{ platforms.name(task.platform) }}</div>
           </v-col>
           <v-col cols="12" md="6">
-            <div class="text-caption text-medium-emphasis">动作</div>
+            <div class="text-body-small text-medium-emphasis">动作</div>
             <div>{{ task.action }}</div>
           </v-col>
           <v-col cols="12" md="6">
-            <div class="text-caption text-medium-emphasis">状态</div>
+            <div class="text-body-small text-medium-emphasis">状态</div>
             <v-chip size="small" :color="statusMeta(task.status).color" variant="tonal">
               {{ statusMeta(task.status).text }}
             </v-chip>
           </v-col>
           <v-col cols="12" md="6">
-            <div class="text-caption text-medium-emphasis">创建时间</div>
+            <div class="text-body-small text-medium-emphasis">创建时间</div>
             <div>{{ formatTime(task.created_at) }}</div>
           </v-col>
         </v-row>
@@ -132,7 +132,7 @@ onBeforeUnmount(() => socket?.close())
         </v-alert>
 
         <template v-if="Object.keys(task.params || {}).length">
-          <div class="text-subtitle-2 mt-6 mb-2">参数</div>
+          <div class="text-title-small mt-6 mb-2">参数</div>
           <v-chip
             v-for="(value, key) in task.params"
             :key="key"
@@ -148,7 +148,7 @@ onBeforeUnmount(() => socket?.close())
 
     <v-card class="mt-4">
       <v-card-item>
-        <v-card-title class="text-subtitle-1">实时进度</v-card-title>
+        <v-card-title class="text-title-medium">实时进度</v-card-title>
       </v-card-item>
       <v-card-text>
         <v-timeline v-if="events.length" density="compact" side="end">
@@ -158,8 +158,8 @@ onBeforeUnmount(() => socket?.close())
             :dot-color="statusMeta(event.status).color"
             size="small"
           >
-            <div class="text-body-2">{{ event.message || event.status }}</div>
-            <div class="text-caption text-medium-emphasis">
+            <div class="text-body-medium">{{ event.message || event.status }}</div>
+            <div class="text-body-small text-medium-emphasis">
               {{ statusMeta(event.status).text }} · {{ event.percent ?? 0 }}%
             </div>
           </v-timeline-item>
