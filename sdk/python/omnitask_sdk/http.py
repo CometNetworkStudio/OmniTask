@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import os
+
 import requests
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
@@ -34,6 +36,7 @@ def new_session(
     session.mount("http://", adapter)
     session.mount("https://", adapter)
     session.request_timeout = timeout  # type: ignore[attr-defined]
+    proxy = proxy or os.environ.get("OMNITASK_PROXY", "")
     if proxy:
         session.proxies.update({"http": proxy, "https": proxy})
     return session

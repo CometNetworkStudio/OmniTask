@@ -17,7 +17,16 @@ Host 会以 cwd=脚本目录、``python -m omnitask_sdk.bridge`` 启动本桥；
 命令行参数支持 ``{key}`` 占位符（取自 params / credentials / action / task_id）。
 
 进度：默认识别形如 ``[progress] 42 正在处理`` 的输出行；可用 manifest 的
-``progress_regex`` 自定义（需含捕获组 1=百分比、2=消息）。其余输出作为日志事件。
+``progress_regex`` 自定义（需含捕获组 1=百分比、2=消息）。
+
+组件标记（可选，零代码也能用）：
+
+    [progress] 42 正在处理
+    [step] login running 登录
+    [metric] correct 正确率 96 %
+    [log] warn 遇到限流，稍后重试
+
+其余输出按 info 日志展示。
 """
 
 from __future__ import annotations
@@ -30,6 +39,9 @@ import subprocess
 import sys
 
 DEFAULT_PROGRESS_RE = re.compile(r"\[progress\]\s*(\d+)\s*(.*)")
+STEP_RE = re.compile(r"\[step\]\s*(\S+)\s+(running|succeeded|failed|skipped)\s*(.*)")
+METRIC_RE = re.compile(r"\[metric\]\s*(\S+)\s*(\S*)\s*(\S+)\s*(\S*)")
+LOG_RE = re.compile(r"\[log\]\s*(debug|info|warn|error)\s+(.*)")
 
 
 def serve() -> None:
@@ -65,23 +77,76 @@ def serve() -> None:
 
     signal.signal(signal.SIGTERM, _terminate)
 
+    _emit({"type": "event", "task_id": task_id, "event": "started", "message": "开始执行"})
+
     percent = 0
+    last_line = ""
     assert proc.stdout is not None
     for raw in proc.stdout:
         line = raw.rstrip("\n")
+        if not line.strip():
+            continue
+        last_line = line
+        step = STEP_RE.search(line)
+        if step:
+            _emit(
+                {
+                    "type": "event",
+                    "task_id": task_id,
+                    "event": "step",
+                    "step": step.group(1),
+                    "status": step.group(2),
+                    "label": (step.group(3) or step.group(1)).strip(),
+                }
+            )
+            continue
+        metric = METRIC_RE.search(line)
+        if metric:
+            _emit(
+                {
+                    "type": "event",
+                    "task_id": task_id,
+                    "event": "metric",
+                    "key": metric.group(1),
+                    "label": metric.group(2) or metric.group(1),
+                    "value": metric.group(3),
+                    "unit": metric.group(4),
+                }
+            )
+            continue
+        log_line = LOG_RE.search(line)
+        if log_line:
+            _emit(
+                {
+                    "type": "event",
+                    "task_id": task_id,
+                    "event": "log",
+                    "level": log_line.group(1),
+                    "message": log_line.group(2),
+                }
+            )
+            continue
         match = regex.search(line) if regex else None
         if match:
             percent = int(match.group(1))
             message = (match.group(2) or "").strip() or line
+            _emit_progress(task_id, percent, message)
         else:
-            message = line
-        _emit_progress(task_id, percent, message)
+            _emit(
+                {
+                    "type": "event",
+                    "task_id": task_id,
+                    "event": "log",
+                    "level": "info",
+                    "message": line,
+                }
+            )
 
     code = proc.wait()
     if code == 0:
         _emit({"type": "event", "task_id": task_id, "event": "succeeded", "percent": 100, "message": "done", "result": {}})
     else:
-        _emit_failed(task_id, f"命令退出码 {code}")
+        _emit_failed(task_id, f"命令退出码 {code}" + (f"：{last_line}" if last_line else ""))
 
 
 def _read_request() -> dict | None:
@@ -98,12 +163,18 @@ def _read_request() -> dict | None:
 
 
 def _load_manifest() -> dict:
-    path = os.path.join(os.getcwd(), "script.json")
-    try:
-        with open(path, encoding="utf-8") as handle:
-            return json.load(handle)
-    except Exception:
-        return {}
+    roots = []
+    if os.environ.get("OMNITASK_SCRIPT_DIR"):
+        roots.append(os.environ["OMNITASK_SCRIPT_DIR"])
+    roots.append(os.getcwd())
+    for root in roots:
+        path = os.path.join(root, "script.json")
+        try:
+            with open(path, encoding="utf-8-sig") as handle:
+                return json.load(handle)
+        except Exception:
+            continue
+    return {}
 
 
 def _find_action(manifest: dict, action_id: str) -> dict | None:

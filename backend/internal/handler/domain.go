@@ -130,7 +130,7 @@ func (h *TaskHandler) Create(ctx *gin.Context) {
 	}
 	resp, err := h.svc.Create(ctx, GetUserIdFromCtx(ctx), &req)
 	if err != nil {
-		v1.HandleError(ctx, statusFor(err), err, nil)
+		v1.HandleError(ctx, statusFor(err), err, gin.H{"error": err.Error()})
 		return
 	}
 	v1.HandleSuccess(ctx, resp)
@@ -156,6 +156,16 @@ func (h *TaskHandler) Get(ctx *gin.Context) {
 		return
 	}
 	v1.HandleSuccess(ctx, resp)
+}
+
+func (h *TaskHandler) Events(ctx *gin.Context) {
+	limit, _ := strconv.Atoi(ctx.DefaultQuery("limit", "1000"))
+	list, err := h.svc.Events(ctx, GetUserIdFromCtx(ctx), ctx.Param("id"), limit)
+	if err != nil {
+		v1.HandleError(ctx, statusFor(err), err, nil)
+		return
+	}
+	v1.HandleSuccess(ctx, list)
 }
 
 func (h *TaskHandler) Cancel(ctx *gin.Context) {
@@ -240,7 +250,9 @@ func statusFor(err error) int {
 		return http.StatusNotFound
 	case errors.Is(err, v1.ErrUserAlreadyExists), errors.Is(err, v1.ErrUnsupportedPlatform),
 		errors.Is(err, v1.ErrBadRequest), errors.Is(err, v1.ErrCredentialEncrypt),
-		errors.Is(err, v1.ErrTaskNotCancelable), errors.Is(err, v1.ErrRegistrationClosed):
+		errors.Is(err, v1.ErrTaskNotCancelable), errors.Is(err, v1.ErrRegistrationClosed),
+		errors.Is(err, v1.ErrInvalidTaskParams), errors.Is(err, v1.ErrTaskLimit),
+		errors.Is(err, v1.ErrQueueFull):
 		return http.StatusBadRequest
 	default:
 		return http.StatusInternalServerError

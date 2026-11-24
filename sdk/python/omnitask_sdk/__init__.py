@@ -17,6 +17,8 @@
     serve()
 """
 
+__version__ = "0.2.1"
+
 from .context import AdapterContext
 from .decorator import action, registered_actions
 from .listing import listing, registered_listings
@@ -29,4 +31,5 @@ __all__ = [
     "listing",
     "registered_listings",
     "serve",
+    "__version__",
 ]

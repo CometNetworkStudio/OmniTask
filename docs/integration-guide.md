@@ -2,6 +2,7 @@
 
 OmniTask 的平台能力来自**可插拔脚本**。脚本是**独立项目**，可任意语言；你**不必改文件名、不必改造既有项目结构**。
 
+> 完整开发指南（组件、manifest v2、工作区、并发、本地调试、开发者注意事项）：`docs/script-development.md`
 > 协议细节：`docs/script-protocol.md` ｜ Python SDK：`sdk/python/README.md`
 
 ---
@@ -40,9 +41,11 @@ import mytool                      # 你已发布的库
 
 @action("run")
 def run(ctx):
+    ctx.step("login", "登录", "running")
     ctx.progress(5, "启动")
     mytool.do_work(course=ctx.params.get("cid"), token=ctx.credentials["token"])
-    ctx.progress(100, "完成")
+    ctx.step("login", "登录", "succeeded")
+    ctx.result["course"] = ctx.params.get("cid")
 
 if __name__ == "__main__":
     serve()
@@ -58,8 +61,14 @@ from omnitask_sdk import action, serve
 
 @action("study")
 def study(ctx):
+    ctx.step("login", "登录", "running")
     ctx.progress(10, "登录成功")
-    ...
+    ctx.step("login", "登录", "succeeded")
+
+    ctx.progress_of(12, 144, "正在观看", unit="节")
+    ctx.metric("correct", "正确率", 96, "%")
+    ctx.log("完成课程 2416", level="info")
+
     ctx.result["score"] = 100
 
 if __name__ == "__main__":
@@ -84,14 +93,18 @@ if __name__ == "__main__":
 
 - `module: omnitask_sdk.bridge` 表示由 SDK 桥启动；
 - `{cid}`/`{token}` 等占位符从 params/credentials 取；
-- 子进程输出含 `[progress] 42 处理中` → 进度，其余 → 日志；退出码 0=成功。
+- 输出标记：`[progress] 42 处理中`、`[step] login running 登录`、`[metric] correct 正确率 96 %`、`[log] warn ...`；
+- 其余输出按 info 日志展示；退出码 0=成功。
 
 ## 6. manifest（`script.json`）
 
 字段规范见 `docs/script-protocol.md`。要点：
 - **入口任意**：`entry`（文件）或 `module`（`python -m`）二选一；**没有 `runner.py` 这种硬性要求**。
-- `actions`：动作列表（对应 `run(action)`）。
-- `credentials` / `params`：字段 schema，前端据此生成表单。
+- `protocol: 2`：启用动作级参数、组件事件和安装校验。
+- `actions`：动作列表；每个动作可有 `description` 与独立 `params`。
+- `credentials` / `params`：字段 schema，前端据此生成表单；支持 `required/options/help/min/max` 等。
+- `discovery`：声明平台页的列表列与操作；发现请求支持参数筛选。
+- `actions[].result`：声明结果视图，支持 `table`、`links`、`keyvalue`。
 
 ## 7. 参数、凭据与上下文
 
@@ -103,9 +116,16 @@ if __name__ == "__main__":
 - 进度：`ctx.progress(percent, message)`；日志：`ctx.log(message)`；结果：`ctx.result[...] = ...`。
 - 需要题库时用 `omnitask_sdk.bank.GrpcBank`（Host 会注入 `OMNITASK_BANK_ADDR`/`OMNITASK_BANK_MODE`）。
 
-## 8. 独立运行（CLI）
+## 8. 本地调试
 
-脚本应能脱离平台单跑，便于调试。SDK 不强制；可用 `argparse` 包一层你自己的入口。
+SDK 自带开发命令，在脚本目录执行：
+
+```bash
+python -m omnitask_sdk.cli check
+python -m omnitask_sdk.cli run --action study --param cid=2416 --credential token=xxx
+```
+
+`check` 校验 manifest、入口文件和字段；`run` 模拟 Host，打印组件事件、非 JSON 输出和 stderr。安装 SDK 后也可直接使用 `omnitask-script`。
 
 ## 9. 发布与接入
 
@@ -118,14 +138,14 @@ if __name__ == "__main__":
 - https://github.com/CometNetworkStudio/cidaren
 - https://github.com/CometNetworkStudio/welearn
 
-> 目前按默认分支 `main` 安装；指定 commit/tag 的固定安装为后续增强。
+> 安装时可指定分支、标签或 commit；建议生产环境固定 commit。
 
 ## 10. 安全与免责
 
 - 仅**管理员**可安装脚本；安装前请审阅源码。
 - 脚本以宿主权限运行，恶意脚本可窃取凭据/攻击主机，请只安装可信来源。
 - 脚本仅供学习研究，使用者需遵守目标平台条款；脚本作者自负责任。
-- **凭据信任模型**：服务端在任务运行时必须解密凭据（AES-256-GCM，数据库/备份泄露不会暴露明文），且每次解密都会写入审计记录（「凭据 → 访问记录」可自查）。但任何**代用户登录的服务器在技术上都能拿到明文**——若不信任部署者，请自托管；**不要使用来路不明的公开实例**。
+- **凭据信任模型**：服务端在任务运行时必须解密凭据（AES-256-GCM，数据库/备份泄露不会暴露明文），且每次解密都会写入审计记录（「凭据 → 访问记录」可自查）。主密钥支持版本化轮换，轮换后旧数据仍可按 `key_version` 解密。但任何**代用户登录的服务器在技术上都能拿到明文**——若不信任部署者，请自托管；**不要使用来路不明的公开实例**。服务端日志默认不记录请求/响应正文，查询串中的令牌字段会脱敏。
 - 建议为各平台使用**独立密码**，避免与邮箱、银行等重要账号相同，以防撞库。
 
 ---
@@ -145,8 +165,9 @@ if __name__ == "__main__":
 - 若已有库：写一个 adapter.py（文件名任意），用 @action("...") 包装，ctx.progress 上报进度，ctx.credentials 取凭据。
 - 若新写：用 @action + serve()，入口文件名自定。
 要求：
-1. script.json 的 id/name/version/actions/params/credentials 完整。
-2. 凭据只用 ctx.credentials，禁止打印/落盘。
-3. 不要复制任何 GPL/无协议项目源码；独立实现，MIT 开源。
-4. 给出目录结构、每个文件完整内容、以及本地如何测试（含 stdio 手动测试示例）。
+1. script.json 使用 protocol 2，id/name/version/actions/params/credentials 完整。
+2. 用 ctx.progress_of / ctx.step / ctx.log / ctx.metric / ctx.result 展示执行过程。
+3. 凭据只用 ctx.credentials，禁止打印/落盘。
+4. 不要复制任何 GPL/无协议项目源码；独立实现，MIT 开源。
+5. 给出目录结构、每个文件完整内容，并用 `python -m omnitask_sdk.cli check` 与 `run` 验证。
 ```

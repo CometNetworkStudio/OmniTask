@@ -19,11 +19,11 @@ OmniTask 把重复、耗时的线上学习任务交给自动化脚本执行：�
 | 模块 | 说明 |
 |------|------|
 | 账号体系 | 注册 / 登录（JWT），角色 `admin` / `user`（Casbin 鉴权） |
-| 凭据管理 | 平台凭据 AES-256-GCM 加密入库，仅任务下发瞬间解密；每次解密留审计（用户可自查）；推荐令牌/Cookie 优先 |
+| 凭据管理 | 平台凭据 AES-256-GCM 加密入库，仅任务下发瞬间解密；主密钥版本化可轮换；支持账号级粘性代理；每次解密留审计（用户可自查，可配置审计失败即拒绝使用）；推荐令牌/Cookie 优先 |
 | 任务中心 | 按平台/动作创建任务，参数由脚本 manifest 动态表单；状态机与历史 |
 | 实时进度 | WebSocket 事件流 + 进度存储 |
 | 题库 | 答题结果沉淀，命中直接作答，减少 LLM 调用 |
-| 脚本生态 | 平台脚本可插拔：从 GitHub 安装（zip/加速源）、注册表、启停、卸载（仅管理员） |
+| 脚本生态 | 平台脚本可插拔：GitHub 安装（zip/加速源/ref）、详情与实时 manifest、平台内调试、重新安装、启停与卸载（仅管理员） |
 
 ## 架构
 
@@ -62,22 +62,33 @@ Go Host (cmd/agent) ── 扫描脚本目录 / 生命周期 / 热扫描
 ```bash
 # 1. 构建（前端可选）
 cd frontend && npm install && npm run build && cd ..
-cd backend && go build -o omnitask ./cmd/server && cd ..
+cd backend
+go build -o omnitask-server ./cmd/server
+go build -o omnitask-agent  ./cmd/agent
 
 # 2. 运行（首次生成 config.yaml：mode=lite，SQLite，随机密钥）
-cd backend && ./omnitask -conf config.yaml
-# 另开：启动脚本 Host
-go run ./cmd/agent -conf config.yaml
+./omnitask-server -conf config.yaml
+# lite 会自动拉起同目录的 omnitask-agent；也可 agent.autostart=false 后手动启动
 
 # 3. 浏览器打开 http://127.0.0.1:8080 ，首个注册用户为管理员
 # 4. 在「脚本」页从 GitHub 安装 cidaren / welearn
 ```
 
-### full（MySQL + Redis）
+### full（推荐：Docker Compose 一键启动）
+
+```bash
+docker compose -f deploy/docker-compose/docker-compose.full.yml up -d --build
+# 打开 http://<服务器IP>:4096/ ，首个注册用户为管理员
+```
+
+包含 MySQL、Redis、server、Host、nginx。配置与数据说明见
+[deploy/docker-compose/README.md](deploy/docker-compose/README.md)。
+
+只启动 MySQL/Redis 做本地开发：
 
 ```bash
 docker compose -f backend/deploy/docker-compose/docker-compose.yml up -d
-cd backend && go run ./cmd/server -migrate -conf config/deploy.yml   # 迁移
+cd backend && go run ./cmd/server -migrate -conf config/deploy.yml
 go run ./cmd/server -conf config/deploy.yml
 go run ./cmd/agent  -conf config/deploy.yml
 ```
@@ -111,7 +122,8 @@ pip install "git+https://github.com/CometNetworkStudio/OmniTask.git#subdirectory
 
 官方脚本（可作模板）：[cidaren](https://github.com/CometNetworkStudio/cidaren) ｜ [welearn](https://github.com/CometNetworkStudio/welearn)
 
-👉 **接入与开发文档（含 Vibecoding Prompt）：[docs/integration-guide.md](docs/integration-guide.md)**
+👉 **脚本开发指南（组件、manifest v2、本地调试）：[docs/script-development.md](docs/script-development.md)**
+👉 **接入总览：[docs/integration-guide.md](docs/integration-guide.md)**
 👉 **脚本协议：[docs/script-protocol.md](docs/script-protocol.md)** ｜ **SDK：[sdk/python/README.md](sdk/python/README.md)**
 
 ## 免责声明
@@ -119,6 +131,16 @@ pip install "git+https://github.com/CometNetworkStudio/OmniTask.git#subdirectory
 本项目仅供个人学习与技术研究使用。请遵守各平台服务条款与学校相关规定，因使用本项目产生的一切后果由使用者自行承担。本项目不包含第三方平台脚本代码，脚本由作者独立发布并自负责任。
 
 **凭据信任提示**：OmniTask 需要代用户登录目标平台，因此**任何部署实例在任务运行时都能在技术上解密用户凭据**。加密（AES-256-GCM）只能防止数据库/备份泄露，防不住恶意运维。请只使用你信任的实例，**不要使用来路不明的公开部署**；担心风险请自行本地部署。建议为各平台使用独立密码，避免与邮箱、银行等账号相同。
+
+**已实施的基础加固**：
+
+- 主密钥支持版本化与轮换（`security.master_keys` + `-rotate-credentials`），旧数据按记录的 `key_version` 解密；
+- 请求日志只记录方法、路径、脱敏查询串与大小，响应日志只记录状态码/大小/耗时，**不记录任何请求体或响应体**（避免凭据明文与登录 Token 入日志）；
+- 下发 CSP、HSTS（HTTPS 时）、`X-Content-Type-Options`、`X-Frame-Options` 等安全响应头；
+- 登录/注册按 IP 限流；凭据访问审计可配置为 fail-closed；
+- `config.yaml` 在 Unix 上创建后收紧为 `0600`（Windows 请自行用文件 ACL 限制访问）；其中含 JWT 与主密钥，请勿提交或随数据库一起备份。
+
+**残余风险**：恶意服务器仍可在任务执行时取得明文；前端仍将 JWT 存在 `localStorage`，XSS 可窃取会话（已用 CSP 缓解，尚未迁移到 HttpOnly Cookie）。高敏感场景请自托管并限制实例访问范围。
 
 ## License
 

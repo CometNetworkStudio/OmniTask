@@ -23,6 +23,7 @@ backend/config/deploy.yml
 /backend/migrate
 /scripts/
 /scripts-src/
+/.script_backups/
 # embedded frontend dist (built by deploy.sh); keep .keep
 /backend/internal/server/webdist/*
 !backend/internal/server/webdist/.gitkeep
@@ -37,3 +38,7 @@ backend/config/deploy.yml
 /backend/data/
 /backend/logs/
 /backend/scripts/
+/backend/workspaces/
+/workspaces/
+/backend/rate/
+/rate/

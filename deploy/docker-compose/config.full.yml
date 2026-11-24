@@ -1,0 +1,79 @@
+# OmniTask full 模式（Docker Compose）
+# 首次启动后 server 会为空白的 jwt.key/master_key 生成随机值并回写本文件。
+# 生产环境请同时修改 MySQL 密码，并同步修改 data.db.user.dsn。
+mode: full
+
+http:
+  host: 0.0.0.0
+  port: 8080
+  swagger: false
+  cors_origins: ""
+  # nginx 位于 Docker 默认网段，信任其转发头以获取真实客户端 IP。
+  trusted_proxies: "172.16.0.0/12,192.168.0.0/16,10.0.0.0/8"
+  tls:
+    enabled: false
+    cert_file: ""
+    key_file: ""
+
+grpc:
+  host: 0.0.0.0
+  port: 9000
+
+agent:
+  addr: omnitask-agent:50051
+  host: 0.0.0.0
+  port: 50051
+  scripts_dir: /data/scripts
+  python: python3
+  pythonpath: /sdk
+  bank_addr: omnitask-server:9000
+  task_timeout: 0s
+  global_concurrency: 4
+  platform_concurrency: 2
+  auto_install_deps: true
+  pip_index_url: ""
+  autostart: false
+  workspaces_dir: /data/workspaces
+  rate_dir: /data/rate
+  max_processes: 8
+  keep_workspaces: false
+  keep_failed_workspaces: true
+  keep_versions: 3
+
+security:
+  registration: open
+  jwt:
+    key: ""
+  master_key: ""
+
+data:
+  db:
+    migrate_on_start: true
+    user:
+      driver: mysql
+      dsn: "root:123456@tcp(omnitask-db:3306)/omnitask?charset=utf8mb4&parseTime=True&loc=Local"
+  redis:
+    addr: omnitask-redis:6379
+    password: ""
+    db: 0
+    read_timeout: 0.2s
+    write_timeout: 0.2s
+
+pagination:
+  default: 100
+  max: 1000
+task:
+  max_active_per_user: 20
+  max_pending: 500
+discovery:
+  min_interval: 60
+
+log:
+  log_level: info
+  mode: both
+  encoding: console
+  log_file_name: /data/logs/server.log
+  max_backups: 30
+  max_age: 7
+  max_size: 1024
+  compress: true

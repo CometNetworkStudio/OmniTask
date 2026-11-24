@@ -1,0 +1,4 @@
+*.sh text eol=lf
+deploy/docker-compose/entrypoint.sh text eol=lf
+deploy/docker-compose/Dockerfile text eol=lf
+deploy/docker-compose/*.yml text eol=lf

@@ -197,10 +197,10 @@
 
 ### P6 部署上线
 
-- `Dockerfile`：backend、agent；compiler 产物多阶段构建。
-- `docker-compose.yml`：mysql/redis/backend/agent/frontend+nginx。
-- 环境变量与密钥注入；数据卷持久化。
-- nginx：静态前端 + `/api` 反代 + `/ws` 升级。
+- `deploy/docker-compose/Dockerfile`：多阶段构建前端 + proto + server + agent。
+- `deploy/docker-compose/docker-compose.full.yml`：mysql/redis/server/agent/nginx。
+- 配置模板首启复制到 Docker 卷；密钥由 server 首次生成；数据卷持久化。
+- nginx：内嵌前端反代 + `/api` + WebSocket 升级。
 
 **验收**：目标服务器 `docker compose up -d` 后全流程可用。
 
@@ -220,7 +220,12 @@
 
 ### 5.2 凭据加密
 
-AES-256-GCM，`OMNITASK_MASTER_KEY`（32 字节，hex/base64）来源 env；随机 nonce 随密文存储；解密仅在下发 Agent 指令时进行；任何日志禁止出现明文。
+AES-256-GCM，随机 nonce 随密文存储；解密仅在下发 Agent 指令时进行；任何日志禁止出现明文。
+
+- **密钥来源**：`security.master_key`，其次 `OMNITASK_MASTER_KEY`；默认版本 1。
+- **版本与轮换**：`security.master_keys` 为 `版本号 -> 密钥` 映射，`credentials.key_version` 记录密文所用版本；映射非空时只读该映射，不再读取 `master_key`。新写入使用最大版本（可用 `security.master_key_version` 显式指定）。轮换步骤：把旧 `master_key` 以原版本号加入 `master_keys`，再加入新版本；执行 `server -rotate-credentials` 将全部凭据重加密到当前版本；确认后从映射移除旧版本。
+- **审计**：每次任务/发现/编辑触发的解密写 `credential_access_logs`，并更新 `credentials.last_used_at`；`security.credential_audit_fail_closed` 为 true 时，审计写失败则拒绝解密使用。
+- **日志**：请求/响应中间件不记录正文，查询串中的 token/password 等字段脱敏。
 
 ### 5.3 任务状态机
 

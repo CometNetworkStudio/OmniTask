@@ -114,8 +114,8 @@ func NewDB(conf *viper.Viper, l *log.Logger) *gorm.DB {
 		}
 		if err := db.AutoMigrate(
 			&model.User{}, &model.Credential{}, &model.Task{},
-			&model.TaskEvent{}, &model.Question{}, &model.Script{}, &model.PlatformCache{},
-			&model.CredentialAccessLog{}, &model.PlatformConfig{},
+			&model.TaskEvent{}, &model.Question{}, &model.Script{}, &model.ScriptInstallJob{},
+			&model.PlatformCache{}, &model.CredentialAccessLog{}, &model.PlatformConfig{},
 		); err != nil {
 			panic(err)
 		}

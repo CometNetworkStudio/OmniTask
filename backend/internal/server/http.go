@@ -2,7 +2,9 @@ package server
 
 import (
 	"context"
+	"net"
 	"strings"
+	"time"
 
 	apiV1 "backend/api/v1"
 	"backend/docs"
@@ -12,6 +14,7 @@ import (
 	"github.com/gin-gonic/gin"
 	swaggerfiles "github.com/swaggo/files"
 	ginSwagger "github.com/swaggo/gin-swagger"
+	"go.uber.org/zap"
 )
 
 func NewHTTPServer(
@@ -27,14 +30,31 @@ func NewHTTPServer(
 		http.WithServerHost(deps.Config.GetString("http.host")),
 		http.WithServerPort(deps.Config.GetInt("http.port")),
 	}
-	if deps.Config.GetBool("http.tls.enabled") {
+	tlsEnabled := deps.Config.GetBool("http.tls.enabled")
+	if tlsEnabled {
 		opts = append(opts, http.WithServerTLS(
 			true,
 			deps.Config.GetString("http.tls.cert_file"),
 			deps.Config.GetString("http.tls.key_file"),
 		))
+	} else if !isLoopbackHost(deps.Config.GetString("http.host")) {
+		deps.Logger.Warn("HTTP 未启用 TLS 且监听非回环地址；令牌与凭据可能明文传输。请由反向代理终结 TLS 并限制网络访问。",
+			zap.String("host", deps.Config.GetString("http.host")))
 	}
-	s := http.NewServer(gin.Default(), deps.Logger, opts...)
+	// 不用 gin.Default()：其访问日志会打印含 accessToken 的原始查询串，
+	// 这里改用自定义的脱敏日志中间件，仅保留 panic 恢复。
+	s := http.NewServer(gin.New(), deps.Logger, opts...)
+
+	// 只信任显式配置的反向代理，避免客户端伪造 X-Forwarded-For 绕过限流。
+	proxies := make([]string, 0)
+	for _, proxy := range strings.Split(deps.Config.GetString("http.trusted_proxies"), ",") {
+		if trimmed := strings.TrimSpace(proxy); trimmed != "" {
+			proxies = append(proxies, trimmed)
+		}
+	}
+	if err := s.SetTrustedProxies(proxies); err != nil {
+		deps.Logger.Warn("设置可信代理失败，将不信任任何代理", zap.Error(err))
+	}
 
 	// swagger doc（生产默认关闭，可用 http.swagger 强制开启）
 	if deps.Config.GetBool("http.swagger") || deps.Config.GetString("env") != "prod" {
@@ -53,6 +73,8 @@ func NewHTTPServer(
 		}
 	}
 	s.Use(
+		gin.Recovery(),
+		middleware.SecurityHeaders(),
 		middleware.CORSMiddleware(origins),
 		middleware.ResponseLogMiddleware(deps.Logger),
 		middleware.RequestLogMiddleware(deps.Logger),
@@ -68,6 +90,7 @@ func NewHTTPServer(
 	v1Group := s.Group("/api/v1")
 	{
 		auth := v1Group.Group("/auth")
+		auth.Use(middleware.IPRateLimit(deps.Config.GetInt("security.auth_rate_limit_per_minute"), time.Minute))
 		auth.POST("/register", deps.AuthHandler.Register)
 		auth.POST("/login", deps.AuthHandler.Login)
 
@@ -84,6 +107,7 @@ func NewHTTPServer(
 		authed.POST("/tasks", deps.TaskHandler.Create)
 		authed.GET("/tasks", deps.TaskHandler.List)
 		authed.GET("/tasks/:id", deps.TaskHandler.Get)
+		authed.GET("/tasks/:id/events", deps.TaskHandler.Events)
 		authed.POST("/tasks/:id/cancel", deps.TaskHandler.Cancel)
 		authed.POST("/tasks/:id/retry", deps.TaskHandler.Retry)
 		authed.DELETE("/tasks/:id", deps.TaskHandler.Delete)
@@ -94,6 +118,10 @@ func NewHTTPServer(
 		authed.GET("/scripts", deps.ScriptHandler.List)
 		authed.POST("/scripts/install", deps.ScriptHandler.Install)
 		authed.GET("/scripts/install/:job", deps.ScriptHandler.InstallJob)
+		authed.GET("/scripts/:id", deps.ScriptHandler.Get)
+		authed.POST("/scripts/:id/reinstall", deps.ScriptHandler.Reinstall)
+		authed.POST("/scripts/:id/rollback", deps.ScriptHandler.Rollback)
+		authed.POST("/scripts/:id/debug", deps.ScriptHandler.Debug)
 		authed.POST("/scripts/:id/enable", deps.ScriptHandler.Toggle)
 		authed.DELETE("/scripts/:id", deps.ScriptHandler.Uninstall)
 
@@ -114,4 +142,16 @@ func NewHTTPServer(
 	registerStatic(s, deps.Logger)
 
 	return s
+}
+
+func isLoopbackHost(host string) bool {
+	host = strings.TrimSpace(host)
+	if host == "" {
+		return false
+	}
+	if strings.EqualFold(host, "localhost") {
+		return true
+	}
+	ip := net.ParseIP(strings.Trim(host, "[]"))
+	return ip != nil && ip.IsLoopback()
 }

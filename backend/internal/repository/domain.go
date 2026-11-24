@@ -52,13 +52,21 @@ func (repo *CredentialRepository) Create(ctx context.Context, cred *model.Creden
 func (repo *CredentialRepository) Update(ctx context.Context, cred *model.Credential) error {
 	return repo.r.DB(ctx).Model(&model.Credential{}).Where("id = ? AND user_id = ?", cred.ID, cred.UserID).
 		Updates(map[string]interface{}{
-			"label":      cred.Label,
-			"preview":    cred.Preview,
-			"is_default": cred.IsDefault,
-			"cipher":     cred.Cipher,
-			"nonce":      cred.Nonce,
-			"updated_at": time.Now(),
+			"label":       cred.Label,
+			"preview":     cred.Preview,
+			"proxy_hint":  cred.ProxyHint,
+			"is_default":  cred.IsDefault,
+			"key_version": cred.KeyVersion,
+			"cipher":      cred.Cipher,
+			"nonce":       cred.Nonce,
+			"updated_at":  time.Now(),
 		}).Error
+}
+
+// MarkUsed 记录凭据最近一次被解密使用的时间；失败不影响主流程。
+func (repo *CredentialRepository) MarkUsed(ctx context.Context, id string, at time.Time) error {
+	return repo.r.DB(ctx).Model(&model.Credential{}).Where("id = ?", id).
+		Update("last_used_at", at).Error
 }
 
 func (repo *CredentialRepository) GetByID(ctx context.Context, userID, id string) (*model.Credential, error) {
@@ -187,6 +195,21 @@ func (repo *TaskRepository) UpdateStatus(ctx context.Context, id string, fields 
 	return repo.r.DB(ctx).Model(&model.Task{}).Where("id = ?", id).Updates(fields).Error
 }
 
+func (repo *TaskRepository) CountActiveByUser(ctx context.Context, userID string) (int64, error) {
+	var count int64
+	err := repo.r.DB(ctx).Model(&model.Task{}).
+		Where("user_id = ? AND status IN ?", userID, []string{"pending", "queued", "running"}).
+		Count(&count).Error
+	return count, err
+}
+
+func (repo *TaskRepository) CountByStatuses(ctx context.Context, statuses ...string) (int64, error) {
+	var count int64
+	err := repo.r.DB(ctx).Model(&model.Task{}).
+		Where("status IN ?", statuses).Count(&count).Error
+	return count, err
+}
+
 func (repo *TaskRepository) ListByStatus(ctx context.Context, status string, limit int) ([]model.Task, error) {
 	var tasks []model.Task
 	if err := repo.r.DB(ctx).
@@ -201,6 +224,19 @@ func (repo *TaskRepository) ListByStatus(ctx context.Context, status string, lim
 
 func (repo *TaskRepository) AppendEvent(ctx context.Context, event *model.TaskEvent) error {
 	return repo.r.DB(ctx).Create(event).Error
+}
+
+// ListEvents 返回任务的展示事件，按时间正序；limit<=0 时默认 1000 条。
+func (repo *TaskRepository) ListEvents(ctx context.Context, taskID string, limit int) ([]model.TaskEvent, error) {
+	if limit <= 0 {
+		limit = 1000
+	}
+	var events []model.TaskEvent
+	if err := repo.r.DB(ctx).Where("task_id = ?", taskID).
+		Order("created_at ASC").Limit(limit).Find(&events).Error; err != nil {
+		return nil, err
+	}
+	return events, nil
 }
 
 // Claim 原子地把任务从 from 状态改为 to 状态；返回是否抢到。
@@ -284,9 +320,47 @@ func (repo *ScriptRepository) Upsert(ctx context.Context, script *model.Script) 
 	return repo.r.DB(ctx).Clauses(clause.OnConflict{
 		Columns: []clause.Column{{Name: "id"}},
 		DoUpdates: clause.AssignmentColumns([]string{
-			"name", "version", "source_url", "manifest", "enabled", "status", "updated_at",
+			"name", "version", "source_url", "ref", "commit_sha", "manifest_hash",
+			"manifest", "enabled", "status", "last_error", "updated_at",
 		}),
 	}).Create(script).Error
+}
+
+func (repo *ScriptRepository) UpdateStatus(ctx context.Context, id, status, lastError string) error {
+	return repo.r.DB(ctx).Model(&model.Script{}).Where("id = ?", id).
+		Updates(map[string]interface{}{
+			"status": status, "last_error": lastError, "updated_at": time.Now(),
+		}).Error
+}
+
+type ScriptInstallJobRepository struct{ r *Repository }
+
+func NewScriptInstallJobRepository(r *Repository) *ScriptInstallJobRepository {
+	return &ScriptInstallJobRepository{r: r}
+}
+
+func (repo *ScriptInstallJobRepository) Upsert(ctx context.Context, job *model.ScriptInstallJob) error {
+	return repo.r.DB(ctx).Clauses(clause.OnConflict{
+		Columns: []clause.Column{{Name: "id"}},
+		DoUpdates: clause.AssignmentColumns([]string{
+			"status", "stage", "percent", "message", "error", "script_id", "updated_at",
+		}),
+	}).Create(job).Error
+}
+
+func (repo *ScriptInstallJobRepository) Get(ctx context.Context, id string) (*model.ScriptInstallJob, error) {
+	var job model.ScriptInstallJob
+	if err := repo.r.DB(ctx).Where("id = ?", id).First(&job).Error; err != nil {
+		return nil, err
+	}
+	return &job, nil
+}
+
+// MarkRunningInterrupted 服务重启后把遗留 running 安装任务标记为中断。
+func (repo *ScriptInstallJobRepository) MarkRunningInterrupted(ctx context.Context) error {
+	return repo.r.DB(ctx).Model(&model.ScriptInstallJob{}).
+		Where("status = ?", "running").
+		Updates(map[string]interface{}{"status": "failed", "error": "服务重启导致中断", "updated_at": time.Now()}).Error
 }
 
 func (repo *ScriptRepository) SetEnabled(ctx context.Context, id string, enabled bool) error {

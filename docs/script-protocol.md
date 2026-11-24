@@ -18,22 +18,31 @@
 
 ## 2. 脚本目录与 manifest
 
+版本化布局（推荐，Host 以 `active.json` 指向的版本运行）：
+
 ```
 <scripts_dir>/
 └── <script-id>/
-    ├── script.json     # 必须
-    ├── main.py         # entry（示例）
-    └── ...
+    ├── active.json              # {"active":"<version>","previous":"<version>"}
+    └── versions/
+        └── <version>/
+            ├── script.json      # 必须
+            ├── main.py          # entry（示例）
+            └── ...
 ```
 
-`script.json`：
+兼容旧的扁平布局 `<scripts_dir>/<script-id>/script.json`；安装新脚本时自动使用版本化布局。
+
+`script.json`（推荐完整写法）：
 
 ```json
 {
+  "protocol": 2,
   "id": "welearn",
   "name": "WeLearn",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "author": "CometNetworkStudio",
+  "icon": "mdi-school",
   "runtime": "python3",
   "entry": "main.py",
   "module": "",
@@ -41,16 +50,34 @@
   "requires": ["requests"],
   "progress_regex": "",
   "actions": [
-    { "id": "time", "name": "挂时长" },
-    { "id": "progress", "name": "提交进度", "command": ["mycli", "progress", "--cid", "{cid}"] }
+    {
+      "id": "time",
+      "name": "挂时长",
+      "description": "完成课程视频时长",
+      "params": [
+        { "key": "duration", "label": "挂时长(秒)", "type": "number", "default": 60 }
+      ],
+      "result": {
+        "type": "table",
+        "columns": [
+          { "key": "course", "label": "课程", "type": "text" },
+          { "key": "status", "label": "状态", "type": "chip" }
+        ]
+      }
+    },
+    {
+      "id": "progress",
+      "name": "提交进度",
+      "description": "按课程提交学习进度",
+      "command": ["mycli", "progress", "--cid", "{cid}"]
+    }
   ],
   "credentials": [
-    { "key": "username", "label": "账号", "type": "text" },
-    { "key": "password", "label": "密码", "type": "password" }
+    { "key": "username", "label": "账号", "type": "text", "required": true },
+    { "key": "password", "label": "密码", "type": "password", "required": true }
   ],
   "params": [
-    { "key": "cid", "label": "课程 id", "type": "text", "default": "" },
-    { "key": "duration", "label": "挂时长(秒)", "type": "number", "default": 60 }
+    { "key": "cid", "label": "课程 id", "type": "text" }
   ]
 }
 ```
@@ -61,10 +88,16 @@
   - `module`：Host 以 `runtime -m <module> args...` 启动（Python 模块）。
   - **你不需要把文件叫 `runner.py`/`main.py`**——那只是官方脚本的示例。
 - `args`：附加命令行参数。
-- `requires`：运行时依赖说明，Host 只用于展示/预检提示（不自动安装）。
+- `requires`：运行时依赖说明，供展示与预检；实际安装读取脚本目录的 `requirements.txt`（需开启 `agent.auto_install_deps`）。
+- `permissions`：权限声明（如 `network`、`filesystem`），目前仅透明展示，不强制执行。
 - `progress_regex`：CLI 桥提取进度的正则（捕获组 1=百分比，2=消息），可空。
 - `actions[].command`：**仅 CLI 桥**使用；该动作要执行的命令（支持 `{占位符}`）。
+- `actions[].description`：动作说明，显示在执行对话框。
+- `actions[].params`：动作级参数；存在时优先于顶层 `params`，未声明则回退。
+- `actions[].result`：结果渲染 schema，`type` 支持 `keyvalue`（默认）、`table`、`links`；`columns` 用于 table 表头。
+- 字段支持 `required`、`placeholder`、`help`、`options`（select）、`min/max/step`（number）、`multiline`。
 - 用 `@action` 装饰器或生成器接入时无需 `module`/`command`，见 `sdk/python/README.md`。
+- 安装时会校验 manifest：id、runtime、entry/module、action/字段 key 唯一性；v2 至少一个 action。
 
 ## 3. 运行协议（NDJSON）
 
@@ -77,22 +110,57 @@ Host 启动脚本后，**一个任务一个子进程**：
     "credentials":{"username":"...","password":"..."},
     "bank_addr":"127.0.0.1:9000"}
    ```
-2. 脚本向 **stdout** 逐行输出事件 JSON：
+2. 脚本向 **stdout** 逐行输出事件 JSON。v2 事件类型：
+
+   | event | 说明 | 关键字段 |
+   |---|---|---|
+   | `started` | 开始执行 | `message` |
+   | `progress` | 百分比或数量进度 | `percent`、`current`、`total`、`unit`、`stage` |
+   | `step` | 步骤状态 | `step`、`label`、`status` |
+   | `log` | 日志 | `level`、`message` |
+   | `metric` | 业务指标 | `key`、`label`、`value`、`unit` |
+   | `succeeded` | 成功结束 | `percent`、`message`、`result` |
+   | `failed` | 失败结束 | `message`、`result` |
+
+   示例：
+
    ```json
-   {"type":"event","task_id":"L8...","event":"progress","percent":10,"message":"登录成功","result":{}}
-   {"type":"event","task_id":"L8...","event":"succeeded","percent":100,"message":"done","result":{}}
+   {"type":"event","task_id":"L8...","event":"started","message":"开始执行"}
+   {"type":"event","task_id":"L8...","event":"step","step":"login","label":"登录","status":"running"}
+   {"type":"event","task_id":"L8...","event":"progress","percent":20,"current":12,"total":60,"unit":"节","message":"正在观看"}
+   {"type":"event","task_id":"L8...","event":"log","level":"warn","message":"触发限流"}
+   {"type":"event","task_id":"L8...","event":"metric","key":"correct","label":"正确率","value":"96","unit":"%"}
+   {"type":"event","task_id":"L8...","event":"succeeded","percent":100,"message":"done","result":{"score":"96"}}
    ```
-   - `event` ∈ `progress | succeeded | failed`。
-   - 出错输出 `{"type":"event","event":"failed","message":"...","result":{}}`。
+
+   - `status` ∈ `running | succeeded | failed | skipped`。
+   - `level` ∈ `debug | info | warn | error`。
+   - 只给 `current/total` 时，Host 自动计算百分比。
+   - 未提供 `percent` 的 `step/log/metric` 不会改变任务进度。
+   - `result` 可以是对象或数组；数组配合 `actions[].result.type=table` 渲染表格。
+   - 取消：Host 会先向 stdin 写一行 `{"type":"cancel"}`，给脚本约 3 秒清理时间，再终止进程。Python SDK 暴露 `ctx.canceled` 与 `ctx.check_canceled()`。
 3. 脚本输出终止事件（`succeeded`/`failed`）后即可退出；Host 也会在读尽后结束。
-4. 脚本可在**执行前**输出一行 `{"type":"ready","platform":"welearn","version":"0.1.0"}`（可选）。
+4. 脚本可在**执行前**输出一行 `{"type":"ready","platform":"welearn","version":"0.2.0"}`（可选）。
 
 约束：
 - stdout **只能**输出协议 JSON（一行一个）；调试信息走 stderr。
+- 非协议输出会被忽略，并在任务日志中给出一次警告。
 - 凭据只来自请求，禁止落盘/打印。
 - 若进程 EOF 前没有终止事件，Host 判定为 `failed`。
+- Python 作者直接使用 `ctx.progress/progress_of/step/log/metric/result`，见 `docs/script-development.md`。
 
-## 4. 运行时检测
+## 4. 代理与运行时检测
+
+凭据配置了账号级代理时，后端在任务/发现请求中携带 `proxy`，Host 会以环境变量 `OMNITASK_PROXY` 注入脚本进程。Python SDK 的 `omnitask_sdk.http.new_session()` 会自动使用它；自建 HTTP 客户端的脚本也应读取该变量。
+
+每个任务会复制一份脚本源码到独立工作区，并设置：
+
+- `OMNITASK_WORKDIR`：当前任务工作区
+- `OMNITASK_SCRIPT_DIR`：原脚本版本目录，只读参考
+- `TMPDIR` / `TEMP` / `TMP`、`HOME`、`XDG_CACHE_HOME` 指向工作区
+- `OMNITASK_RATE_DB`：Host 级 SQLite 共享限速库，SDK `RateLimiter` 会跨进程协调平台请求间隔
+
+脚本应把 `config.ini`、Cookie、缓存、临时文件写到当前工作区（通常直接用相对路径即可），不要修改原脚本目录。
 
 - Host 加载 manifest 后用 `exec.LookPath(runtime)` 预检；缺失则该脚本标记为不可用、不对外暴露，并在日志中体现。
 - Host 在 `Health`/`Execute` 时**热扫描**脚本目录，安装后无需重启。
@@ -103,32 +171,33 @@ Host 启动脚本后，**一个任务一个子进程**：
 Host 实现既有 `AgentService`：
 
 - `Health` → 返回可用脚本的 `platforms`。
+- `ListScripts` → 返回 Host 实际加载的完整 manifest、hash、运行时与可用性；后端以此同步注册表，修改 manifest 无需重装。
 - `Execute(ExecuteRequest)` → 启动对应脚本子进程，把 stdio 事件映射为 `ExecuteEvent` 流返回后端。
+- `Discover(DiscoverRequest)` → 列出账号在平台上的条目（课程/任务），支持 `params` 筛选。
 
-后端**无需任何改动**。
+proto 的 `ExecuteEvent` 在 v2 增加 `has_percent`、`step/label/status`、`level`、`current/total/unit`、`key/value`、`stage`、`result_json`。后端原样落 `task_events` 并通过 WebSocket 推送；任务详情页可通过 `GET /api/v1/tasks/:id/events` 回放历史事件。
 
 ## 6. Python 便捷运行时（SDK）
 
-为降低 Python 作者门槛，提供 `runtime.serve(run_func)`：作者只需实现与现在相同的生成器
+Python 作者用 `@action` + `serve()` 接入，通过 `ctx` 调用组件：
 
 ```python
-def run(action, params, credentials):
-    yield {"percent": 10, "message": "..."}
-```
+from omnitask_sdk import action, serve
 
-`main.py`：
-
-```python
-import os, sys
-sys.path.insert(0, os.environ.get("OMNITASK_SDK", ""))
-from runtime import serve
-from runner import run
+@action("time")
+def time(ctx):
+    ctx.step("login", "登录", "running")
+    ctx.progress_of(12, 60, "正在挂时长", unit="分钟")
+    ctx.metric("watched", "已观看", 12, "分钟")
+    ctx.result["watched"] = 60
 
 if __name__ == "__main__":
-    serve(run)
+    serve()
 ```
 
-Host 启动 Python 脚本时会注入 `OMNITASK_SDK=<sdk_dir>` 与 `OMNITASK_BANK_ADDR`。
+完整组件说明与示例见 `docs/script-development.md`。
+
+Host 启动 Python 脚本时会注入 `OMNITASK_SDK=<sdk_dir>`、`PYTHONPATH` 与 `OMNITASK_BANK_ADDR`。
 
 ## 7. 独立单跑（CLI/GUI）
 
@@ -150,7 +219,7 @@ python main.py --cli --action time --param cid=2416 --credential username=u --cr
 
 除 `Execute` 外，Agent 还提供 `Discover`：列出账号在平台上的条目（课程/任务），供前端选择。
 
-- 请求：`DiscoverRequest{platform, params, credentials}`；Host 以子进程发送 `{"type":"discover",...}`。
+- 请求：`DiscoverRequest{platform, params, credentials}`；Host 以子进程发送 `{"type":"discover",...}`。平台页的「筛选」会把参数传入 `params`，带筛选的查询不读写缓存。
 - 脚本（Python SDK）：用 `@listing()` 注册发现函数，返回条目列表；运行时归一化后输出
   `{"type":"items","items":[{"key":"...","fields":{...}}]}`。
 - manifest 用 `discovery` 声明展示 schema（不新增平台也无需改前端）：

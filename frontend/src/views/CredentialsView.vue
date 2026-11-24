@@ -14,10 +14,11 @@ const loading = ref(false)
 const dialog = ref(false)
 const saving = ref(false)
 const editingId = ref('')
+const editTarget = ref(null)
 const deleteTarget = ref(null)
 const deleting = ref(false)
 
-const form = reactive({ platform: '', label: '', isDefault: false, data: {} })
+const form = reactive({ platform: '', label: '', isDefault: false, data: {}, proxy: '', clearProxy: false })
 const platform = computed(() => platforms.platform(form.platform))
 const fields = computed(() => platform.value?.credentials || [])
 const isEditing = computed(() => Boolean(editingId.value))
@@ -25,7 +26,9 @@ const isEditing = computed(() => Boolean(editingId.value))
 const headers = [
   { title: '平台', key: 'platform' },
   { title: '账号', key: 'account' },
+  { title: '代理', key: 'proxy' },
   { title: '默认', key: 'is_default', sortable: false },
+  { title: '最后使用', key: 'last_used_at' },
   { title: '更新时间', key: 'updated_at' },
   { title: '', key: 'actions', sortable: false, align: 'end' },
 ]
@@ -55,18 +58,24 @@ function resetData() {
 
 function openCreate() {
   editingId.value = ''
+  editTarget.value = null
   form.platform = platforms.list[0]?.id || ''
   form.label = ''
   form.isDefault = false
+  form.proxy = ''
+  form.clearProxy = false
   resetData()
   dialog.value = true
 }
 
 function openEdit(item) {
   editingId.value = item.id
+  editTarget.value = item
   form.platform = item.platform
   form.label = item.label || ''
-  form.isDefault = item.isDefault
+  form.isDefault = item.is_default
+  form.proxy = ''
+  form.clearProxy = false
   resetData()
   dialog.value = true
 }
@@ -88,9 +97,21 @@ async function save() {
   saving.value = true
   try {
     if (isEditing.value) {
-      await credentialsApi.update(editingId.value, { data, label: form.label, is_default: form.isDefault })
+      await credentialsApi.update(editingId.value, {
+        data,
+        label: form.label,
+        is_default: form.isDefault,
+        proxy: form.proxy,
+        clear_proxy: form.clearProxy,
+      })
     } else {
-      await credentialsApi.create({ platform: form.platform, data, label: form.label, is_default: form.isDefault })
+      await credentialsApi.create({
+        platform: form.platform,
+        data,
+        label: form.label,
+        is_default: form.isDefault,
+        proxy: form.proxy,
+      })
     }
     ui.notify('已保存')
     dialog.value = false
@@ -133,7 +154,7 @@ async function confirmDelete() {
     <v-row align="center" class="mb-2">
       <v-col>
         <div class="text-headline-small">凭据</div>
-        <div class="text-medium-emphasis">加密存储，仅任务下发时解密；推荐使用令牌 / Cookie，避免保存长期密码</div>
+        <div class="text-medium-emphasis">加密存储，仅在执行、发现或编辑时解密；推荐令牌 / Cookie，避免保存长期密码</div>
       </v-col>
       <v-col cols="auto">
         <div class="d-flex align-center ga-2">
@@ -154,11 +175,20 @@ async function confirmDelete() {
             <span v-if="item.label && item.preview" class="text-body-small text-medium-emphasis">{{ item.preview }}</span>
           </div>
         </template>
+        <template #item.proxy="{ item }">
+          <v-chip v-if="item.proxy_hint" size="small" variant="tonal" color="info">
+            {{ item.proxy_hint }}
+          </v-chip>
+          <span v-else class="text-body-small text-medium-emphasis">直连</span>
+        </template>
         <template #item.is_default="{ item }">
-          <v-chip v-if="item.isDefault" size="small" color="primary" variant="tonal" prepend-icon="mdi-star">
+          <v-chip v-if="item.is_default" size="small" color="primary" variant="tonal" prepend-icon="mdi-star">
             默认
           </v-chip>
           <v-btn v-else size="small" variant="text" @click="setDefault(item)">设为默认</v-btn>
+        </template>
+        <template #item.last_used_at="{ item }">
+          <span :class="item.last_used_at ? '' : 'text-medium-emphasis'">{{ item.last_used_at ? formatTime(item.last_used_at) : '未使用' }}</span>
         </template>
         <template #item.updated_at="{ item }">{{ formatTime(item.updated_at) }}</template>
         <template #item.actions="{ item }">
@@ -206,7 +236,45 @@ async function confirmDelete() {
                 :type="['password', 'token'].includes(field.type) ? 'password' : 'text'"
               />
             </template>
-            <v-switch v-model="form.isDefault" label="设为该平台默认凭据" color="primary" hide-details />
+            <v-expansion-panels variant="accordion" flat class="mt-4">
+              <v-expansion-panel>
+                <v-expansion-panel-title>
+                  <span>高级</span>
+                  <v-chip
+                    v-if="isEditing && editTarget?.proxy_hint"
+                    size="x-small"
+                    variant="tonal"
+                    color="info"
+                    class="ms-2"
+                  >
+                    {{ editTarget.proxy_hint }}
+                  </v-chip>
+                </v-expansion-panel-title>
+                <v-expansion-panel-text>
+                  <v-text-field
+                    v-model="form.proxy"
+                    label="代理地址"
+                    placeholder="http://user:pass@host:port"
+                    hide-details
+                  />
+                  <v-switch
+                    v-if="isEditing && editTarget?.proxy_hint"
+                    v-model="form.clearProxy"
+                    label="清除已配置的代理"
+                    color="warning"
+                    hide-details
+                    class="mt-2"
+                  />
+                </v-expansion-panel-text>
+              </v-expansion-panel>
+            </v-expansion-panels>
+            <v-switch
+              v-model="form.isDefault"
+              label="设为该平台默认凭据"
+              color="primary"
+              hide-details
+              class="mt-2"
+            />
             <div class="d-flex justify-end ga-2 mt-4">
               <v-btn variant="text" @click="dialog = false">取消</v-btn>
               <v-btn type="submit" color="primary" :loading="saving">保存</v-btn>

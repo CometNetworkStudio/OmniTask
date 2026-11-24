@@ -1,10 +1,12 @@
 <script setup>
 import { onMounted, reactive, ref } from 'vue'
+import { useRouter } from 'vue-router'
 import { scriptsApi } from '@/api/services/scripts'
 import { usePlatformsStore } from '@/stores/platforms'
 import { useUiStore } from '@/stores/ui'
 import DataTable from '@/components/DataTable.vue'
 
+const router = useRouter()
 const ui = useUiStore()
 const platforms = usePlatformsStore()
 const scripts = ref([])
@@ -112,7 +114,16 @@ async function uninstall(item) {
 }
 
 function statusColor(status) {
-  return status === 'installed' ? 'success' : 'warning'
+  if (status === 'installed') return 'success'
+  if (status === 'missing_runtime') return 'warning'
+  return 'error'
+}
+
+function statusText(status) {
+  if (status === 'installed') return '可用'
+  if (status === 'missing_runtime') return '缺少运行时'
+  if (status === 'missing') return '未加载'
+  return status
 }
 </script>
 
@@ -146,7 +157,7 @@ function statusColor(status) {
       >
         <template #item.status="{ item }">
           <v-chip size="small" :color="statusColor(item.status)" variant="tonal">
-            {{ item.status === 'installed' ? '可用' : '缺少运行时' }}
+            {{ statusText(item.status) }}
           </v-chip>
         </template>
         <template #item.enabled="{ item }">
@@ -159,7 +170,12 @@ function statusColor(status) {
           />
         </template>
         <template #item.actions="{ item }">
-          <v-btn size="small" variant="text" color="error" @click="uninstall(item)">卸载</v-btn>
+          <div class="d-flex align-center justify-end ga-1">
+            <v-btn size="small" variant="text" color="primary" @click.stop="router.push(`/scripts/${item.id}`)">
+              详情
+            </v-btn>
+            <v-btn size="small" variant="text" color="error" @click.stop="uninstall(item)">卸载</v-btn>
+          </div>
         </template>
         <template #no-data>
           <div class="pa-6 text-medium-emphasis">暂无脚本，点击右上角「从 GitHub 安装」</div>
@@ -171,13 +187,12 @@ function statusColor(status) {
       <v-card>
         <v-card-item>
           <v-card-title class="text-title-large">安装脚本</v-card-title>
-          <v-card-subtitle>填写符合规范的脚本仓库地址（zip 由后端下载）</v-card-subtitle>
         </v-card-item>
         <v-card-text>
           <template v-if="installing">
             <v-progress-linear :model-value="installPercent" color="primary" height="8" rounded class="mb-1" />
             <div class="text-body-small text-medium-emphasis mb-2">
-              {{ installStage }} {{ installPercent }}% · {{ installMessage }}
+              {{ installStage }} {{ installPercent }}%，{{ installMessage }}
             </div>
           </template>
           <v-form @submit.prevent="install">

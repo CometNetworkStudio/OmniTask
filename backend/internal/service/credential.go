@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"net/url"
 	"strings"
 	"time"
 
@@ -13,25 +14,52 @@ import (
 	"backend/pkg/crypto"
 	"backend/pkg/log"
 	"backend/pkg/sid"
+	"github.com/spf13/viper"
 	"go.uber.org/zap"
 	"gorm.io/gorm"
 )
 
+const proxyKey = "__proxy"
+
+func cloneStringMap(in map[string]string) map[string]string {
+	out := make(map[string]string, len(in)+1)
+	for key, value := range in {
+		out[key] = value
+	}
+	return out
+}
+
+func maskProxy(raw string) string {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return ""
+	}
+	u, err := url.Parse(raw)
+	if err != nil || u.Host == "" || u.Scheme == "" {
+		return "已配置"
+	}
+	if u.User != nil {
+		return u.Scheme + "://***@" + u.Host
+	}
+	return u.Scheme + "://" + u.Host
+}
+
 // CredentialAccess 描述一次凭据解密的用途，供审计记录。
 type CredentialAccess struct {
-	Purpose string // task | discover
-	RefID   string // task_id，discover 为空
+	Purpose string // task | discover | update
+	RefID   string // task_id，discover/update 为空
 }
 
 type CredentialService struct {
-	repo      *repository.CredentialRepository
-	audit     *repository.CredentialAccessLogRepository
-	taskRepo  *repository.TaskRepository
-	cacheRepo *repository.PlatformCacheRepository
-	cfg       *PlatformConfigService
-	cipher    *crypto.Cipher
-	sid       *sid.Sid
-	logger    *log.Logger
+	repo            *repository.CredentialRepository
+	audit           *repository.CredentialAccessLogRepository
+	taskRepo        *repository.TaskRepository
+	cacheRepo       *repository.PlatformCacheRepository
+	cfg             *PlatformConfigService
+	keys            *crypto.Keyring
+	sid             *sid.Sid
+	logger          *log.Logger
+	auditFailClosed bool
 }
 
 func NewCredentialService(
@@ -40,11 +68,22 @@ func NewCredentialService(
 	taskRepo *repository.TaskRepository,
 	cacheRepo *repository.PlatformCacheRepository,
 	cfg *PlatformConfigService,
-	cipher *crypto.Cipher,
+	keys *crypto.Keyring,
 	sid *sid.Sid,
 	logger *log.Logger,
+	conf *viper.Viper,
 ) *CredentialService {
-	return &CredentialService{repo: repo, audit: audit, taskRepo: taskRepo, cacheRepo: cacheRepo, cfg: cfg, cipher: cipher, sid: sid, logger: logger}
+	return &CredentialService{
+		repo:            repo,
+		audit:           audit,
+		taskRepo:        taskRepo,
+		cacheRepo:       cacheRepo,
+		cfg:             cfg,
+		keys:            keys,
+		sid:             sid,
+		logger:          logger,
+		auditFailClosed: conf.GetBool("security.credential_audit_fail_closed"),
+	}
 }
 
 func (s *CredentialService) List(ctx context.Context, userID string) ([]v1.CredentialResponse, error) {
@@ -69,7 +108,14 @@ func (s *CredentialService) Create(ctx context.Context, userID string, req *v1.C
 	if int(count) >= cfg.MaxCredentials {
 		return nil, v1.ErrCredentialLimit
 	}
-	ciphertext, nonce, err := s.encrypt(req.Data)
+	data := cloneStringMap(req.Data)
+	proxy := strings.TrimSpace(req.Proxy)
+	if proxy != "" {
+		data[proxyKey] = proxy
+	} else {
+		delete(data, proxyKey)
+	}
+	ciphertext, nonce, keyVersion, err := s.encrypt(data)
 	if err != nil {
 		return nil, err
 	}
@@ -83,8 +129,9 @@ func (s *CredentialService) Create(ctx context.Context, userID string, req *v1.C
 	}
 	cred := &model.Credential{
 		ID: id, UserID: userID, Platform: req.Platform,
-		Label: req.Label, Preview: s.buildPreview(cfg, req.Data),
-		IsDefault: isDefault, Cipher: ciphertext, Nonce: nonce,
+		Label: req.Label, Preview: s.buildPreview(cfg, data),
+		ProxyHint: maskProxy(proxy), IsDefault: isDefault,
+		KeyVersion: keyVersion, Cipher: ciphertext, Nonce: nonce,
 	}
 	if err := s.repo.Create(ctx, cred); err != nil {
 		return nil, err
@@ -99,14 +146,36 @@ func (s *CredentialService) Update(ctx context.Context, userID, id string, req *
 		return nil, v1.ErrCredentialNotFound
 	}
 	cfg := s.cfg.Ensure(ctx, cred.Platform)
-	if len(req.Data) > 0 {
-		ciphertext, nonce, err := s.encrypt(req.Data)
+	proxyChanged := req.Proxy != "" || req.ClearProxy
+	if len(req.Data) > 0 || proxyChanged {
+		plain, err := s.keys.Decrypt(cred.Cipher, cred.Nonce, cred.KeyVersion)
+		if err != nil {
+			return nil, v1.ErrCredentialDecrypt
+		}
+		if err := s.auditAccess(ctx, userID, cred.Platform, cred.ID, CredentialAccess{Purpose: "update"}); err != nil && s.auditFailClosed {
+			return nil, v1.ErrCredentialAudit
+		}
+		data := map[string]string{}
+		if err := json.Unmarshal(plain, &data); err != nil {
+			return nil, v1.ErrCredentialDecrypt
+		}
+		for key, value := range req.Data {
+			data[key] = value
+		}
+		if req.ClearProxy {
+			delete(data, proxyKey)
+		} else if req.Proxy != "" {
+			data[proxyKey] = strings.TrimSpace(req.Proxy)
+		}
+		ciphertext, nonce, keyVersion, err := s.encrypt(data)
 		if err != nil {
 			return nil, err
 		}
 		cred.Cipher = ciphertext
 		cred.Nonce = nonce
-		cred.Preview = s.buildPreview(cfg, req.Data)
+		cred.KeyVersion = keyVersion
+		cred.Preview = s.buildPreview(cfg, data)
+		cred.ProxyHint = maskProxy(data[proxyKey])
 	}
 	if req.IsDefault {
 		_ = s.repo.ClearDefault(ctx, userID, cred.Platform)
@@ -216,7 +285,7 @@ func (s *CredentialService) Decrypted(ctx context.Context, userID, credentialID,
 		}
 		return nil, err
 	}
-	plain, err := s.cipher.Decrypt(cred.Cipher, cred.Nonce)
+	plain, err := s.keys.Decrypt(cred.Cipher, cred.Nonce, cred.KeyVersion)
 	if err != nil {
 		return nil, v1.ErrCredentialDecrypt
 	}
@@ -224,20 +293,25 @@ func (s *CredentialService) Decrypted(ctx context.Context, userID, credentialID,
 	if err := json.Unmarshal(plain, &data); err != nil {
 		return nil, v1.ErrCredentialDecrypt
 	}
-	s.auditAccess(ctx, userID, cred.Platform, cred.ID, access)
+	if err := s.auditAccess(ctx, userID, cred.Platform, cred.ID, access); err != nil {
+		// 默认只告警不阻断；开启 fail-closed 后，审计写不进去就不放行凭据。
+		if s.auditFailClosed {
+			return nil, v1.ErrCredentialAudit
+		}
+	}
 	return data, nil
 }
 
-func (s *CredentialService) encrypt(data map[string]string) ([]byte, []byte, error) {
+func (s *CredentialService) encrypt(data map[string]string) ([]byte, []byte, int, error) {
 	plain, err := json.Marshal(data)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, 0, err
 	}
-	ciphertext, nonce, err := s.cipher.Encrypt(plain)
+	ciphertext, nonce, version, err := s.keys.Encrypt(plain)
 	if err != nil {
-		return nil, nil, v1.ErrCredentialEncrypt
+		return nil, nil, 0, v1.ErrCredentialEncrypt
 	}
-	return ciphertext, nonce, nil
+	return ciphertext, nonce, version, nil
 }
 
 // buildPreview 生成非敏感展示串：优先标识字段脱敏，否则对令牌/密钥取头尾。
@@ -268,7 +342,10 @@ func (s *CredentialService) buildPreview(cfg *model.PlatformConfig, data map[str
 			return maskSecret(v, head, tail)
 		}
 	}
-	for _, v := range data {
+	for key, v := range data {
+		if strings.HasPrefix(key, "__") {
+			continue
+		}
 		if s := strings.TrimSpace(v); s != "" {
 			return maskSecret(s, head, tail)
 		}
@@ -307,15 +384,15 @@ func maskSecret(v string, head, tail int) string {
 	return string(r[:head]) + "…" + string(r[len(r)-tail:])
 }
 
-func (s *CredentialService) auditAccess(ctx context.Context, userID, platform, credentialID string, access CredentialAccess) {
-	// ponytail: 审计失败只告警不阻断任务；如需 fail-closed 再改。
+func (s *CredentialService) auditAccess(ctx context.Context, userID, platform, credentialID string, access CredentialAccess) error {
 	// 审计上下文与任务 ctx 解耦，避免任务取消/超时导致漏记。
 	logCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 3*time.Second)
 	defer cancel()
+	now := time.Now()
 	id, err := s.sid.GenString()
 	if err != nil {
 		s.logger.Warn("credential audit id failed", zap.Error(err))
-		return
+		return err
 	}
 	entry := &model.CredentialAccessLog{
 		ID:           id,
@@ -324,21 +401,28 @@ func (s *CredentialService) auditAccess(ctx context.Context, userID, platform, c
 		CredentialID: credentialID,
 		Purpose:      access.Purpose,
 		RefID:        access.RefID,
-		CreatedAt:    time.Now(),
+		CreatedAt:    now,
 	}
 	if err := s.audit.Create(logCtx, entry); err != nil {
 		s.logger.Warn("credential audit write failed", zap.Error(err))
+		return err
 	}
+	if err := s.repo.MarkUsed(logCtx, credentialID, now); err != nil {
+		s.logger.Warn("credential last-used update failed", zap.Error(err))
+	}
+	return nil
 }
 
 func toCredentialResponse(cred *model.Credential) *v1.CredentialResponse {
 	return &v1.CredentialResponse{
-		ID:        cred.ID,
-		Platform:  cred.Platform,
-		Label:     cred.Label,
-		Preview:   cred.Preview,
-		IsDefault: cred.IsDefault,
-		CreatedAt: cred.CreatedAt,
-		UpdatedAt: cred.UpdatedAt,
+		ID:         cred.ID,
+		Platform:   cred.Platform,
+		Label:      cred.Label,
+		Preview:    cred.Preview,
+		ProxyHint:  cred.ProxyHint,
+		IsDefault:  cred.IsDefault,
+		LastUsedAt: cred.LastUsedAt,
+		CreatedAt:  cred.CreatedAt,
+		UpdatedAt:  cred.UpdatedAt,
 	}
 }

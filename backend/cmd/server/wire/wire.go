@@ -33,6 +33,7 @@ var repositorySet = wire.NewSet(
 	repository.NewTaskRepository,
 	repository.NewQuestionRepository,
 	repository.NewScriptRepository,
+	repository.NewScriptInstallJobRepository,
 	repository.NewPlatformCacheRepository,
 )
 

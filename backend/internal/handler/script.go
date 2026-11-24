@@ -27,6 +27,15 @@ func (h *ScriptHandler) List(ctx *gin.Context) {
 	v1.HandleSuccess(ctx, list)
 }
 
+func (h *ScriptHandler) Get(ctx *gin.Context) {
+	script, err := h.svc.Get(ctx, ctx.Param("id"))
+	if err != nil {
+		v1.HandleError(ctx, statusFor(err), err, nil)
+		return
+	}
+	v1.HandleSuccess(ctx, script)
+}
+
 func (h *ScriptHandler) Install(ctx *gin.Context) {
 	var req v1.ScriptInstallRequest
 	if err := ctx.ShouldBindJSON(&req); err != nil {
@@ -58,6 +67,38 @@ func (h *ScriptHandler) InstallJob(ctx *gin.Context) {
 		resp["script"] = job.Script
 	}
 	v1.HandleSuccess(ctx, resp)
+}
+
+func (h *ScriptHandler) Reinstall(ctx *gin.Context) {
+	jobID, err := h.svc.Reinstall(ctx, ctx.Param("id"))
+	if err != nil {
+		v1.HandleError(ctx, statusFor(err), err, nil)
+		return
+	}
+	v1.HandleSuccess(ctx, gin.H{"job_id": jobID})
+}
+
+func (h *ScriptHandler) Rollback(ctx *gin.Context) {
+	script, err := h.svc.Rollback(ctx, ctx.Param("id"))
+	if err != nil {
+		v1.HandleError(ctx, statusFor(err), err, nil)
+		return
+	}
+	v1.HandleSuccess(ctx, script)
+}
+
+func (h *ScriptHandler) Debug(ctx *gin.Context) {
+	var req v1.ScriptDebugRequest
+	if err := ctx.ShouldBindJSON(&req); err != nil {
+		v1.HandleError(ctx, http.StatusBadRequest, v1.ErrBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	events, err := h.svc.Debug(ctx, ctx.Param("id"), &req)
+	if err != nil {
+		v1.HandleError(ctx, statusFor(err), err, nil)
+		return
+	}
+	v1.HandleSuccess(ctx, events)
 }
 
 func (h *ScriptHandler) Toggle(ctx *gin.Context) {

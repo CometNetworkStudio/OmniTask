@@ -112,8 +112,7 @@ call :build_go server windows
 call :build_go agent windows
 echo ==^> 迁移（lite 自动跳过，full 执行）
 "%BUILD%\omnitask-server-windows-amd64.exe" -migrate -conf config.yaml
-echo 启动 backend 与 agent（首次运行会自动生成 config.yaml）...
+echo 启动 backend（首次运行会自动生成 config.yaml，lite 会自动拉起 agent）...
 start "OmniTask backend" "%BUILD%\omnitask-server-windows-amd64.exe" -conf config.yaml
-start "OmniTask agent" "%BUILD%\omnitask-agent-windows-amd64.exe" -conf config.yaml
 echo 已在新窗口启动。浏览器打开 http://127.0.0.1:8080
 exit /b

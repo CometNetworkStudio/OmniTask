@@ -31,7 +31,7 @@ const logs = ref([])
 const logsLoading = ref(false)
 
 const roleLabel = computed(() => (auth.isAdmin ? '管理员' : '普通用户'))
-const PURPOSE_LABELS = { task: '任务执行', discover: '平台列表刷新' }
+const PURPOSE_LABELS = { task: '任务执行', discover: '平台列表刷新', update: '编辑凭据' }
 const logHeaders = [
   { title: '时间', key: 'created_at' },
   { title: '平台', key: 'platform' },

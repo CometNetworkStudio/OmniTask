@@ -7,6 +7,8 @@ type CredentialCreateRequest struct {
 	Data      map[string]string `json:"data" binding:"required"`
 	Label     string            `json:"label"`
 	IsDefault bool              `json:"is_default"`
+	// Proxy 可选：http/socks 代理，仅用于该凭据的任务与发现。
+	Proxy string `json:"proxy"`
 }
 
 type CredentialUpdateRequest struct {
@@ -14,16 +16,21 @@ type CredentialUpdateRequest struct {
 	Data      map[string]string `json:"data"`
 	Label     string            `json:"label"`
 	IsDefault bool              `json:"is_default"`
+	// Proxy 非空时替换；ClearProxy 为 true 时清除。
+	Proxy      string `json:"proxy"`
+	ClearProxy bool   `json:"clear_proxy"`
 }
 
 type CredentialResponse struct {
-	ID        string    `json:"id"`
-	Platform  string    `json:"platform"`
-	Label     string    `json:"label"`
-	Preview   string    `json:"preview"`
-	IsDefault bool      `json:"is_default"`
-	CreatedAt time.Time `json:"created_at"`
-	UpdatedAt time.Time `json:"updated_at"`
+	ID         string     `json:"id"`
+	Platform   string     `json:"platform"`
+	Label      string     `json:"label"`
+	Preview    string     `json:"preview"`
+	ProxyHint  string     `json:"proxy_hint,omitempty"`
+	IsDefault  bool       `json:"is_default"`
+	LastUsedAt *time.Time `json:"last_used_at,omitempty"`
+	CreatedAt  time.Time  `json:"created_at"`
+	UpdatedAt  time.Time  `json:"updated_at"`
 }
 
 // CredentialAccessLogResponse 是凭据解密审计记录的对外视图（不含明文）。

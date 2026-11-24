@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"context"
 	"encoding/json"
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -26,34 +27,104 @@ const Version = "agent-go/0.1.0"
 // 并实现 gRPC AgentService 供后端调用。支持热扫描（安装后无需重启）。
 type Host struct {
 	agentv1.UnimplementedAgentServiceServer
-	mu        sync.RWMutex
-	scripts   map[string]Script
-	available map[string]bool
-	runtimes  map[string]string
+	mu            sync.RWMutex
+	scripts       map[string]Script
+	available     map[string]bool
+	runtimes      map[string]string
+	runtimeErrors map[string]string
 
 	dir      string
 	python   string
 	sdkDir   string
 	bankAddr string
 	logger   *log.Logger
+
+	workspacesDir   string
+	rateDir         string
+	processSem      chan struct{}
+	platformLimit   int
+	platformSems    map[string]chan struct{}
+	workspaceMu     sync.Mutex
+	keepWorkspaces  bool
+	keepFailedWorks bool
 }
 
 func NewHost(conf *viper.Viper, logger *log.Logger) (*Host, error) {
+	workspacesDir := absolute(conf.GetString("agent.workspaces_dir"))
+	if workspacesDir == "" {
+		workspacesDir = absolute("workspaces")
+	}
+	rateDir := absolute(conf.GetString("agent.rate_dir"))
+	if rateDir == "" {
+		rateDir = absolute("rate")
+	}
+	maxProcesses := conf.GetInt("agent.max_processes")
+	if maxProcesses <= 0 {
+		maxProcesses = 8
+	}
+	platformLimit := conf.GetInt("agent.platform_concurrency")
+	if platformLimit <= 0 {
+		platformLimit = 2
+	}
 	h := &Host{
-		scripts:   map[string]Script{},
-		available: map[string]bool{},
-		runtimes:  map[string]string{},
-		dir:       conf.GetString("agent.scripts_dir"),
-		python:    conf.GetString("agent.python"),
-		sdkDir:    absolute(conf.GetString("agent.pythonpath")),
-		bankAddr:  conf.GetString("agent.bank_addr"),
-		logger:    logger,
+		scripts:         map[string]Script{},
+		available:       map[string]bool{},
+		runtimes:        map[string]string{},
+		runtimeErrors:   map[string]string{},
+		dir:             absolute(conf.GetString("agent.scripts_dir")),
+		python:          conf.GetString("agent.python"),
+		sdkDir:          absolute(conf.GetString("agent.pythonpath")),
+		bankAddr:        conf.GetString("agent.bank_addr"),
+		logger:          logger,
+		workspacesDir:   workspacesDir,
+		rateDir:         rateDir,
+		processSem:      make(chan struct{}, maxProcesses),
+		platformLimit:   platformLimit,
+		platformSems:    map[string]chan struct{}{},
+		keepWorkspaces:  conf.GetBool("agent.keep_workspaces"),
+		keepFailedWorks: conf.GetBool("agent.keep_failed_workspaces"),
 	}
 	if err := os.MkdirAll(h.dir, 0o755); err != nil {
 		return nil, err
 	}
+	if err := os.MkdirAll(workspacesDir, 0o755); err != nil {
+		return nil, err
+	}
+	if err := os.MkdirAll(rateDir, 0o755); err != nil {
+		return nil, err
+	}
 	h.reload()
 	return h, nil
+}
+
+func (h *Host) platformSem(platform string) chan struct{} {
+	h.workspaceMu.Lock()
+	defer h.workspaceMu.Unlock()
+	sem, ok := h.platformSems[platform]
+	if !ok {
+		sem = make(chan struct{}, h.platformLimit)
+		h.platformSems[platform] = sem
+	}
+	return sem
+}
+
+func (h *Host) acquire(ctx context.Context, platform string) (func(), bool) {
+	select {
+	case h.processSem <- struct{}{}:
+	case <-ctx.Done():
+		return nil, false
+	}
+	platformSem := h.platformSem(platform)
+	select {
+	case platformSem <- struct{}{}:
+	case <-ctx.Done():
+		<-h.processSem
+		return nil, false
+	}
+	return func() {
+		<-platformSem
+		<-h.processSem
+	}, true
 }
 
 func (h *Host) reload() {
@@ -65,6 +136,7 @@ func (h *Host) reload() {
 	scripts := map[string]Script{}
 	available := map[string]bool{}
 	runtimes := map[string]string{}
+	runtimeErrors := map[string]string{}
 	for _, s := range loaded {
 		scripts[s.Manifest.ID] = s
 		runtimePath, err := h.resolveRuntime(s.Manifest, s.Dir)
@@ -72,13 +144,14 @@ func (h *Host) reload() {
 			h.logger.Warn("script runtime not found",
 				zap.String("script", s.Manifest.ID), zap.String("runtime", s.Manifest.Runtime))
 			available[s.Manifest.ID] = false
+			runtimeErrors[s.Manifest.ID] = err.Error()
 			continue
 		}
 		runtimes[s.Manifest.ID] = runtimePath
 		available[s.Manifest.ID] = true
 	}
 	h.mu.Lock()
-	h.scripts, h.available, h.runtimes = scripts, available, runtimes
+	h.scripts, h.available, h.runtimes, h.runtimeErrors = scripts, available, runtimes, runtimeErrors
 	h.mu.Unlock()
 }
 
@@ -132,6 +205,37 @@ func (h *Host) Health(ctx context.Context, req *agentv1.HealthRequest) (*agentv1
 	return &agentv1.HealthResponse{Version: Version, Platforms: platforms}, nil
 }
 
+// ListScripts 返回 Host 实际加载的脚本清单，后端以此同步注册表。
+func (h *Host) ListScripts(ctx context.Context, req *agentv1.ListScriptsRequest) (*agentv1.ListScriptsResponse, error) {
+	h.reload()
+	h.mu.RLock()
+	defer h.mu.RUnlock()
+	ids := make([]string, 0, len(h.scripts))
+	for id := range h.scripts {
+		ids = append(ids, id)
+	}
+	sort.Strings(ids)
+	resp := &agentv1.ListScriptsResponse{}
+	for _, id := range ids {
+		s := h.scripts[id]
+		item := &agentv1.ScriptInfo{
+			Id:          id,
+			Name:        s.Manifest.Name,
+			Version:     s.Manifest.Version,
+			Author:      s.Manifest.Author,
+			Icon:        s.Manifest.Icon,
+			Runtime:     s.Manifest.Runtime,
+			Manifest:    s.ManifestJSON,
+			Hash:        s.ManifestHash,
+			Available:   h.available[id],
+			Error:       h.runtimeErrors[id],
+			RuntimePath: h.runtimes[id],
+		}
+		resp.Items = append(resp.Items, item)
+	}
+	return resp, nil
+}
+
 type scriptRequest struct {
 	Type        string            `json:"type"`
 	TaskID      string            `json:"task_id"`
@@ -140,15 +244,26 @@ type scriptRequest struct {
 	Params      map[string]string `json:"params"`
 	Credentials map[string]string `json:"credentials"`
 	BankAddr    string            `json:"bank_addr"`
+	Proxy       string            `json:"proxy"`
 }
 
 type scriptEvent struct {
-	Type    string            `json:"type"`
-	TaskID  string            `json:"task_id"`
-	Event   string            `json:"event"`
-	Percent int               `json:"percent"`
-	Message string            `json:"message"`
-	Result  map[string]string `json:"result"`
+	Type    string `json:"type"`
+	TaskID  string `json:"task_id"`
+	Event   string `json:"event"`
+	Percent *int   `json:"percent"`
+	Message string `json:"message"`
+	Result  any    `json:"result"`
+	Current int    `json:"current"`
+	Total   int    `json:"total"`
+	Unit    string `json:"unit"`
+	Stage   string `json:"stage"`
+	Step    string `json:"step"`
+	Label   string `json:"label"`
+	Status  string `json:"status"`
+	Level   string `json:"level"`
+	Key     string `json:"key"`
+	Value   string `json:"value"`
 }
 
 func (h *Host) Execute(req *agentv1.ExecuteRequest, stream agentv1.AgentService_ExecuteServer) error {
@@ -158,16 +273,22 @@ func (h *Host) Execute(req *agentv1.ExecuteRequest, stream agentv1.AgentService_
 	if !ok {
 		return h.fail(stream, taskID, "platform unavailable: "+req.GetPlatform())
 	}
-	cmd := exec.CommandContext(stream.Context(), runtimePath, commandArgs(script.Manifest)...)
-	cmd.Dir = script.Dir
-	env := os.Environ()
-	if h.sdkDir != "" {
-		env = append(env, "OMNITASK_SDK="+h.sdkDir, "PYTHONPATH="+h.sdkDir)
+	release, ok := h.acquire(stream.Context(), req.GetPlatform())
+	if !ok {
+		return h.fail(stream, taskID, "任务已取消")
 	}
-	if h.bankAddr != "" {
-		env = append(env, "OMNITASK_BANK_ADDR="+h.bankAddr, "OMNITASK_BANK_MODE=grpc")
+	defer release()
+
+	workspace, err := h.prepareWorkspace("task-"+taskID, script)
+	if err != nil {
+		return h.fail(stream, taskID, err.Error())
 	}
-	cmd.Env = env
+	succeeded := false
+	defer func() { h.cleanupWorkspace(workspace, succeeded) }()
+
+	cmd := exec.Command(runtimePath, commandArgs(script.Manifest)...)
+	cmd.Dir = workspace
+	cmd.Env = h.scriptEnv(os.Environ(), script, workspace, taskID, req.GetProxy())
 
 	stdin, err := cmd.StdinPipe()
 	if err != nil {
@@ -191,11 +312,29 @@ func (h *Host) Execute(req *agentv1.ExecuteRequest, stream agentv1.AgentService_
 		Params:      req.GetParams(),
 		Credentials: req.GetCredentials(),
 		BankAddr:    h.bankAddr,
+		Proxy:       req.GetProxy(),
 	})
 	_, _ = stdin.Write(append(payload, '\n'))
-	_ = stdin.Close()
+
+	// 取消协议：先通知脚本清理，宽限期后再强杀。
+	done := make(chan struct{})
+	go func() {
+		select {
+		case <-stream.Context().Done():
+			_, _ = stdin.Write([]byte(`{"type":"cancel"}` + "\n"))
+			select {
+			case <-done:
+			case <-time.After(3 * time.Second):
+				if cmd.Process != nil {
+					_ = cmd.Process.Kill()
+				}
+			}
+		case <-done:
+		}
+	}()
 
 	terminal := false
+	badLines := 0
 	scanner := bufio.NewScanner(stdout)
 	scanner.Buffer(make([]byte, 0, 64*1024), 1024*1024)
 	for scanner.Scan() {
@@ -204,23 +343,79 @@ func (h *Host) Execute(req *agentv1.ExecuteRequest, stream agentv1.AgentService_
 			continue
 		}
 		var ev scriptEvent
-		if err := json.Unmarshal([]byte(line), &ev); err != nil || ev.Type != "event" {
+		if err := json.Unmarshal([]byte(line), &ev); err != nil || (ev.Type != "event" && ev.Type != "ready") {
+			badLines++
+			if badLines == 1 {
+				_ = stream.Send(&agentv1.ExecuteEvent{
+					TaskId:    taskID,
+					Type:      agentv1.EventType_EVENT_TYPE_LOG,
+					Level:     "warn",
+					Message:   "脚本 stdout 出现非协议输出，已忽略；stdout 只能逐行输出 JSON，调试信息请走 stderr",
+					Timestamp: time.Now().Unix(),
+				})
+			}
 			continue
 		}
+		if ev.Type == "ready" {
+			continue
+		}
+		percent := 0
+		hasPercent := ev.Percent != nil
+		if hasPercent {
+			percent = *ev.Percent
+		} else if ev.Total > 0 {
+			percent = ev.Current * 100 / ev.Total
+			hasPercent = true
+		}
+		if percent < 0 {
+			percent = 0
+		}
+		if percent > 100 {
+			percent = 100
+		}
+		resultJSON := ""
+		if ev.Result != nil {
+			if buf, err := json.Marshal(ev.Result); err == nil {
+				resultJSON = string(buf)
+			}
+		}
 		event := &agentv1.ExecuteEvent{
-			TaskId:    taskID,
-			Percent:   int32(ev.Percent),
-			Message:   ev.Message,
-			Timestamp: time.Now().Unix(),
-			Result:    ev.Result,
+			TaskId:     taskID,
+			Percent:    int32(percent),
+			HasPercent: hasPercent,
+			Message:    ev.Message,
+			Timestamp:  time.Now().Unix(),
+			Result:     stringMap(ev.Result),
+			ResultJson: resultJSON,
+			Step:       ev.Step,
+			Label:      ev.Label,
+			Status:     ev.Status,
+			Level:      ev.Level,
+			Current:    int32(ev.Current),
+			Total:      int32(ev.Total),
+			Unit:       ev.Unit,
+			Key:        ev.Key,
+			Value:      ev.Value,
+			Stage:      ev.Stage,
 		}
 		switch ev.Event {
 		case "succeeded":
 			event.Type = agentv1.EventType_EVENT_TYPE_SUCCEEDED
 			terminal = true
+			succeeded = true
 		case "failed":
 			event.Type = agentv1.EventType_EVENT_TYPE_FAILED
 			terminal = true
+		case "started":
+			event.Type = agentv1.EventType_EVENT_TYPE_STARTED
+		case "log":
+			event.Type = agentv1.EventType_EVENT_TYPE_LOG
+		case "step":
+			event.Type = agentv1.EventType_EVENT_TYPE_STEP
+		case "metric":
+			event.Type = agentv1.EventType_EVENT_TYPE_METRIC
+		case "heartbeat":
+			event.Type = agentv1.EventType_EVENT_TYPE_HEARTBEAT
 		default:
 			event.Type = agentv1.EventType_EVENT_TYPE_PROGRESS
 		}
@@ -232,6 +427,8 @@ func (h *Host) Execute(req *agentv1.ExecuteRequest, stream agentv1.AgentService_
 		}
 	}
 	_ = cmd.Wait()
+	close(done)
+	_ = stdin.Close()
 	if !terminal {
 		msg := "script exited without terminal event"
 		if s := lastLine(stderr.String()); s != "" {
@@ -257,6 +454,7 @@ type discoverRequest struct {
 	Platform    string            `json:"platform"`
 	Params      map[string]string `json:"params"`
 	Credentials map[string]string `json:"credentials"`
+	Proxy       string            `json:"proxy"`
 }
 
 // Discover 让脚本列出该账号在平台上的条目（@listing）。
@@ -266,17 +464,22 @@ func (h *Host) Discover(ctx context.Context, req *agentv1.DiscoverRequest) (*age
 	if !ok {
 		return nil, status.Error(codes.Unavailable, "platform unavailable: "+req.GetPlatform())
 	}
+	release, ok := h.acquire(ctx, req.GetPlatform())
+	if !ok {
+		return nil, status.Error(codes.Canceled, "discover canceled")
+	}
+	defer release()
+
+	label := fmt.Sprintf("discover-%s-%d", req.GetPlatform(), time.Now().UnixNano())
+	workspace, err := h.prepareWorkspace(label, script)
+	if err != nil {
+		return nil, status.Error(codes.Internal, err.Error())
+	}
+	defer h.cleanupWorkspace(workspace, true)
 
 	cmd := exec.CommandContext(ctx, runtimePath, commandArgs(script.Manifest)...)
-	cmd.Dir = script.Dir
-	env := os.Environ()
-	if h.sdkDir != "" {
-		env = append(env, "OMNITASK_SDK="+h.sdkDir, "PYTHONPATH="+h.sdkDir)
-	}
-	if h.bankAddr != "" {
-		env = append(env, "OMNITASK_BANK_ADDR="+h.bankAddr, "OMNITASK_BANK_MODE=grpc")
-	}
-	cmd.Env = env
+	cmd.Dir = workspace
+	cmd.Env = h.scriptEnv(os.Environ(), script, workspace, label, req.GetProxy())
 
 	stdin, err := cmd.StdinPipe()
 	if err != nil {
@@ -296,6 +499,7 @@ func (h *Host) Discover(ctx context.Context, req *agentv1.DiscoverRequest) (*age
 		Platform:    req.GetPlatform(),
 		Params:      req.GetParams(),
 		Credentials: req.GetCredentials(),
+		Proxy:       req.GetProxy(),
 	})
 	_, _ = stdin.Write(append(payload, '\n'))
 	_ = stdin.Close()
@@ -346,6 +550,23 @@ func absolute(path string) string {
 		return abs
 	}
 	return path
+}
+
+// stringMap 把脚本 result 中的任意 JSON 值降级成字符串，兼容数字/布尔等。
+func stringMap(value any) map[string]string {
+	in, ok := value.(map[string]any)
+	if !ok || in == nil {
+		return nil
+	}
+	out := make(map[string]string, len(in))
+	for key, item := range in {
+		if item == nil {
+			out[key] = ""
+			continue
+		}
+		out[key] = fmt.Sprint(item)
+	}
+	return out
 }
 
 func lastLine(text string) string {

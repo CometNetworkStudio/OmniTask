@@ -11,6 +11,7 @@ const routes = [
   { path: '/questions', name: 'questions', component: () => import('@/views/QuestionsView.vue') },
   { path: '/settings', name: 'settings', component: () => import('@/views/SettingsView.vue') },
   { path: '/scripts', name: 'scripts', component: () => import('@/views/ScriptsView.vue'), meta: { requiresAdmin: true } },
+  { path: '/scripts/:id', name: 'script-detail', component: () => import('@/views/ScriptDetailView.vue'), meta: { requiresAdmin: true } },
   { path: '/users', name: 'users', component: () => import('@/views/UsersView.vue'), meta: { requiresAdmin: true } },
   { path: '/', redirect: '/home' },
   { path: '/:pathMatch(.*)*', redirect: '/home' },

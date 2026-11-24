@@ -17,6 +17,19 @@ import (
 	"gorm.io/gorm"
 )
 
+func TestMaskProxy(t *testing.T) {
+	if got := maskProxy(""); got != "" {
+		t.Fatalf("empty proxy: %q", got)
+	}
+	got := maskProxy("http://user:pass@127.0.0.1:8080")
+	if got != "http://***@127.0.0.1:8080" {
+		t.Fatalf("unexpected hint: %q", got)
+	}
+	if got := maskProxy("bad-value"); got != "已配置" {
+		t.Fatalf("unexpected fallback: %q", got)
+	}
+}
+
 func newTestCredentialService(t *testing.T) (*CredentialService, *repository.CredentialRepository, *repository.CredentialAccessLogRepository, *repository.TaskRepository) {
 	t.Helper()
 	conf := viper.New()
@@ -38,11 +51,11 @@ func newTestCredentialService(t *testing.T) (*CredentialService, *repository.Cre
 	taskRepo := repository.NewTaskRepository(repo)
 	cacheRepo := repository.NewPlatformCacheRepository(repo)
 	cfgSvc := NewPlatformConfigService(repository.NewPlatformConfigRepository(repo), repository.NewScriptRepository(repo), logger)
-	cipher, err := crypto.NewCipher([]byte("0123456789abcdef0123456789abcdef"))
+	keys, err := crypto.NewKeyring(map[int][]byte{1: []byte("0123456789abcdef0123456789abcdef")}, 1)
 	if err != nil {
 		t.Fatal(err)
 	}
-	return NewCredentialService(credRepo, auditRepo, taskRepo, cacheRepo, cfgSvc, cipher, sid.NewSid(), logger), credRepo, auditRepo, taskRepo
+	return NewCredentialService(credRepo, auditRepo, taskRepo, cacheRepo, cfgSvc, keys, sid.NewSid(), logger, conf), credRepo, auditRepo, taskRepo
 }
 
 func TestCredentialLifecycleAuditAndPreview(t *testing.T) {
@@ -80,6 +93,13 @@ func TestCredentialLifecycleAuditAndPreview(t *testing.T) {
 	creds, err := svc.Decrypted(ctx, "u1", created.ID, "welearn", CredentialAccess{Purpose: "task", RefID: "t1"})
 	if err != nil || creds["password"] != "s3cret" {
 		t.Fatalf("Decrypted: %v %v", creds, err)
+	}
+	used, err := credRepo.GetByID(ctx, "u1", created.ID)
+	if err != nil || used.LastUsedAt == nil {
+		t.Fatalf("last used should be recorded: %+v err=%v", used, err)
+	}
+	if used.KeyVersion != 1 {
+		t.Fatalf("unexpected key version: %d", used.KeyVersion)
 	}
 
 	logs, err := auditRepo.ListByUser(ctx, "u1", 10)

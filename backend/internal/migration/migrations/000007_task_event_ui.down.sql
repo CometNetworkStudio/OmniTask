@@ -1,0 +1,12 @@
+ALTER TABLE `task_events`
+  DROP COLUMN `kind`,
+  DROP COLUMN `level`,
+  DROP COLUMN `step`,
+  DROP COLUMN `label`,
+  DROP COLUMN `step_status`,
+  DROP COLUMN `current`,
+  DROP COLUMN `total`,
+  DROP COLUMN `unit`,
+  DROP COLUMN `stage`,
+  DROP COLUMN `key`,
+  DROP COLUMN `value`;

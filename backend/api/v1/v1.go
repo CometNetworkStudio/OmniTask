@@ -27,8 +27,17 @@ func HandleError(ctx *gin.Context, httpCode int, err error, data interface{}) {
 	if data == nil {
 		data = map[string]string{}
 	}
-	resp := Response{Code: errorCodeMap[err], Message: err.Error(), Data: data}
-	if _, ok := errorCodeMap[err]; !ok {
+	code, ok := errorCodeMap[err]
+	if !ok {
+		for known, knownCode := range errorCodeMap {
+			if errors.Is(err, known) {
+				code, ok = knownCode, true
+				break
+			}
+		}
+	}
+	resp := Response{Code: code, Message: err.Error(), Data: data}
+	if !ok {
 		resp = Response{Code: 500, Message: "unknown error", Data: data}
 	}
 	ctx.JSON(httpCode, resp)

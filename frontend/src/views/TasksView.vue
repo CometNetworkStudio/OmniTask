@@ -7,6 +7,7 @@ import { useUiStore } from '@/stores/ui'
 import { statusMeta, formatTime } from '@/utils/format'
 import { buildParams } from '@/utils/taskParams'
 import DataTable from '@/components/DataTable.vue'
+import ParamFields from '@/components/ParamFields.vue'
 
 const router = useRouter()
 const platforms = usePlatformsStore()
@@ -37,11 +38,15 @@ const platformFilterOptions = computed(() => [{ title: '全部平台', value: ''
 const form = reactive({ platform: '', action: '', params: {} })
 const platform = computed(() => platforms.platform(form.platform))
 const actionOptions = computed(() => platform.value?.actions || [])
-const paramSchema = computed(() => platform.value?.params || [])
+const selectedAction = computed(() => platforms.action(form.platform, form.action))
+const paramSchema = computed(() => {
+  const fields = selectedAction.value?.params || []
+  return fields.length ? fields : platform.value?.params || []
+})
 
 const headers = [
   { title: '平台', key: 'platform' },
-  { title: '动作', key: 'action' },
+  { title: '动作', key: 'action_name' },
   { title: '状态', key: 'status' },
   { title: '进度', key: 'progress' },
   { title: '创建时间', key: 'created_at' },
@@ -92,11 +97,18 @@ function resetDialog() {
 }
 
 function onPlatformChange() {
-  const current = platform.value
-  form.action = current?.actions?.[0]?.id || ''
+  form.action = platform.value?.actions?.[0]?.id || ''
+  initParams()
+}
+
+function onActionChange() {
+  initParams()
+}
+
+function initParams() {
   form.params = {}
-  for (const field of current?.params || []) {
-    form.params[field.key] = field.default
+  for (const field of paramSchema.value) {
+    form.params[field.key] = field.type === 'switch' ? Boolean(field.default) : field.default ?? ''
   }
 }
 
@@ -206,6 +218,9 @@ async function removeRow(item) {
         <template #item.platform="{ item }">
           <v-chip size="small" variant="tonal">{{ platforms.name(item.platform) }}</v-chip>
         </template>
+        <template #item.action_name="{ item }">
+          {{ platforms.actionName(item.platform, item.action) }}
+        </template>
         <template #item.status="{ item }">
           <v-chip size="small" :color="statusMeta(item.status).color" variant="tonal">
             {{ statusMeta(item.status).text }}
@@ -263,7 +278,6 @@ async function removeRow(item) {
       <v-card>
         <v-card-item>
           <v-card-title class="text-title-large">新建任务</v-card-title>
-          <v-card-subtitle>高级模式：直接填写平台参数。一般使用请从左侧平台页选择要处理的条目</v-card-subtitle>
         </v-card-item>
         <v-card-text>
           <v-form @submit.prevent="createTask">
@@ -278,28 +292,15 @@ async function removeRow(item) {
             <v-select
               v-model="form.action"
               :items="actionOptions"
-              item-title="title"
-              item-value="value"
+              item-title="name"
+              item-value="id"
               label="动作"
+              @update:model-value="onActionChange"
             />
 
             <v-divider class="my-4" />
             <div class="text-title-small mb-2">执行参数</div>
-            <template v-for="field in paramSchema" :key="field.key">
-              <v-switch
-                v-if="field.type === 'switch'"
-                v-model="form.params[field.key]"
-                :label="field.label"
-                color="primary"
-                hide-details
-              />
-              <v-text-field
-                v-else
-                v-model="form.params[field.key]"
-                :label="field.label"
-                :type="field.type === 'number' ? 'number' : 'text'"
-              />
-            </template>
+            <ParamFields :fields="paramSchema" :values="form.params" />
 
             <div class="d-flex justify-end ga-2 mt-4">
               <v-btn variant="text" @click="dialog = false">取消</v-btn>

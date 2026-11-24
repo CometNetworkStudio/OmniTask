@@ -36,13 +36,14 @@ func (h *PlatformHandler) Items(ctx *gin.Context) {
 
 func (h *PlatformHandler) Refresh(ctx *gin.Context) {
 	var body struct {
-		CredentialID string `json:"credential_id"`
+		CredentialID string            `json:"credential_id"`
+		Params       map[string]string `json:"params"`
 	}
 	_ = ctx.ShouldBindJSON(&body)
 	if body.CredentialID == "" {
 		body.CredentialID = ctx.Query("credential_id")
 	}
-	resp, err := h.svc.Refresh(ctx, GetUserIdFromCtx(ctx), ctx.Param("id"), body.CredentialID)
+	resp, err := h.svc.Refresh(ctx, GetUserIdFromCtx(ctx), ctx.Param("id"), body.CredentialID, body.Params)
 	if err != nil {
 		v1.HandleError(ctx, statusFor(err), err, nil)
 		return

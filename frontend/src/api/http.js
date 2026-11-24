@@ -32,7 +32,8 @@ http.interceptors.response.use(
         window.location.assign('/login')
       }
     }
-    const message = err.response?.data?.message || err.message || '网络错误'
+    const message =
+      err.response?.data?.data?.error || err.response?.data?.message || err.message || '网络错误'
     return Promise.reject(new Error(message))
   },
 )

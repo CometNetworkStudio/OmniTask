@@ -365,3 +365,56 @@ cd frontend && npm run build
 - **脚本**：cidaren/welearn/chaoxing 均新增 `@listing` 与 manifest `discovery`（已推送三个脚本仓库）。
 - **说明**：注册表里的 manifest 是**安装时**快照，新增 discovery 后需**重新安装**脚本以刷新；已在部署环境重装并验证 `/platforms` 返回三平台 schema。
 - **待办**：前端改为从 `/platforms` 动态获取（删除写死 platforms.js）、发现列表 UI、Home/引导/名句。
+
+## 28. 脚本契约 v2：组件化与可视化（2026-11）
+- **目标**：外部脚本低门槛接入，脚本用平台组件描述执行过程，前端通用渲染；不为旧脚本兼容做妥协（开发期）。
+- **manifest v2**：`protocol: 2`；`actions[].description/params`；字段支持 `required/placeholder/help/options/min/max/step/multiline`；安装与加载校验 id、runtime、入口、action/字段唯一性，v2 至少一个 action。
+- **事件 v2**：`started/progress/step/log/metric/succeeded/failed`；`progress` 支持 `current/total/unit/stage`；新增 `has_percent`，非进度事件不改变任务进度；Host 对非协议 stdout 输出给出一次警告。
+- **SDK 组件**：`ctx.progress`/`ctx.progress_of`/`ctx.step`/`ctx.log`（debug/warn/error）/`ctx.metric`/`ctx.result`；CLI 桥支持 `[progress]`、`[step]`、`[metric]`、`[log]` 标记。
+- **开发者工具**：`python -m omnitask_sdk.cli check|run|schema`，安装后 `omnitask-script`；发布 `script.schema.json`。
+- **可视化**：`task_events` 增加 kind/level/step/status/current/total/unit/stage/key/value（迁移 000007）；新增 `GET /api/v1/tasks/:id/events`；任务详情展示步骤、指标、结果、日志与历史事件回放。
+- **后端校验**：任务创建时按 manifest 校验 action 与必填参数；失败保留最后进度。
+- **文档**：新增 `docs/script-development.md`，同步协议、接入指南、SDK README。
+
+## 29. 脚本管理闭环（2026-11）
+- **Host 实时清单**：proto 新增 `ListScripts`，返回完整 manifest、sha256、运行时路径与可用性；后端 `ScriptService.Sync` 以 Host 为准刷新注册表，改 `script.json` 无需重装，Host 不可达时不误标缺失。
+- **脚本详情**：`GET /api/v1/scripts/:id` 返回 manifest、动作、来源、ref、commit、hash、状态、最近错误；前端新增 `/scripts/:id` 详情页。
+- **平台内调试**：`POST /api/v1/scripts/:id/debug` 直接运行脚本并返回组件事件，仅管理员；前端详情页提供参数、凭据与事件面板。
+- **安装管理**：安装任务落库 `script_install_jobs`（迁移 000008），重启可查；`scripts` 增加 `ref/commit_sha/manifest_hash/last_error`；新增 `POST /scripts/:id/reinstall` 与 `POST /scripts/:id/rollback`，安装前保留上一版本，前端支持「重新安装 / 回滚」。
+- **结果 schema**：`actions[].result` 支持 `table/links/keyvalue`；`ExecuteEvent.result_json` 保留数组/对象结构，`TaskResponse.result` 改为任意 JSON。
+- **发现筛选**：`POST /platforms/:id/discover` 接受 `params`，带筛选查询不读写缓存；平台页新增筛选、批量勾选与批量执行。
+- **并发与取消**：后端实现全局/平台/账号三级并发（`agent.global_concurrency`、`agent.platform_concurrency`）；Host 取消先发 `{"type":"cancel"}`，3 秒后强杀；SDK 提供 `ctx.canceled/ctx.check_canceled()`。
+
+## 30. 部署与出口代理（2026-11）
+- **Full 一键 Compose**：`deploy/docker-compose/docker-compose.full.yml` 启动 MySQL、Redis、server、Host、nginx；多阶段 Dockerfile 内构建前端 + proto + Go 产物；配置模板首次复制到 Docker 卷，避免把随机密钥写回仓库；脚本与日志共享 `omnitask-data` 卷。
+- **Lite 单命令**：`agent.autostart` 默认在 lite 为 true，server 启动时检测端口并拉起同目录 `omnitask-agent`；可用 `agent.bin` 指定路径，或设为 false 手动启动。
+- **账号级粘性代理**：凭据可配置 `proxy`，加密存储并生成脱敏 `proxy_hint`；任务/发现解密时提取代理，经 gRPC `proxy` 字段由 Host 注入 `OMNITASK_PROXY`；SDK `new_session()` 自动读取该环境变量。调试接口也支持临时 proxy。
+- **多机决策**：当前仍是单 Host；多机需要节点注册、心跳、脚本分发、账号亲和与 TLS，暂不做。IP 风控优先用账号级代理，而不是直接拆多机。
+
+## 31. 并发隔离与版本化脚本（2026-11）
+- **每任务工作区**：Host 将脚本源码复制到 `<workspaces_dir>/task-<id>/`（排除 `.venv/.git/node_modules/缓存`），以工作区为 cwd，注入 `OMNITASK_WORKDIR`、`OMNITASK_SCRIPT_DIR`、`TMPDIR`、`HOME`、`XDG_*`；`config.ini`、Cookie、缓存等不再跨任务/账号互相覆盖。失败工作区默认保留，便于排查。
+- **版本化脚本目录**：安装写入 `scripts/<id>/versions/<hash-time>/`，`active.json` 记录 active/previous；回滚只切换指针；旧版本按 `agent.keep_versions` 和 24 小时保护期清理。运行中的任务使用工作区副本，不受更新影响。
+- **Host 并发保护**：新增 `agent.max_processes`（默认 8）与 Host 级平台并发；任务、发现、调试统一受进程额度约束。
+- **队列与用户配额**：`task.max_active_per_user`（默认 20）、`task.max_pending`（默认 500）；创建任务时拦截，避免单用户打满队列。
+- **跨进程节流**：Host 注入 `OMNITASK_RATE_DB`，SDK `RateLimiter` 用 SQLite（WAL + BEGIN IMMEDIATE）协调同一 Host 上多个脚本进程的平台请求间隔；未使用 SDK 限速器的脚本仍按进程独立。
+- **配置**：新增 `agent.workspaces_dir/rate_dir/max_processes/keep_workspaces/keep_failed_workspaces/keep_versions`；Docker full 与 local.yml 同步。
+
+## 32. 凭据安全加固（2026-11）
+- **决策**：评估「浏览器本地存凭据」与「账号密码派生密钥」后，拍板维持服务端 AES 加密 + 无人值守执行，只做加固（方案 A）。浏览器本地存储防不住恶意服务端/XSS，且会破坏定时与无人值守任务；账号密码派生密钥只防备份泄露，仍防不住运行时代解密，且带来改密/找回/多端解锁的复杂度。
+- **修复日志泄露**：原 `RequestLogMiddleware` 记录完整请求体（凭据明文）、全部请求头（含 Authorization）与完整 URL（WebSocket accessToken），`ResponseLogMiddleware` 记录响应体（登录 Token）。现改为仅记录方法、路径、脱敏查询串、请求大小，以及状态码/响应大小/耗时。
+- **主密钥版本化**：新增 `crypto.Keyring`、`credentials.key_version`（迁移 000010）与 `security.master_keys`；映射非空时只读映射，新写入用最大版本，旧数据按记录版本解密。新增 `-rotate-credentials`：批量重加密到当前版本，成功后再移除旧密钥。`config.yaml` 在 Unix 上创建后 `chmod 0600`（Windows 需自行设置 ACL）。生成密钥时确保含字母，避免 YAML 把纯数字串当数值回写。
+- **审计与展示**：任务/发现/编辑解密均写访问日志，并更新 `last_used_at`；`security.credential_audit_fail_closed=true` 时审计失败即拒绝解密。凭据页新增「最后使用」列。
+- **传输与前端**：HTTPS 时下发 HSTS；全局 CSP（`script-src 'self'`，样式允许内联）、`X-Frame-Options`、`X-Content-Type-Options`、`Referrer-Policy`；API 响应 `Cache-Control: no-store`；登录/注册按 IP 限流（`security.auth_rate_limit_per_minute`，默认 20）。
+- **残余风险**：恶意部署者仍可在运行时取得凭据明文；JWT 仍在 `localStorage`，XSS 可窃取会话；Agent gRPC 仍为明文（默认仅监听回环，远程部署需私网/VPN 或后续补 TLS）。
+
+## 33. 平台页头部与批量操作（2026-11）
+- **头部压缩**：平台页顶栏改为单行 flex，不再用 `flex-md-nowrap` 的网格列；筛选、表格/卡片切换、刷新均为图标按钮（带 tooltip），顺序为筛选、视图切换、刷新。搜索框和账号下拉恢复原来的 outlined 样式；桌面端搜索框靠右，紧邻账号下拉，宽度 200px（账号下拉 160px）。
+- **响应式**：`md` 起显示截断的平台名，`lg` 起显示版本；刷新时间改到刷新按钮的 tooltip（`刷新于 xx`）。`xs` 隐藏平台标识，账号选择改为图标菜单；图标按钮保持默认尺寸不缩小，只压缩搜索框（小屏最小 48px）。表格卡片加 `overflow-x-auto`，窄屏横向滚动不再撑宽整个页面导致右侧按钮被挤出卡片。
+- **Snackbar**：全局 `v-snackbar-queue` 使用 `rounded="xl"`（24px），与全局 MD3 圆角一致。
+- **批量操作**：移除选中后插入的批量卡片，改为右下角常驻位置出现的 `v-speed-dial`；FAB 显示已选数量，展开后按动作直接打开批量执行弹窗（预选该动作），另提供清除选择。speed dial 的所有子项必须带 key，否则 Vuetify 的 TransitionGroup 会告警。卡片视图补上每张卡的勾选框，两种视图都可多选。
+
+## 34. 页面细节与文案（2026-11）
+- **任务详情间距**：内容区 `v-row` 改为 `density="comfortable"`，并把信息卡到步骤/指标区改为 `mt-4`，步骤/指标、结果、执行记录之间统一为 16px。
+- **凭据高级项**：去掉代理字段前的 `v-divider` 和长说明，改为标题为「高级」的 `v-expansion-panels`；编辑已有代理时在面板标题显示脱敏提示，清除代理开关放在面板内。
+- **脚本详情**：基本信息改为 8 个字段的 2 行 4 列（补全缺失的 `md="3"`），内容区加 `pa-5` 留白；来源只显示 `x-small` 的 GitHub 图标按钮；动作改为 `v-list`，描述和参数 chips 放在 `v-list-item` 默认内容区，避免 `v-list-item-subtitle` 的行高裁剪；Manifest 收进手风琴；回滚/卸载收进右上角更多菜单。
+- **名句**：首页名句扩充到 35 条；`工欲善其事，必先利其器。` 从 `quotes.js` 移到引导步骤条第一步的描述上方。

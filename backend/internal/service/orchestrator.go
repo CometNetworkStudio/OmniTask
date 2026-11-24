@@ -29,9 +29,13 @@ type Orchestrator struct {
 	sid      *sid.Sid
 	logger   *log.Logger
 
-	sem      chan struct{}
-	interval time.Duration
-	timeout  time.Duration
+	global        chan struct{}
+	platformLimit int
+	platformSems  map[string]chan struct{}
+	accountSems   map[string]chan struct{}
+	semMu         sync.Mutex
+	interval      time.Duration
+	timeout       time.Duration
 
 	mu      sync.Mutex
 	running map[string]context.CancelFunc
@@ -50,19 +54,82 @@ func NewOrchestrator(
 	conf *viper.Viper,
 	logger *log.Logger,
 ) *Orchestrator {
-	return &Orchestrator{
-		taskRepo: taskRepo,
-		creds:    creds,
-		agent:    agent,
-		progress: progress,
-		hub:      hub,
-		sid:      sid,
-		logger:   logger,
-		sem:      make(chan struct{}, 4),
-		interval: 2 * time.Second,
-		timeout:  conf.GetDuration("agent.task_timeout"),
-		running:  map[string]context.CancelFunc{},
+	globalLimit := conf.GetInt("agent.global_concurrency")
+	if globalLimit <= 0 {
+		globalLimit = 4
 	}
+	platformLimit := conf.GetInt("agent.platform_concurrency")
+	if platformLimit <= 0 {
+		platformLimit = 2
+	}
+	return &Orchestrator{
+		taskRepo:      taskRepo,
+		creds:         creds,
+		agent:         agent,
+		progress:      progress,
+		hub:           hub,
+		sid:           sid,
+		logger:        logger,
+		global:        make(chan struct{}, globalLimit),
+		platformLimit: platformLimit,
+		platformSems:  map[string]chan struct{}{},
+		accountSems:   map[string]chan struct{}{},
+		interval:      2 * time.Second,
+		timeout:       conf.GetDuration("agent.task_timeout"),
+		running:       map[string]context.CancelFunc{},
+	}
+}
+
+func (o *Orchestrator) platformSem(platform string) chan struct{} {
+	o.semMu.Lock()
+	defer o.semMu.Unlock()
+	sem, ok := o.platformSems[platform]
+	if !ok {
+		sem = make(chan struct{}, o.platformLimit)
+		o.platformSems[platform] = sem
+	}
+	return sem
+}
+
+func (o *Orchestrator) accountSem(key string) chan struct{} {
+	o.semMu.Lock()
+	defer o.semMu.Unlock()
+	sem, ok := o.accountSems[key]
+	if !ok {
+		sem = make(chan struct{}, 1)
+		o.accountSems[key] = sem
+	}
+	return sem
+}
+
+// acquire 依次获取全局、平台、账号三级并发额度；ctx 取消时返回 false。
+func (o *Orchestrator) acquire(ctx context.Context, task model.Task) (func(), bool) {
+	select {
+	case o.global <- struct{}{}:
+	case <-ctx.Done():
+		return nil, false
+	}
+	platform := o.platformSem(task.Platform)
+	select {
+	case platform <- struct{}{}:
+	case <-ctx.Done():
+		<-o.global
+		return nil, false
+	}
+	accountKey := task.UserID + ":" + task.CredentialID
+	account := o.accountSem(accountKey)
+	select {
+	case account <- struct{}{}:
+	case <-ctx.Done():
+		<-platform
+		<-o.global
+		return nil, false
+	}
+	return func() {
+		<-account
+		<-platform
+		<-o.global
+	}, true
 }
 
 func (o *Orchestrator) Start(ctx context.Context) error {
@@ -114,8 +181,6 @@ func (o *Orchestrator) dispatch(ctx context.Context) {
 		o.wg.Add(1)
 		go func() {
 			defer o.wg.Done()
-			o.sem <- struct{}{}
-			defer func() { <-o.sem }()
 			o.run(ctx, task)
 		}()
 	}
@@ -141,17 +206,30 @@ func (o *Orchestrator) run(ctx context.Context, task model.Task) {
 	defer cancel()
 	o.register(task.ID, cancel)
 	defer o.unregister(task.ID)
+	release, ok := o.acquire(runCtx, task)
+	if !ok {
+		return
+	}
+	defer release()
 
 	_ = o.taskRepo.UpdateStatus(ctx, task.ID, map[string]interface{}{
 		"status":     "running",
 		"started_at": time.Now(),
 	})
-	o.publish(ctx, task.ID, "running", task.Progress, "任务开始", nil)
+	lastPercent := task.Progress
+	o.publish(ctx, task.ID, "running", lastPercent, "任务开始", nil, eventMeta{Kind: "started"})
 
-	creds, err := o.creds.Decrypted(ctx, task.UserID, task.CredentialID, task.Platform, CredentialAccess{Purpose: "task", RefID: task.ID})
-	if err != nil {
-		o.fail(ctx, task.ID, err.Error())
-		return
+	creds := map[string]string{}
+	proxy := ""
+	if task.CredentialID != "" {
+		var err error
+		creds, err = o.creds.Decrypted(ctx, task.UserID, task.CredentialID, task.Platform, CredentialAccess{Purpose: "task", RefID: task.ID})
+		if err != nil {
+			o.fail(ctx, task.ID, err.Error(), lastPercent)
+			return
+		}
+		proxy = creds[proxyKey]
+		delete(creds, proxyKey)
 	}
 	params := map[string]string{}
 	if task.Params != "" {
@@ -163,33 +241,60 @@ func (o *Orchestrator) run(ctx context.Context, task model.Task) {
 		Action:      task.Action,
 		Params:      params,
 		Credentials: creds,
+		Proxy:       proxy,
 	}
 	terminal := false
-	err = o.agent.Execute(runCtx, req, func(ev *agentv1.ExecuteEvent) {
+	runErr := o.agent.Execute(runCtx, req, func(ev *agentv1.ExecuteEvent) {
+		if runCtx.Err() != nil {
+			return
+		}
 		switch ev.GetType() {
 		case agentv1.EventType_EVENT_TYPE_SUCCEEDED:
 			terminal = true
-			o.succeed(ctx, task.ID, ev.GetResult())
+			o.succeed(ctx, task.ID, ev.GetResult(), ev.GetResultJson())
 		case agentv1.EventType_EVENT_TYPE_FAILED:
 			terminal = true
-			o.fail(ctx, task.ID, ev.GetMessage())
+			o.fail(ctx, task.ID, ev.GetMessage(), lastPercent)
+		case agentv1.EventType_EVENT_TYPE_STARTED:
+			// 任务开始时后端已落一条 started，脚本侧 started 只用于本机调试。
+		case agentv1.EventType_EVENT_TYPE_LOG:
+			o.publish(ctx, task.ID, "running", lastPercent, ev.GetMessage(), nil, eventMeta{
+				Kind: "log", Level: ev.GetLevel(),
+			})
+		case agentv1.EventType_EVENT_TYPE_STEP:
+			o.publish(ctx, task.ID, "running", lastPercent, ev.GetMessage(), nil, eventMeta{
+				Kind: "step", Step: ev.GetStep(), Label: ev.GetLabel(), StepStatus: ev.GetStatus(),
+			})
+		case agentv1.EventType_EVENT_TYPE_METRIC:
+			o.publish(ctx, task.ID, "running", lastPercent, ev.GetMessage(), nil, eventMeta{
+				Kind: "metric", Key: ev.GetKey(), Label: ev.GetLabel(), Value: ev.GetValue(), Unit: ev.GetUnit(),
+			})
+		case agentv1.EventType_EVENT_TYPE_HEARTBEAT:
+			// 心跳只用于保活，不落事件表。
 		default:
-			o.publish(ctx, task.ID, "running", int(ev.GetPercent()), ev.GetMessage(), ev.GetResult())
+			if ev.GetHasPercent() {
+				lastPercent = int(ev.GetPercent())
+			}
+			o.publish(ctx, task.ID, "running", lastPercent, ev.GetMessage(), ev.GetResult(), eventMeta{
+				Kind: "progress", HasPercent: ev.GetHasPercent(),
+				Current: int(ev.GetCurrent()), Total: int(ev.GetTotal()),
+				Unit: ev.GetUnit(), Stage: ev.GetStage(),
+			})
 		}
 	})
-	if err != nil {
+	if runErr != nil {
 		switch {
 		case errors.Is(runCtx.Err(), context.Canceled):
 			// 取消已由 CancelTask 落库并广播，这里不覆盖状态
 		case errors.Is(runCtx.Err(), context.DeadlineExceeded):
-			o.fail(ctx, task.ID, "任务超时")
+			o.fail(ctx, task.ID, "任务超时", lastPercent)
 		default:
-			o.fail(ctx, task.ID, "agent 通讯失败: "+err.Error())
+			o.fail(ctx, task.ID, "agent 通讯失败: "+runErr.Error(), lastPercent)
 		}
 		return
 	}
 	if !terminal {
-		o.fail(ctx, task.ID, "agent 事件流意外结束")
+		o.fail(ctx, task.ID, "agent 事件流意外结束", lastPercent)
 	}
 }
 
@@ -212,66 +317,114 @@ func (o *Orchestrator) CancelTask(ctx context.Context, userID, taskID string) er
 		"error":       "用户取消",
 		"finished_at": time.Now(),
 	})
-	o.publish(ctx, taskID, "canceled", task.Progress, "已取消", nil)
+	o.publish(ctx, taskID, "canceled", task.Progress, "已取消", nil, eventMeta{Kind: "canceled"})
 	if running && cancel != nil {
 		cancel()
 	}
 	return nil
 }
 
-func (o *Orchestrator) publish(ctx context.Context, taskID, status string, percent int, message string, result map[string]string) {
+type eventMeta struct {
+	Kind       string
+	Level      string
+	Step       string
+	Label      string
+	StepStatus string
+	Current    int
+	Total      int
+	Unit       string
+	Stage      string
+	Key        string
+	Value      string
+	HasPercent bool
+}
+
+func (o *Orchestrator) publish(ctx context.Context, taskID, status string, percent int, message string, result map[string]string, meta eventMeta) {
+	if meta.Kind == "" {
+		meta.Kind = "progress"
+	}
+	eventID := o.appendEvent(ctx, taskID, status, percent, message, result, meta)
 	payload := map[string]interface{}{
-		"task_id":   taskID,
-		"status":    status,
-		"percent":   percent,
-		"message":   message,
-		"timestamp": time.Now().Unix(),
+		"id":          eventID,
+		"task_id":     taskID,
+		"status":      status,
+		"kind":        meta.Kind,
+		"percent":     percent,
+		"message":     message,
+		"level":       meta.Level,
+		"step":        meta.Step,
+		"label":       meta.Label,
+		"step_status": meta.StepStatus,
+		"current":     meta.Current,
+		"total":       meta.Total,
+		"unit":        meta.Unit,
+		"stage":       meta.Stage,
+		"key":         meta.Key,
+		"value":       meta.Value,
+		"timestamp":   time.Now().Unix(),
 	}
 	if result != nil {
 		payload["result"] = result
 	}
 	_ = o.progress.Set(ctx, taskID, payload)
 	o.hub.Publish(taskID, payload)
-	o.appendEvent(ctx, taskID, status, percent, message)
-	_ = o.taskRepo.UpdateStatus(ctx, taskID, map[string]interface{}{"progress": percent})
+	if meta.HasPercent {
+		_ = o.taskRepo.UpdateStatus(ctx, taskID, map[string]interface{}{"progress": percent})
+	}
 }
 
-func (o *Orchestrator) succeed(ctx context.Context, taskID string, result map[string]string) {
+func (o *Orchestrator) succeed(ctx context.Context, taskID string, result map[string]string, resultJSON string) {
 	if result == nil {
 		result = map[string]string{}
 	}
-	buf, _ := json.Marshal(result)
+	stored := resultJSON
+	if stored == "" || !json.Valid([]byte(stored)) {
+		buf, _ := json.Marshal(result)
+		stored = string(buf)
+	}
 	now := time.Now()
 	_ = o.taskRepo.UpdateStatus(ctx, taskID, map[string]interface{}{
 		"status":      "succeeded",
 		"progress":    100,
-		"result":      string(buf),
+		"result":      stored,
 		"finished_at": now,
 		"error":       "",
 	})
-	o.publish(ctx, taskID, "succeeded", 100, "任务完成", result)
+	o.publish(ctx, taskID, "succeeded", 100, "任务完成", result, eventMeta{Kind: "succeeded", HasPercent: true})
 }
 
-func (o *Orchestrator) fail(ctx context.Context, taskID, message string) {
+func (o *Orchestrator) fail(ctx context.Context, taskID, message string, percent int) {
 	now := time.Now()
 	_ = o.taskRepo.UpdateStatus(ctx, taskID, map[string]interface{}{
 		"status":      "failed",
 		"error":       message,
 		"finished_at": now,
 	})
-	o.publish(ctx, taskID, "failed", 0, message, nil)
+	o.publish(ctx, taskID, "failed", percent, message, nil, eventMeta{Kind: "failed"})
 }
 
-func (o *Orchestrator) appendEvent(ctx context.Context, taskID, eventType string, percent int, message string) {
+func (o *Orchestrator) appendEvent(ctx context.Context, taskID, status string, percent int, message string, result map[string]string, meta eventMeta) string {
 	id, err := o.sid.GenString()
 	if err != nil {
-		return
+		return ""
 	}
 	_ = o.taskRepo.AppendEvent(ctx, &model.TaskEvent{
-		ID:      id,
-		TaskID:  taskID,
-		Type:    eventType,
-		Percent: percent,
-		Message: message,
+		ID:         id,
+		TaskID:     taskID,
+		Type:       status,
+		Kind:       meta.Kind,
+		Percent:    percent,
+		Message:    message,
+		Level:      meta.Level,
+		Step:       meta.Step,
+		Label:      meta.Label,
+		StepStatus: meta.StepStatus,
+		Current:    meta.Current,
+		Total:      meta.Total,
+		Unit:       meta.Unit,
+		Stage:      meta.Stage,
+		Key:        meta.Key,
+		Value:      meta.Value,
 	})
+	return id
 }

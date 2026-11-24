@@ -1,0 +1,36 @@
+# OmniTask Host（agent）配置，仅容器内使用。
+mode: full
+
+agent:
+  host: 0.0.0.0
+  port: 50051
+  scripts_dir: /data/scripts
+  python: python3
+  pythonpath: /sdk
+  bank_addr: omnitask-server:9000
+  task_timeout: 0s
+  global_concurrency: 4
+  platform_concurrency: 2
+  auto_install_deps: true
+  pip_index_url: ""
+  workspaces_dir: /data/workspaces
+  rate_dir: /data/rate
+  max_processes: 8
+  keep_workspaces: false
+  keep_failed_workspaces: true
+  keep_versions: 3
+
+security:
+  jwt:
+    key: ""
+  master_key: ""
+
+log:
+  log_level: info
+  mode: console
+  encoding: console
+  log_file_name: /data/logs/agent.log
+  max_backups: 10
+  max_age: 7
+  max_size: 256
+  compress: true

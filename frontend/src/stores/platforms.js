@@ -27,5 +27,12 @@ export const usePlatformsStore = defineStore('platforms', {
     name(id) {
       return this.platform(id)?.name || id
     },
+    actionName(platformId, actionId) {
+      const action = this.platform(platformId)?.actions?.find((item) => item.id === actionId)
+      return action?.name || actionId
+    },
+    action(platformId, actionId) {
+      return this.platform(platformId)?.actions?.find((item) => item.id === actionId) || null
+    },
   },
 })

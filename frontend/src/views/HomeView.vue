@@ -70,7 +70,11 @@ const steps = computed(() => {
       complete: tasksTotal.value > 0,
     },
   )
-  return list.map((step, index) => ({ ...step, value: index + 1 }))
+  return list.map((step, index) => ({
+    ...step,
+    value: index + 1,
+    quote: index === 0 ? '工欲善其事，必先利其器。' : '',
+  }))
 })
 
 function stepSlot(value) {
@@ -131,6 +135,9 @@ onMounted(async () => {
         <span class="text-title-small">{{ title }}</span>
       </template>
       <template v-for="step in steps" :key="step.value" #[stepSlot(step.value)]>
+        <div v-if="step.quote" class="text-body-small text-medium-emphasis font-italic mb-1">
+          {{ step.quote }}
+        </div>
         <div class="text-body-medium text-medium-emphasis">{{ step.desc }}</div>
         <div class="d-flex align-center mt-3">
           <v-btn color="primary" size="small" :to="step.to">{{ step.action }}</v-btn>

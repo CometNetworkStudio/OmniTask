@@ -26,8 +26,11 @@ type Credential struct {
 	Platform   string     `gorm:"index:idx_credential_user_platform;size:32;not null"`
 	Label      string     `gorm:"size:64"`
 	Preview    string     `gorm:"size:128"`
+	ProxyHint  string     `gorm:"size:255"`
 	IsDefault  bool       `gorm:"not null;default:false"`
 	ArchivedAt *time.Time // 归档后从列表/选择器隐藏，历史任务删净后真正清除
+	KeyVersion int        `gorm:"not null;default:1"` // 加密所用主密钥版本，支持轮换
+	LastUsedAt *time.Time // 最近一次任务/发现解密时间，仅用于展示
 	Cipher     []byte     `gorm:"type:blob"`
 	Nonce      []byte     `gorm:"type:blob"`
 	CreatedAt  time.Time
@@ -76,12 +79,23 @@ type Task struct {
 }
 
 type TaskEvent struct {
-	ID        string    `gorm:"primaryKey;size:32"`
-	TaskID    string    `gorm:"index;size:32;not null"`
-	Type      string    `gorm:"size:32;not null"`
-	Percent   int       `gorm:"not null;default:0"`
-	Message   string    `gorm:"type:text"`
-	CreatedAt time.Time `gorm:"index"`
+	ID         string    `gorm:"primaryKey;size:32"`
+	TaskID     string    `gorm:"index;size:32;not null"`
+	Type       string    `gorm:"size:32;not null"`                  // 任务状态：running/succeeded/failed...
+	Kind       string    `gorm:"size:32;not null;default:progress"` // 展示类型：progress/log/step/metric/started
+	Percent    int       `gorm:"not null;default:0"`
+	Message    string    `gorm:"type:text"`
+	Level      string    `gorm:"size:16"`
+	Step       string    `gorm:"size:64"`
+	Label      string    `gorm:"size:128"`
+	StepStatus string    `gorm:"size:16"`
+	Current    int       `gorm:"not null;default:0"`
+	Total      int       `gorm:"not null;default:0"`
+	Unit       string    `gorm:"size:16"`
+	Stage      string    `gorm:"size:64"`
+	Key        string    `gorm:"size:64"`
+	Value      string    `gorm:"size:255"`
+	CreatedAt  time.Time `gorm:"index"`
 }
 
 type Question struct {
@@ -100,15 +114,32 @@ type Question struct {
 
 // Script 是已安装的平台脚本注册表。
 type Script struct {
-	ID          string `gorm:"primaryKey;size:64"`
-	Name        string `gorm:"size:128;not null;default:''"`
-	Version     string `gorm:"size:32;not null;default:''"`
-	SourceURL   string `gorm:"size:512;not null;default:''"`
-	Manifest    string `gorm:"type:json"`
-	Enabled     bool   `gorm:"not null;default:true"`
-	Status      string `gorm:"size:32;not null;default:installed"`
-	InstalledAt time.Time
-	UpdatedAt   time.Time
+	ID           string `gorm:"primaryKey;size:64"`
+	Name         string `gorm:"size:128;not null;default:''"`
+	Version      string `gorm:"size:32;not null;default:''"`
+	SourceURL    string `gorm:"size:512;not null;default:''"`
+	Ref          string `gorm:"size:128;not null;default:''"`
+	CommitSHA    string `gorm:"size(64);not null;default:''"`
+	ManifestHash string `gorm:"size:64;not null;default:''"`
+	Manifest     string `gorm:"type:json"`
+	Enabled      bool   `gorm:"not null;default:true"`
+	Status       string `gorm:"size:32;not null;default:installed"`
+	LastError    string `gorm:"type:text"`
+	InstalledAt  time.Time
+	UpdatedAt    time.Time
+}
+
+// ScriptInstallJob 把安装进度落库，服务重启后仍可查询。
+type ScriptInstallJob struct {
+	ID        string `gorm:"primaryKey;size:32"`
+	Status    string `gorm:"size:16;not null;default:running"`
+	Stage     string `gorm:"size:32;not null;default:queued"`
+	Percent   int    `gorm:"not null;default:0"`
+	Message   string `gorm:"type:text"`
+	Error     string `gorm:"type:text"`
+	ScriptID  string `gorm:"size:64"`
+	CreatedAt time.Time
+	UpdatedAt time.Time
 }
 
 // PlatformCache 缓存某用户某凭据在平台的“任务/条目列表”（原始字段存 JSON，前端按 manifest schema 渲染）。

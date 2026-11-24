@@ -78,6 +78,7 @@ const PAGE_TITLES = {
   credentials: '凭据',
   questions: '题库',
   scripts: '脚本',
+  'script-detail': '脚本详情',
   users: '用户',
   settings: '设置',
 }
@@ -188,7 +189,7 @@ watch(
 
           <div class="drawer-legal-spacer" aria-hidden="true" />
 
-          <div class="px-4 pb-8 pt-4 text-body-small text-medium-emphasis drawer-legal">
+          <div class="px-4 pb-8 pt-4 text-medium-emphasis drawer-legal">
             <div>© CometNetworkStudio</div>
           </div>
         </div>
@@ -253,6 +254,7 @@ watch(
       timeout="3000"
       total-visible="4"
       transition="bouncy-slide-auto"
+      rounded="xl"
       contained
     >
       <template #actions="{ props }">

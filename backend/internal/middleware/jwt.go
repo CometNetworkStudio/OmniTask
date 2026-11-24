@@ -14,7 +14,7 @@ func StrictAuth(j *jwt.JWT, logger *log.Logger) gin.HandlerFunc {
 		tokenString := ctx.Request.Header.Get("Authorization")
 		if tokenString == "" {
 			logger.WithContext(ctx).Warn("No token", zap.Any("data", map[string]interface{}{
-				"url":    ctx.Request.URL,
+				"url":    ctx.Request.URL.Path,
 				"params": ctx.Params,
 			}))
 			v1.HandleError(ctx, http.StatusUnauthorized, v1.ErrUnauthorized, nil)
@@ -25,7 +25,7 @@ func StrictAuth(j *jwt.JWT, logger *log.Logger) gin.HandlerFunc {
 		claims, err := j.ParseToken(tokenString)
 		if err != nil {
 			logger.WithContext(ctx).Error("token error", zap.Any("data", map[string]interface{}{
-				"url":    ctx.Request.URL,
+				"url":    ctx.Request.URL.Path,
 				"params": ctx.Params,
 			}), zap.Error(err))
 			v1.HandleError(ctx, http.StatusUnauthorized, v1.ErrUnauthorized, nil)

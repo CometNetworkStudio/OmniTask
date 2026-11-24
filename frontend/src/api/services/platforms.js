@@ -6,10 +6,10 @@ export const platformsApi = {
     http.get(`/platforms/${id}/items`, {
       params: credentialId ? { credential_id: credentialId } : {},
     }),
-  discover: (id, credentialId) =>
+  discover: (id, credentialId, params = {}) =>
     http.post(
       `/platforms/${id}/discover`,
-      { credential_id: credentialId || '' },
+      { credential_id: credentialId || '', params },
       { timeout: 120000 },
     ),
 }

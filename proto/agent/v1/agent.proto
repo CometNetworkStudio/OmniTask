@@ -11,6 +11,28 @@ service AgentService {
   rpc Execute(ExecuteRequest) returns (stream ExecuteEvent);
   // Discover 列出该账号在平台上的条目（课程/任务等），用于前端选择。
   rpc Discover(DiscoverRequest) returns (DiscoverResponse);
+  // ListScripts 返回 Host 实际加载的脚本清单与运行时状态（后端以它为准同步注册表）。
+  rpc ListScripts(ListScriptsRequest) returns (ListScriptsResponse);
+}
+
+message ListScriptsRequest {}
+
+message ScriptInfo {
+  string id = 1;
+  string name = 2;
+  string version = 3;
+  string author = 4;
+  string icon = 5;
+  string runtime = 6;
+  string manifest = 7; // 原始 script.json
+  string hash = 8;     // manifest sha256
+  bool available = 9;
+  string error = 10;   // 运行时不可用原因
+  string runtime_path = 11;
+}
+
+message ListScriptsResponse {
+  repeated ScriptInfo items = 1;
 }
 
 message DiscoverRequest {
@@ -18,6 +40,8 @@ message DiscoverRequest {
   map<string, string> params = 2;
   // 已由后端解密后下发的凭据，Agent 不得持久化。
   map<string, string> credentials = 3;
+  // 账号级粘性代理，Host 以 OMNITASK_PROXY 注入脚本环境。
+  string proxy = 4;
 }
 
 message DiscoverItem {
@@ -43,6 +67,8 @@ message ExecuteRequest {
   map<string, string> params = 4;
   // 已由后端解密后下发的平台凭据，Agent 不得持久化。
   map<string, string> credentials = 5;
+  // 账号级粘性代理，Host 以 OMNITASK_PROXY 注入脚本环境。
+  string proxy = 6;
 }
 
 enum EventType {
@@ -52,6 +78,9 @@ enum EventType {
   EVENT_TYPE_LOG = 3;
   EVENT_TYPE_SUCCEEDED = 4;
   EVENT_TYPE_FAILED = 5;
+  EVENT_TYPE_STEP = 6;
+  EVENT_TYPE_METRIC = 7;
+  EVENT_TYPE_HEARTBEAT = 8;
 }
 
 message ExecuteEvent {
@@ -61,6 +90,20 @@ message ExecuteEvent {
   string message = 4;
   int64 timestamp = 5;
   map<string, string> result = 6;
+
+  // 结构化展示字段（v2，全部可选，旧脚本无需填写）。
+  bool has_percent = 7; // false 表示不改变任务进度
+  string step = 8;      // 步骤标识
+  string label = 9;     // 步骤/指标展示名
+  string status = 10;   // 步骤状态：running | succeeded | failed | skipped
+  string level = 11;    // 日志级别：debug | info | warn | error
+  int32 current = 12;   // 当前进度
+  int32 total = 13;     // 总量
+  string unit = 14;     // 单位，如“节”“题”
+  string key = 15;      // 指标 key
+  string value = 16;    // 指标值
+  string stage = 17;    // 阶段标识，如 watch / submit
+  string result_json = 18; // 结构化结果（可为对象/数组），优先于 result map
 }
 
 // QuestionBank 由 Go 后端实现，Python Agent 作为客户端调用。

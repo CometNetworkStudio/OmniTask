@@ -48,8 +48,12 @@ CGO_ENABLED=0 GOOS=<linux|windows> GOARCH=amd64 \
 
 ## 4. 两种运行模式与 HTTPS
 
-- **lite（默认）**：SQLite + 无 Redis。直接运行 `omnitask-server` → 当前目录自动生成 `config.yaml`（含随机密钥）→ 浏览器打开 `http://127.0.0.1:8080`，首个注册用户为管理员。
-- **full**：MySQL + Redis。先 `omnitask-server -migrate` 迁移，再启动 `server` 与 `agent`。
+- **lite（默认）**：SQLite + 无 Redis。直接运行 `omnitask-server` → 当前目录自动生成 `config.yaml`（含随机密钥）→ 浏览器打开 `http://127.0.0.1:8080`，首个注册用户为管理员。lite 默认 `agent.autostart: true`，会拉起同目录的 `omnitask-agent`；也可以用 `agent.bin` 指定路径或设为 `false` 手动启动。
+- **full**：MySQL + Redis。推荐一键 Compose：
+  ```bash
+  docker compose -f deploy/docker-compose/docker-compose.full.yml up -d --build
+  ```
+  也可手动先 `omnitask-server -migrate` 迁移，再启动 `server` 与 `agent`。详见 `deploy/docker-compose/README.md`。
 - **HTTPS**：可在 `config.yaml` 配置 `http.tls`（`enabled/cert_file/key_file`）由 server 直接终结 TLS；不需要自签功能，证书自备。也可继续用 nginx 等反代。
 
 ## 5. 一键构建

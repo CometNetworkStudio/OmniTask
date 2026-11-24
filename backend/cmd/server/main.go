@@ -30,6 +30,7 @@ import (
 func main() {
 	var envConf = flag.String("conf", "config.yaml", "config path, eg: -conf ./config.yaml")
 	var migrateOnly = flag.Bool("migrate", false, "仅执行数据库迁移后退出（full 模式）")
+	var rotateOnly = flag.Bool("rotate-credentials", false, "将所有凭据重加密到当前主密钥版本后退出")
 	flag.Parse()
 	conf := config.NewConfig(*envConf)
 
@@ -40,6 +41,13 @@ func main() {
 			logger.Sugar().Fatalf("migrate failed: %v", err)
 		}
 		logger.Info("migrate done")
+		return
+	}
+	if *rotateOnly {
+		if err := rotateCredentials(conf, logger); err != nil {
+			logger.Sugar().Fatalf("rotate credentials failed: %v", err)
+		}
+		logger.Info("rotate credentials done")
 		return
 	}
 	if conf.GetBool("data.db.migrate_on_start") {
@@ -53,6 +61,8 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
+	stopAgent := startLocalAgent(conf, *envConf, logger)
+	defer stopAgent()
 	scheme := "http"
 	if conf.GetBool("http.tls.enabled") {
 		scheme = "https"

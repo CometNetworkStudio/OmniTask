@@ -15,6 +15,15 @@ agent:
   python: ../sdk/python/.venv/bin/python
   pythonpath: ../sdk/python
   bank_addr: 127.0.0.1:9000
+  global_concurrency: 4
+  platform_concurrency: 2
+  autostart: false
+  workspaces_dir: ../workspaces
+  rate_dir: ../rate
+  max_processes: 8
+  keep_workspaces: false
+  keep_failed_workspaces: true
+  keep_versions: 3
 security:
   api_sign:
     app_key: 123456
@@ -34,6 +43,9 @@ data:
     write_timeout: 0.2s
   mongo:
     uri: mongodb://root:123456@localhost:27017
+task:
+  max_active_per_user: 20
+  max_pending: 500
 log:
   log_level: debug
   mode: both               #  file or console or both

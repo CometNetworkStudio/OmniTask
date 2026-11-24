@@ -20,6 +20,9 @@ type Logger struct {
 func NewLog(conf *viper.Viper) *Logger {
 	// log address "out.log" User-defined
 	lp := conf.GetString("log.log_file_name")
+	if override := os.Getenv("OMNITASK_LOG_FILE"); override != "" {
+		lp = override
+	}
 	lv := conf.GetString("log.log_level")
 	var level zapcore.Level
 	//debug<info<warn<error<fatal<panic

@@ -2,16 +2,37 @@ package v1
 
 import "time"
 
+type PlatformOption struct {
+	Label string `json:"label"`
+	Value string `json:"value"`
+}
+
 type PlatformField struct {
-	Key     string `json:"key"`
-	Label   string `json:"label"`
-	Type    string `json:"type"`
-	Default any    `json:"default,omitempty"`
+	Key         string           `json:"key"`
+	Label       string           `json:"label"`
+	Type        string           `json:"type"`
+	Default     any              `json:"default,omitempty"`
+	Required    bool             `json:"required"`
+	Placeholder string           `json:"placeholder,omitempty"`
+	Help        string           `json:"help,omitempty"`
+	Options     []PlatformOption `json:"options,omitempty"`
+	Min         any              `json:"min,omitempty"`
+	Max         any              `json:"max,omitempty"`
+	Step        any              `json:"step,omitempty"`
+	Multiline   bool             `json:"multiline"`
+}
+
+type PlatformResult struct {
+	Type    string          `json:"type"`
+	Columns []PlatformField `json:"columns"`
 }
 
 type PlatformAction struct {
-	ID   string `json:"id"`
-	Name string `json:"name"`
+	ID          string          `json:"id"`
+	Name        string          `json:"name"`
+	Description string          `json:"description"`
+	Params      []PlatformField `json:"params"`
+	Result      *PlatformResult `json:"result"`
 }
 
 type PlatformDiscovery struct {

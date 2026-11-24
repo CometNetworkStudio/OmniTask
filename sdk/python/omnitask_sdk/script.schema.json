@@ -1,0 +1,93 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/CometNetworkStudio/OmniTask/script.schema.json",
+  "title": "OmniTask script manifest",
+  "type": "object",
+  "required": ["id", "name", "runtime"],
+  "anyOf": [
+    { "required": ["entry"] },
+    { "required": ["module"] }
+  ],
+  "properties": {
+    "protocol": { "type": "integer", "minimum": 1, "maximum": 2, "default": 2 },
+    "id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9_-]*$" },
+    "name": { "type": "string" },
+    "version": { "type": "string" },
+    "author": { "type": "string" },
+    "icon": { "type": "string", "description": "MDI 图标名，如 mdi-school" },
+    "runtime": { "type": "string", "description": "可执行文件，如 python3 / node" },
+    "entry": { "type": "string" },
+    "module": { "type": "string" },
+    "args": { "type": "array", "items": { "type": "string" } },
+    "requires": { "type": "array", "items": { "type": "string" } },
+    "permissions": { "type": "array", "items": { "type": "string" } },
+    "progress_regex": { "type": "string" },
+    "actions": { "type": "array", "items": { "$ref": "#/$defs/action" } },
+    "params": { "type": "array", "items": { "$ref": "#/$defs/field" } },
+    "credentials": { "type": "array", "items": { "$ref": "#/$defs/field" } },
+    "discovery": { "$ref": "#/$defs/discovery" }
+  },
+  "$defs": {
+    "option": {
+      "oneOf": [
+        { "type": "string" },
+        {
+          "type": "object",
+          "required": ["value"],
+          "properties": {
+            "label": { "type": "string" },
+            "value": { "type": "string" }
+          }
+        }
+      ]
+    },
+    "field": {
+      "type": "object",
+      "required": ["key", "label"],
+      "properties": {
+        "key": { "type": "string" },
+        "label": { "type": "string" },
+        "type": {
+          "enum": ["text", "number", "switch", "select", "textarea", "password", "token", "cookie", "date", "progress", "chip", "sparkline"]
+        },
+        "default": {},
+        "required": { "type": "boolean" },
+        "placeholder": { "type": "string" },
+        "help": { "type": "string" },
+        "options": { "type": "array", "items": { "$ref": "#/$defs/option" } },
+        "min": { "type": ["number", "string"] },
+        "max": { "type": ["number", "string"] },
+        "step": { "type": ["number", "string"] },
+        "multiline": { "type": "boolean" }
+      }
+    },
+    "action": {
+      "type": "object",
+      "required": ["id", "name"],
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "description": { "type": "string" },
+        "command": { "type": "array", "items": { "type": "string" } },
+        "params": { "type": "array", "items": { "$ref": "#/$defs/field" } },
+        "result": {
+          "type": "object",
+          "properties": {
+            "type": { "enum": ["table", "links", "keyvalue"] },
+            "columns": { "type": "array", "items": { "$ref": "#/$defs/field" } }
+          }
+        }
+      }
+    },
+    "discovery": {
+      "type": "object",
+      "properties": {
+        "label": { "type": "string" },
+        "columns": { "type": "array", "items": { "$ref": "#/$defs/field" } },
+        "actions": { "type": "array", "items": { "type": "string" } },
+        "param_map": { "type": "object", "additionalProperties": { "type": "string" } },
+        "primary": { "type": "string" }
+      }
+    }
+  }
+}
