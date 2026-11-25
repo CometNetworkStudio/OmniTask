@@ -234,21 +234,24 @@ Host 取消时会先发送 `{"type":"cancel"}`，给脚本约 3 秒清理时间�
   "label": "课程",
   "primary": "title",
   "columns": [
-    { "key": "title", "label": "课程", "type": "text" },
-    { "key": "progress", "label": "进度", "type": "progress" },
-    { "key": "status", "label": "状态", "type": "chip" }
+    { "key": "title", "label": "课程", "type": "text", "important": true },
+    { "key": "cid", "label": "课程ID", "type": "text", "sort": "number" },
+    { "key": "progress", "label": "进度", "type": "progress", "important": true },
+    { "key": "status", "label": "状态", "type": "chip", "important": true }
   ],
   "actions": ["study"],
   "param_map": { "course_id": "cid" }
 }
 ```
 
-`param_map` 会把选中条目的字段自动填入任务参数。列类型支持：
+`param_map` 会把选中条目的字段自动填入任务参数。`important: true` 的列会显示在表格；未标注的列收进「详细信息」对话框。若没有任何列标记，前端仍展示全部列（兼容旧脚本）。卡片视图始终展示全部列与全部动作。表格行提供「动作」菜单和「详细信息」按钮。列类型支持：
 
 - `text`、`number`、`date`
 - `progress`：`60%` 或 `0.6`
 - `chip`：`已完成:success`
 - `sparkline`：`1,2,3,5,4`
+
+`columns[].sort` 可选，用于表头排序：`number`、`percent`、`duration`、`date`、`text`。例如学习时长 `"31小时7分钟"` 应标 `duration`，平均正确率 `"97%"` 应标 `percent`。
 
 ---
 

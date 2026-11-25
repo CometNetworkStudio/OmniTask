@@ -418,3 +418,43 @@ cd frontend && npm run build
 - **凭据高级项**：去掉代理字段前的 `v-divider` 和长说明，改为标题为「高级」的 `v-expansion-panels`；编辑已有代理时在面板标题显示脱敏提示，清除代理开关放在面板内。
 - **脚本详情**：基本信息改为 8 个字段的 2 行 4 列（补全缺失的 `md="3"`），内容区加 `pa-5` 留白；来源只显示 `x-small` 的 GitHub 图标按钮；动作改为 `v-list`，描述和参数 chips 放在 `v-list-item` 默认内容区，避免 `v-list-item-subtitle` 的行高裁剪；Manifest 收进手风琴；回滚/卸载收进右上角更多菜单。
 - **名句**：首页名句扩充到 35 条；`工欲善其事，必先利其器。` 从 `quotes.js` 移到引导步骤条第一步的描述上方。
+
+## 35. 脚本输出编码与 WeLearn 行为对齐（2026-11）
+- **乱码根因**：Windows 下 Python 的 stdin/stdout 走管道时默认本地编码（cp936），Host 按 UTF-8 解析 JSON，中文被替换为 U+FFFD；另有一批历史 manifest 是 UTF-8 被按 GBK 解码后入库，标签显示为乱码。
+- **编码修复**：Host `scriptEnv` 注入 `PYTHONUTF8=1`、`PYTHONIOENCODING=utf-8`；SDK `serve` 启动时强制 stdin/stdout/stderr 为 UTF-8，`_emit` 直接以 UTF-8 字节写 stdout；legacy 生成器把最后一个非空 `result` 作为任务结果返回。
+- **WeLearn 对齐原项目**：`time` 处理全部可见 SCO（不再只刷未完成，已完成课程也能挂时长）；`progress` 默认只提交未完成 SCO，`include_completed=true` 才重提已完成项；按 SCO 与单元隔离异常并继续；分别校验 `setscoinfo`/`savescoinfo` 的 `ret:0`；SCO id 优先 `id`；日志使用 `location` 课程名；最终事件返回 total/succeeded/failed/units_failed，单项进度封顶 99。
+- **清单修复**：welearn 升到 0.1.1，`Sync` 按新 hash 覆盖数据库中的乱码 manifest；历史任务日志中的 U+FFFD 为有损替换，未回填。
+- **真实测试**（凭证 `welearn/zym`）：发现 4 门课程；`time`（课程 2416，limit=1，3 秒）在已完成课程上成功处理 1 个 SCO；`progress`（课程 566，`include_completed=true`，limit=1）成功提交 1 个 SCO；DevTools 事件中文、结果 `{total,succeeded,failed}` 与 demo 脚本均正常。
+
+## 36. 平台发现丰富与执行对话框整理（2026-11）
+- **WeLearn 脚本**：独立仓库 `CometNetworkStudio/welearn` 已提交并推送 3 个 commit（挂时长/提交校验修复、发现进度与状态、按动作拆分参数），版本 0.1.3；后续 0.1.4 见下节。README 明确脚本与 OmniTask 主项目相互独立。
+- **发现字段**：WeLearn 课程接口可用的展示字段为 `per`（进度）与 `state`（状态，按 per 派生）；columns 改为 课程名/课程ID/进度/状态，`primary=name`。卡片标题使用课程名，右上角用 `v-progress-circular` 显示进度环；表格进度列用 `v-progress-linear` 并设最小列宽。
+- **响应式视图**：平台页按 `smAndDown` 区分小屏/大屏，分别用 `omnitask_platform_view:small`、`:large` 保存偏好；首次小屏默认卡片、大屏默认表格，跨断点自动切换。
+- **执行对话框**：`param_map` 固定的参数（如 `cid`）不再出现在执行参数中，由所选条目自动注入；每个 action 声明自己的 params（挂时长不含 accuracy/include_completed，提交进度不含 duration）；参数区用 flex + `ga-4` 拉开间距，条目摘要改为 `primary-light` sheet；手动新建任务对话框同步整理间距。
+- **验证**：大屏默认表格、小屏默认卡片；卡片标题为课程名且带进度环；执行对话框无课程 id 输入；提交进度只显示 unit_idx/accuracy/include_completed/limit，挂时长只显示 unit_idx/duration/limit；页面提交的任务 params 含 `cid=2416`，无未完成 SCO 时结果正确返回全 0。
+
+## 37. 平台条目详情与脚本驱动展示（2026-11）
+- **WeLearn 0.1.4**：发现新增 `scogeneral` 课程总览（练习总数、已完成、待完成、平均正确率、学习时长），并拆出 `get_course_identity` 避免发现时多拉单元；字段为 `total/done/remaining/avg_accuracy/study_time`，列 schema 同步更新。
+- **展示由脚本决定**：manifest `discovery.columns[].important` 标记重要列；任一处标记时表格只显示重要列，其余列进入「详细信息」弹窗；未标记时沿用旧行为展示全部列。卡片视图展示全部字段和全部动作。前端不写死 WeLearn 字段名，`primary` 决定卡片标题。
+- **交互**：表格行提供「动作」菜单和「详细信息」图标按钮；「动作」列出脚本全部动作，「详细信息」展示全部字段；卡片视图保留全部内容与动作。参数提示均来自脚本字段的 `help`。
+- **后端**：`agenthost.Field` 与 `v1.PlatformField` 增加 `important`，发现/平台 schema 透传。
+- **验证**：课程 566 返回 283 个练习、已完成 283、平均正确率 97%、学习时长 31 小时 7 分钟；表格只显示课程名/进度/状态/学习时长，详细信息弹窗显示课程ID/练习统计，卡片视图字段完整。
+
+## 38. 表格操作、排序与挂时长总时长（2026-11）
+- **表格操作**：移除「更多」展开行；表格行改为「动作」`v-menu`（列出脚本动作）和「详细信息」图标按钮（带 tooltip）。详细信息弹窗只展示字段，不再放动作执行按钮；卡片视图仍直接展示全部字段与动作。
+- **表头排序**：使用 Vuetify `header.sortRaw`（条目字段在嵌套 `fields` 中，默认按 `f_*` 取不到值）。新增 `columns[].sort`（`number/percent/duration/date/text`）与通用比较器；学习时长按 `duration` 解析为秒，其他按数值/百分比/日期/自然文本兜底。实测学习时长升序 14 分钟→31 小时 7 分钟→50 小时 24 分钟→51 小时 35 分钟，降序相反。
+- **后端**：`agenthost.Field` 与 `v1.PlatformField` 增加 `sort` 透传。
+- **WeLearn 0.1.5**：`duration` 改为本次任务总挂时长，按本次 SCO 数均分（不再每个 SCO 都挂 duration 秒）；事件显示总时长与每个 SCO 的分配值。仓库提交 `3269213` 已推送。
+- **真实测试**：课程 2416 `time`、`limit=2`、`duration=60`，两个 SCO 各 30 秒，任务 wall time 约 90 秒（含登录/单元请求），学习时长从 14 分钟涨到 15 分钟；`progress`（课程 566，limit=1，含已完成，正确率 100）成功提交 1 个 SCO。
+
+## 39. 挂时长收敛与侧边栏置顶（2026-11）
+- **WeLearn time 0.1.6**：总时长按约 60 秒一个 SCO 估算所需数量，只收集并处理这些 SCO；60 秒只处理 1 个，不再遍历全部 SCO 导致数分钟累积。真实测试课程 2417 学习时长 50 小时 24 分 → 50 小时 25 分，任务约 80 秒结束（含登录与课程请求）；进度动作课程 566 limit=1 含已完成成功提交。脚本提交 `9beedaf` 已推送。
+- **侧边栏置顶**：任务二级菜单的平台右侧增加 pin 图标，可置顶/取消；置顶平台插入「概览」与「任务」之间，分组标题为 `Pin`。点击 Pin 内条目不会自动展开任务二级菜单。置顶项和任务子项使用手动 active 状态，同一平台同时出现时只高亮用户点击的那一个；pin 按钮不再带 tooltip/aria-label。
+- **任务详情参数**：按脚本 manifest 的 action 参数标签展示；通过 `discovery.param_map` + 发现缓存把 `cid` 等参数解析为条目主字段（如课程名），并隐藏空值、0 限制和关闭的开关。课程参数用 primary 色 chip 展示。
+- **存储**：新表 `user_preferences`（迁移 000011），`user_id` 主键 + `pinned_platforms` JSON；API `GET/PUT /api/v1/me/preferences`；Casbin 增加 user 权限；lite 模式 AutoMigrate 同步模型。
+- **前端**：App.vue 加载用户偏好并乐观更新，失败回滚；置顶按钮带 aria-label/tooltip，点击阻止路由跳转；测试后已清空当前用户偏好。
+
+## 40. 平台页标题与脚本反馈入口（2026-11）
+- **标题**：`/platforms/:id` 的应用栏标题改为「平台名 + 脚本版本」（如 `WeLearn v0.1.6`），平台卡内副标题改为脚本作者。
+- **反馈**：`PlatformResponse` 增加 `author`、`source_url`；应用栏在主题按钮左侧新增 bug 图标，仅当前平台来自 GitHub 时显示，跳转到脚本仓库的 `issues/new`。demo 等非 GitHub 来源不显示。
+- **验证**：WeLearn 标题 `WeLearn v0.1.6`、作者 `CometNetworkStudio`、反馈链接 `https://github.com/CometNetworkStudio/welearn/issues/new`；首页无反馈按钮；demo 显示作者但不显示反馈。

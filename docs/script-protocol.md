@@ -144,6 +144,7 @@ Host 启动脚本后，**一个任务一个子进程**：
 
 约束：
 - stdout **只能**输出协议 JSON（一行一个）；调试信息走 stderr。
+- stdin/stdout 一律使用 **UTF-8**；Host 会为 Python 注入 `PYTHONUTF8=1`、`PYTHONIOENCODING=utf-8`，SDK 也会强制 UTF-8 并以 UTF-8 字节写出。
 - 非协议输出会被忽略，并在任务日志中给出一次警告。
 - 凭据只来自请求，禁止落盘/打印。
 - 若进程 EOF 前没有终止事件，Host 判定为 `failed`。
@@ -224,14 +225,26 @@ python main.py --cli --action time --param cid=2416 --credential username=u --cr
   `{"type":"items","items":[{"key":"...","fields":{...}}]}`。
 - manifest 用 `discovery` 声明展示 schema（不新增平台也无需改前端）：
   ```json
-  "discovery": { "label": "课程", "columns": [{"key":"cid","label":"课程ID","type":"text"}], "actions": ["time","progress"] }
+  "discovery": {
+    "label": "课程",
+    "primary": "name",
+    "columns": [
+      {"key": "name", "label": "课程名", "type": "text", "important": true},
+      {"key": "cid", "label": "课程ID", "type": "text"},
+      {"key": "per", "label": "进度", "type": "progress", "important": true},
+      {"key": "study_time", "label": "学习时长", "type": "text", "important": true, "sort": "duration"}
+    ],
+    "actions": ["time", "progress"]
+  }
   ```
 - 后端缓存每个用户在平台的条目，并按 `discovery.min_interval`（默认 60s）限流刷新。
 - manifest 顶层可选 `"icon": "mdi-xxx"`，用于前端侧栏/平台页图标；缺省用 `mdi-puzzle-outline` 兜底。
 - `discovery.primary` 可选，指定卡片视图的主字段（列 key），缺省用第一列。
+- `columns[].important` 可选：任一列标记 `true` 时，表格只展示这些重要列，其余列收进「详细信息」对话框；都不标记时沿用旧行为展示全部列。卡片视图始终展示全部列。
+- `columns[].sort` 可选：`number`、`percent`、`duration`、`date`、`text`，前端用它决定表头排序规则；缺省按 `type` 和文本自然排序。不同脚本的字段格式不同，建议为时长/百分比/编号显式标注。
 - `columns[].type` 建议取值（前端据此渲染，值仍是字符串）：
   - `text`（默认）、`number`、`date`
-  - `progress`：值为 `60%` 或 `0.6` → 进度条
+  - `progress`：值为 `60%` 或 `0.6` → 进度条/卡片进度环
   - `chip`：值为 `"已完成:success"`（冒号后为可选颜色）→ 彩色标签
   - `sparkline`：值为逗号分隔数字（如 `"1,2,3,5,4"`）→ 迷你折线图
-- 平台页会为每条条目按 `discovery.actions` 渲染执行按钮；未列出的动作不显示。
+- 平台页表格行提供「动作」菜单（列出 `discovery.actions`）和「详细信息」图标按钮（tooltip + 弹窗展示全部字段）；卡片视图直接展示全部字段与动作。未列出的动作不显示。
