@@ -7,7 +7,7 @@ import { tasksApi } from '@/api/services/tasks'
 import { credentialsApi } from '@/api/services/credentials'
 import { usePlatformsStore } from '@/stores/platforms'
 import { useUiStore } from '@/stores/ui'
-import { buildParams } from '@/utils/taskParams'
+import { buildParams, compareFieldValues, parseProgress } from '@/utils/taskParams'
 import { formatAgo } from '@/utils/format'
 import DataTable from '@/components/DataTable.vue'
 import PlatformField from '@/components/PlatformField.vue'
@@ -17,7 +17,7 @@ const VIEW_KEY = 'omnitask_platform_view'
 
 const route = useRoute()
 const router = useRouter()
-const { mobile } = useDisplay()
+const { smAndDown } = useDisplay()
 const platforms = usePlatformsStore()
 const ui = useUiStore()
 
@@ -29,11 +29,13 @@ const executing = ref(false)
 const search = ref('')
 const credentials = ref([])
 const accountId = ref('')
-const viewMode = ref(localStorage.getItem(VIEW_KEY) || (mobile.value ? 'grid' : 'table'))
+const viewMode = ref(defaultView(smAndDown.value))
 
 const execDialog = ref(false)
 const execTarget = ref(null)
 const execParams = reactive({})
+const detailDialog = ref(false)
+const detailTarget = ref(null)
 const selected = ref([])
 const filterDialog = ref(false)
 const filterParams = reactive({})
@@ -47,18 +49,34 @@ const platformId = computed(() => route.params.id)
 const platform = computed(() => platforms.platform(platformId.value))
 const discovery = computed(() => platform.value?.discovery || null)
 const columns = computed(() => discovery.value?.columns || [])
-const execFields = computed(() => {
+const execAllFields = computed(() => {
   const fields = execTarget.value?.action?.params || []
   return fields.length ? fields : platform.value?.params || []
 })
 const primaryKey = computed(() => discovery.value?.primary || columns.value[0]?.key || '')
+const progressColumn = computed(() => columns.value.find((col) => col.type === 'progress') || null)
+const hasImportantColumns = computed(() => columns.value.some((col) => col.important === true))
+const importantColumns = computed(() =>
+  hasImportantColumns.value ? columns.value.filter((col) => col.important === true) : columns.value,
+)
 const selectedItems = computed(() => items.value.filter((item) => selected.value.includes(item.key)))
 const batchAction = computed(() => listActions.value.find((action) => action.id === batchActionId.value))
-const batchFields = computed(() => {
+const batchAllFields = computed(() => {
   const fields = batchAction.value?.params || []
   return fields.length ? fields : platform.value?.params || []
 })
-const otherColumns = computed(() => columns.value.filter((c) => c.key !== primaryKey.value))
+const fixedParamKeys = computed(() => new Set(Object.keys(discovery.value?.param_map || {})))
+const execFields = computed(() =>
+  execAllFields.value.filter((field) => !execTarget.value?.item || !fixedParamKeys.value.has(field.key)),
+)
+const batchFields = computed(() =>
+  batchAllFields.value.filter((field) => !selectedItems.value.length || !fixedParamKeys.value.has(field.key)),
+)
+const otherColumns = computed(() => columns.value.filter((col) => col.key !== primaryKey.value))
+const detailColumns = computed(() => otherColumns.value.filter((col) => col.type !== 'progress'))
+const summaryColumns = computed(() =>
+  importantColumns.value.filter((col) => col.key !== primaryKey.value && col.type !== 'progress'),
+)
 
 const listActions = computed(() => {
   const all = platform.value?.actions || []
@@ -74,7 +92,14 @@ const accountOptions = computed(() =>
 )
 
 const headers = computed(() => [
-  ...columns.value.map((col) => ({ title: col.label, key: `f_${col.key}`, type: col.type })),
+  ...importantColumns.value.map((col) => ({
+    title: col.label,
+    key: `f_${col.key}`,
+    type: col.type,
+    minWidth: col.type === 'progress' ? 180 : undefined,
+    sortable: true,
+    sortRaw: (a, b) => compareFieldValues(a.fields?.[col.key], b.fields?.[col.key], col),
+  })),
   { title: '', key: 'actions', sortable: false, align: 'end' },
 ])
 
@@ -86,11 +111,25 @@ const filteredItems = computed(() => {
   )
 })
 
+function defaultView(small) {
+  const saved = localStorage.getItem(`${VIEW_KEY}:${small ? 'small' : 'large'}`)
+  return saved || (small ? 'grid' : 'table')
+}
+
 function fieldSlot(key) {
   return `item.f_${key}`
 }
 
-watch(viewMode, (mode) => localStorage.setItem(VIEW_KEY, mode))
+function progressValue(item) {
+  return parseProgress(item?.fields?.[progressColumn.value?.key])
+}
+
+watch(viewMode, (mode) =>
+  localStorage.setItem(`${VIEW_KEY}:${smAndDown.value ? 'small' : 'large'}`, mode),
+)
+watch(smAndDown, (small) => {
+  viewMode.value = defaultView(small)
+})
 watch(
   () => selected.value.length,
   (count) => {
@@ -222,6 +261,11 @@ async function confirmBatch() {
   }
 }
 
+function openDetail(item) {
+  detailTarget.value = item
+  detailDialog.value = true
+}
+
 function openExecute(action, item) {
   execTarget.value = { action, item }
   for (const key of Object.keys(execParams)) delete execParams[key]
@@ -266,7 +310,7 @@ async function confirmExecute() {
           <div class="platform-title d-none d-md-block">
             <div class="text-title-medium text-truncate">{{ platform?.name || platformId }}</div>
             <div class="d-none d-lg-block text-body-small text-medium-emphasis text-truncate">
-              v{{ platform?.version || '?' }}{{ discovery?.label ? `（${discovery.label}）` : '' }}
+              {{ platform?.author || '未知作者' }}
             </div>
           </div>
         </div>
@@ -381,20 +425,48 @@ async function confirmExecute() {
           item-value="key"
           show-select
         >
-          <template v-for="col in columns" :key="col.key" #[fieldSlot(col.key)]="{ item }">
-            <PlatformField :value="item.fields[col.key]" :type="col.type" />
+          <template v-for="col in importantColumns" :key="col.key" #[fieldSlot(col.key)]="{ item }">
+            <div v-if="col.type === 'progress'" class="d-flex align-center ga-3">
+              <v-progress-linear
+                :model-value="parseProgress(item.fields[col.key])"
+                height="6"
+                rounded
+                color="primary"
+                class="flex-grow-1"
+              />
+              <span class="text-body-small text-medium-emphasis">
+                {{ parseProgress(item.fields[col.key]) }}%
+              </span>
+            </div>
+            <PlatformField v-else :value="item.fields[col.key]" :type="col.type" />
           </template>
           <template #item.actions="{ item }">
             <div class="d-flex align-center justify-end ga-1">
-              <v-btn
-                v-for="action in listActions"
-                :key="action.id"
-                size="small"
-                variant="tonal"
-                color="primary"
-                @click="openExecute(action, item)"
-              >
-                {{ action.name }}
+              <v-menu v-if="listActions.length" location="bottom end">
+                <template #activator="{ props: menuProps }">
+                  <v-btn
+                    v-bind="menuProps"
+                    size="small"
+                    variant="tonal"
+                    color="primary"
+                    prepend-icon="mdi-play"
+                  >
+                    动作
+                  </v-btn>
+                </template>
+                <v-list density="compact">
+                  <v-list-item
+                    v-for="action in listActions"
+                    :key="action.id"
+                    :title="action.name"
+                    prepend-icon="mdi-play-circle-outline"
+                    @click="openExecute(action, item)"
+                  />
+                </v-list>
+              </v-menu>
+              <v-btn size="small" variant="text" icon aria-label="详细信息" @click.stop="openDetail(item)">
+                <v-icon icon="mdi-information-outline" />
+                <v-tooltip activator="parent" location="bottom">详细信息</v-tooltip>
               </v-btn>
             </div>
           </template>
@@ -409,20 +481,31 @@ async function confirmExecute() {
           <v-card class="h-100 d-flex flex-column">
             <v-card-item>
               <template #append>
-                <v-checkbox-btn
-                  v-model="selected"
-                  :value="item.key"
-                  color="primary"
-                  density="compact"
-                  hide-details
-                  :aria-label="'选择 ' + item.fields[primaryKey]"
-                />
+                <div class="d-flex align-center ga-3">
+                  <v-progress-circular
+                    v-if="progressColumn"
+                    :model-value="progressValue(item)"
+                    :color="progressValue(item) >= 100 ? 'success' : 'primary'"
+                    :size="52"
+                    :width="5"
+                  >
+                    <span class="text-label-small">{{ progressValue(item) }}%</span>
+                  </v-progress-circular>
+                  <v-checkbox-btn
+                    v-model="selected"
+                    :value="item.key"
+                    color="primary"
+                    density="compact"
+                    hide-details
+                    :aria-label="'选择 ' + item.fields[primaryKey]"
+                  />
+                </div>
               </template>
-              <v-card-title class="text-title-medium">{{ item.fields[primaryKey] }}</v-card-title>
+              <v-card-title class="text-title-medium text-wrap">{{ item.fields[primaryKey] }}</v-card-title>
             </v-card-item>
             <v-card-text class="flex-grow-1">
               <div
-                v-for="col in otherColumns"
+                v-for="col in detailColumns"
                 :key="col.key"
                 class="d-flex align-center justify-space-between ga-3 mb-2"
               >
@@ -468,10 +551,12 @@ async function confirmExecute() {
         <v-card-item>
           <v-card-title class="text-title-large">筛选</v-card-title>
         </v-card-item>
-        <v-card-text>
-          <ParamFields :fields="filterFields" :values="filterParams" />
+        <v-card-text class="d-flex flex-column ga-4">
+          <div class="d-flex flex-column ga-4">
+            <ParamFields :fields="filterFields" :values="filterParams" />
+          </div>
         </v-card-text>
-        <v-card-actions class="justify-end">
+        <v-card-actions class="justify-end ga-2 pa-4">
           <v-btn variant="text" @click="clearFilter">清空</v-btn>
           <v-btn variant="text" @click="filterDialog = false">取消</v-btn>
           <v-btn color="primary" @click="applyFilter">应用</v-btn>
@@ -485,7 +570,7 @@ async function confirmExecute() {
           <v-card-title class="text-title-large">批量执行</v-card-title>
           <v-card-subtitle>{{ selectedItems.length }} 个条目</v-card-subtitle>
         </v-card-item>
-        <v-card-text>
+        <v-card-text class="d-flex flex-column ga-4">
           <v-select
             v-model="batchActionId"
             :items="listActions"
@@ -494,9 +579,11 @@ async function confirmExecute() {
             label="动作"
             @update:model-value="onBatchActionChange"
           />
-          <ParamFields :fields="batchFields" :values="batchParams" />
+          <div class="d-flex flex-column ga-4">
+            <ParamFields :fields="batchFields" :values="batchParams" />
+          </div>
         </v-card-text>
-        <v-card-actions class="justify-end">
+        <v-card-actions class="justify-end ga-2 pa-4">
           <v-btn variant="text" @click="batchDialog = false">取消</v-btn>
           <v-btn color="primary" :loading="batchSubmitting" @click="confirmBatch">执行</v-btn>
         </v-card-actions>
@@ -511,27 +598,79 @@ async function confirmExecute() {
             {{ execTarget.action.description }}
           </v-card-subtitle>
         </v-card-item>
-        <v-card-text>
-          <template v-if="execTarget?.item">
-            <v-list density="compact" class="mb-2">
-              <v-list-item v-for="col in columns" :key="col.key">
-                <v-list-item-title class="text-body-small text-medium-emphasis">{{ col.label }}</v-list-item-title>
+        <v-card-text class="d-flex flex-column ga-4">
+          <v-sheet
+            v-if="execTarget?.item"
+            color="primary-light"
+            rounded="xl"
+            class="pa-4"
+          >
+            <div class="d-flex align-center justify-space-between ga-4">
+              <div class="text-title-medium">{{ execTarget.item.fields[primaryKey] }}</div>
+              <v-progress-circular
+                v-if="progressColumn"
+                :model-value="progressValue(execTarget.item)"
+                :color="progressValue(execTarget.item) >= 100 ? 'success' : 'primary'"
+                :size="44"
+                :width="4"
+              >
+                <span class="text-label-small">{{ progressValue(execTarget.item) }}%</span>
+              </v-progress-circular>
+            </div>
+            <div class="d-flex flex-wrap ga-4 mt-2">
+              <div v-for="col in summaryColumns" :key="col.key">
+                <div class="text-label-medium text-medium-emphasis">{{ col.label }}</div>
                 <PlatformField :value="execTarget.item.fields[col.key]" :type="col.type" />
-              </v-list-item>
-            </v-list>
-          </template>
+              </div>
+            </div>
+          </v-sheet>
           <v-expansion-panels v-if="execFields.length" variant="accordion" flat>
             <v-expansion-panel>
               <v-expansion-panel-title class="text-body-medium">执行参数</v-expansion-panel-title>
               <v-expansion-panel-text>
-                <ParamFields :fields="execFields" :values="execParams" />
+                <div class="d-flex flex-column ga-4">
+                  <ParamFields :fields="execFields" :values="execParams" />
+                </div>
               </v-expansion-panel-text>
             </v-expansion-panel>
           </v-expansion-panels>
         </v-card-text>
-        <v-card-actions class="justify-end">
+        <v-card-actions class="justify-end ga-2 pa-4">
           <v-btn variant="text" @click="execDialog = false">取消</v-btn>
           <v-btn color="primary" :loading="executing" @click="confirmExecute">执行</v-btn>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
+
+    <v-dialog v-model="detailDialog" max-width="720">
+      <v-card>
+        <v-card-item>
+          <v-card-title class="text-title-large text-wrap">
+            {{ detailTarget?.fields[primaryKey] }}
+          </v-card-title>
+          <v-card-subtitle>详细信息</v-card-subtitle>
+        </v-card-item>
+        <v-card-text class="d-flex flex-column ga-4">
+          <div v-if="progressColumn" class="d-flex align-center justify-space-between ga-4">
+            <span class="text-body-medium text-medium-emphasis">{{ progressColumn.label }}</span>
+            <v-progress-circular
+              :model-value="progressValue(detailTarget)"
+              :color="progressValue(detailTarget) >= 100 ? 'success' : 'primary'"
+              :size="48"
+              :width="5"
+            >
+              <span class="text-label-small">{{ progressValue(detailTarget) }}%</span>
+            </v-progress-circular>
+          </div>
+          <v-row density="comfortable">
+            <v-col v-for="col in detailColumns" :key="col.key" cols="12" sm="6">
+              <div class="text-label-medium text-medium-emphasis">{{ col.label }}</div>
+              <PlatformField :value="detailTarget?.fields[col.key]" :type="col.type" />
+            </v-col>
+          </v-row>
+        </v-card-text>
+        <v-card-actions class="justify-end pa-4">
+          <v-btn variant="text" @click="detailDialog = false">关闭</v-btn>
         </v-card-actions>
       </v-card>
     </v-dialog>

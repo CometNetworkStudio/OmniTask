@@ -2,7 +2,10 @@ package service
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
+	"strings"
+	"time"
 
 	v1 "backend/api/v1"
 	"backend/internal/model"
@@ -73,6 +76,60 @@ func (s *UserService) SetEnabled(ctx context.Context, id string, enabled bool) (
 		return nil, err
 	}
 	return s.Me(ctx, id)
+}
+
+// Preferences 返回用户界面偏好；没有记录时返回空列表。
+func (s *UserService) Preferences(ctx context.Context, userID string) (*v1.UserPreferences, error) {
+	pref, err := s.repo.GetPreference(ctx, userID)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return &v1.UserPreferences{PinnedPlatforms: []string{}}, nil
+		}
+		return nil, err
+	}
+	ids := []string{}
+	if pref.PinnedPlatforms != "" {
+		_ = json.Unmarshal([]byte(pref.PinnedPlatforms), &ids)
+	}
+	if ids == nil {
+		ids = []string{}
+	}
+	return &v1.UserPreferences{PinnedPlatforms: ids}, nil
+}
+
+// UpdatePreferences 覆盖保存用户置顶平台列表。
+func (s *UserService) UpdatePreferences(ctx context.Context, userID string, req *v1.UpdatePreferencesRequest) (*v1.UserPreferences, error) {
+	ids := sanitizePinnedPlatforms(req.PinnedPlatforms)
+	raw, err := json.Marshal(ids)
+	if err != nil {
+		return nil, err
+	}
+	pref := &model.UserPreference{
+		UserID:          userID,
+		PinnedPlatforms: string(raw),
+		UpdatedAt:       time.Now(),
+	}
+	if err := s.repo.SavePreference(ctx, pref); err != nil {
+		return nil, err
+	}
+	return &v1.UserPreferences{PinnedPlatforms: ids}, nil
+}
+
+func sanitizePinnedPlatforms(values []string) []string {
+	seen := make(map[string]bool, len(values))
+	out := make([]string, 0, len(values))
+	for _, value := range values {
+		value = strings.TrimSpace(value)
+		if value == "" || len(value) > 64 || seen[value] {
+			continue
+		}
+		seen[value] = true
+		out = append(out, value)
+		if len(out) >= 100 {
+			break
+		}
+	}
+	return out
 }
 
 func toUserResponse(user *model.User) *v1.UserResponse {

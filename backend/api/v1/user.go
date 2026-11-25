@@ -17,3 +17,11 @@ type UpdateRoleRequest struct {
 type SetEnabledRequest struct {
 	Enabled bool `json:"enabled"`
 }
+
+type UserPreferences struct {
+	PinnedPlatforms []string `json:"pinned_platforms"`
+}
+
+type UpdatePreferencesRequest struct {
+	PinnedPlatforms []string `json:"pinned_platforms"`
+}

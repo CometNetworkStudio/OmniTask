@@ -2,6 +2,7 @@
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { tasksApi } from '@/api/services/tasks'
+import { platformsApi } from '@/api/services/platforms'
 import { usePlatformsStore } from '@/stores/platforms'
 import { useUiStore } from '@/stores/ui'
 import { formatTime, statusMeta } from '@/utils/format'
@@ -16,6 +17,7 @@ const platforms = usePlatformsStore()
 const task = ref(null)
 const events = ref([])
 const loading = ref(false)
+const discoveryItems = ref([])
 let socket = null
 
 const canCancel = computed(() => ['pending', 'queued', 'running'].includes(task.value?.status))
@@ -99,7 +101,65 @@ const resultEntries = computed(() => {
 const hasResult = computed(
   () => (isTableResult.value && resultRows.value.length) || (isLinksResult.value && resultLinks.value.length) || resultEntries.value.length,
 )
-const paramsEntries = computed(() => Object.entries(task.value?.params || {}))
+const platform = computed(() => platforms.platform(task.value?.platform))
+const paramFields = computed(() => {
+  const fields = action.value?.params?.length ? action.value.params : platform.value?.params || []
+  return fields
+})
+const discoveryPrimary = computed(() => {
+  const disc = platform.value?.discovery
+  return disc?.primary || disc?.columns?.[0]?.key || ''
+})
+const readableParams = computed(() => {
+  const values = task.value?.params || {}
+  const fields = paramFields.value
+  const byKey = new Map(fields.map((field) => [field.key, field]))
+  const keys = [
+    ...fields.map((field) => field.key),
+    ...Object.keys(values).filter((key) => !byKey.has(key)),
+  ]
+  const discovery = platform.value?.discovery
+  const paramMap = discovery?.param_map || {}
+  const titleKey = discoveryPrimary.value
+  const out = []
+  for (const key of keys) {
+    if (!(key in values) || key.startsWith('__')) continue
+    const raw = values[key]
+    const field = byKey.get(key)
+    const mappedField = paramMap[key]
+    let label = field?.label || prettyKey(key)
+    let display = paramValue(raw, field)
+    let highlight = false
+    if (mappedField) {
+      label = discovery?.label || label
+      const item = discoveryItems.value.find(
+        (entry) => String(entry.fields?.[mappedField]) === String(raw),
+      )
+      if (item) {
+        display = String(item.fields?.[titleKey] || raw)
+        highlight = true
+      } else {
+        display = String(raw ?? '')
+      }
+    }
+    if (!display || display === 'false') continue
+    out.push({ key, label, display, highlight })
+  }
+  return out
+})
+
+function paramValue(raw, field) {
+  if (raw === null || raw === undefined || raw === '') return ''
+  if (field?.type === 'switch') {
+    return raw === true || raw === 'true' || raw === 1 || raw === '1' ? '开启' : ''
+  }
+  const text = String(raw)
+  if (field?.key === 'limit' && Number(raw) === 0) return ''
+  if (/accuracy|正确率/i.test(`${field?.key || ''} ${field?.label || ''}`)) {
+    return /^\d+(\.\d+)?$/.test(text) ? `${text}%` : text
+  }
+  return text
+}
 
 const LEVEL_META = {
   debug: { text: '调试', color: 'grey' },
@@ -235,6 +295,16 @@ async function loadEvents() {
   }
 }
 
+async function loadDiscoveryItems() {
+  if (!task.value?.platform) return
+  try {
+    const data = await platformsApi.items(task.value.platform, task.value.credential_id)
+    discoveryItems.value = data.items || []
+  } catch {
+    discoveryItems.value = []
+  }
+}
+
 onMounted(async () => {
   platforms.load().catch(() => {})
   try {
@@ -243,6 +313,7 @@ onMounted(async () => {
     ui.notify(err.message, 'error')
     return
   }
+  loadDiscoveryItems()
   socket = connectTaskSocket(route.params.id, { onEvent: mergeEvent })
   await loadEvents()
 })
@@ -308,17 +379,22 @@ onBeforeUnmount(() => socket?.close())
           {{ task.error }}
         </v-alert>
 
-        <template v-if="paramsEntries.length">
+        <template v-if="readableParams.length">
           <div class="text-title-small mt-6 mb-2">参数</div>
-          <v-chip
-            v-for="[key, value] in paramsEntries"
-            :key="key"
-            size="small"
-            variant="tonal"
-            class="me-1 mb-1"
-          >
-            {{ prettyKey(key) }}: {{ value }}
-          </v-chip>
+          <div class="d-flex flex-wrap ga-2">
+            <v-chip
+              v-for="item in readableParams"
+              :key="item.key"
+              size="small"
+              variant="tonal"
+              :color="item.highlight ? 'primary' : undefined"
+            >
+              <span :class="item.highlight ? 'font-weight-medium' : 'text-medium-emphasis'" class="me-1">
+                {{ item.label }}
+              </span>
+              <span>{{ item.display }}</span>
+            </v-chip>
+          </div>
         </template>
       </v-card-text>
     </v-card>

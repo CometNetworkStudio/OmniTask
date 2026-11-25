@@ -5,6 +5,7 @@ import { useDisplay, useTheme } from 'vuetify'
 import { useAuthStore } from '@/stores/auth'
 import { usePlatformsStore } from '@/stores/platforms'
 import { useUiStore } from '@/stores/ui'
+import { preferencesApi } from '@/api/services/preferences'
 
 const auth = useAuthStore()
 const platforms = usePlatformsStore()
@@ -17,9 +18,64 @@ const { mobile } = useDisplay()
 const drawer = ref(!mobile.value)
 const userMenu = ref(false)
 const openGroups = reactive({ '/tasks': false })
+const pinnedPlatformIds = ref([])
+const activeNavKey = ref('')
+let navSource = ''
+
+function isPinned(platformId) {
+  return pinnedPlatformIds.value.includes(platformId)
+}
+
+const pinnedItems = computed(() =>
+  pinnedPlatformIds.value
+    .map((id) => platforms.list.find((p) => p.id === id))
+    .filter(Boolean)
+    .map((p) => ({
+      title: p.name,
+      to: `/platforms/${p.id}`,
+      icon: p.icon || 'mdi-puzzle-outline',
+      platformId: p.id,
+    })),
+)
 
 function toggleGroup(key) {
   openGroups[key] = !openGroups[key]
+}
+
+async function loadPreferences() {
+  try {
+    const data = await preferencesApi.get()
+    pinnedPlatformIds.value = Array.isArray(data?.pinned_platforms) ? data.pinned_platforms : []
+  } catch {
+    pinnedPlatformIds.value = []
+  }
+}
+
+async function togglePin(platformId) {
+  const wasPinned = isPinned(platformId)
+  const next = wasPinned
+    ? pinnedPlatformIds.value.filter((id) => id !== platformId)
+    : [...pinnedPlatformIds.value, platformId]
+  const previous = [...pinnedPlatformIds.value]
+  pinnedPlatformIds.value = next
+  if (wasPinned && activeNavKey.value === `pin:${platformId}`) {
+    activeNavKey.value = route.path === `/platforms/${platformId}` ? `task:${platformId}` : ''
+  }
+  try {
+    await preferencesApi.update(next)
+  } catch (err) {
+    pinnedPlatformIds.value = previous
+    ui.notify(err.message, 'error')
+  }
+}
+
+function navigatePlatform(platformId, source) {
+  activeNavKey.value = `${source}:${platformId}`
+  const target = `/platforms/${platformId}`
+  if (route.path !== target) {
+    navSource = source
+    router.push(target)
+  }
 }
 
 watch(mobile, (isMobile) => {
@@ -36,28 +92,30 @@ const navGroups = computed(() => {
   const groups = [
     {
       title: '概览',
-      items: [
-        { title: '首页', to: '/home', icon: 'mdi-home-outline' },
-      ],
-    },
-    {
-      title: '任务',
-      items: [
-        {
-          title: '任务',
-          to: '/tasks',
-          icon: 'mdi-clipboard-list-outline',
-          children: platforms.list.map((p) => ({
-            title: p.name,
-            to: `/platforms/${p.id}`,
-            icon: p.icon || 'mdi-puzzle-outline',
-          })),
-        },
-        { title: '凭据', to: '/credentials', icon: 'mdi-key-variant' },
-        { title: '题库', to: '/questions', icon: 'mdi-database-outline' },
-      ],
+      items: [{ title: '首页', to: '/home', icon: 'mdi-home-outline' }],
     },
   ]
+  if (pinnedItems.value.length) {
+    groups.push({ title: 'Pin', items: pinnedItems.value })
+  }
+  groups.push({
+    title: '任务',
+    items: [
+      {
+        title: '任务',
+        to: '/tasks',
+        icon: 'mdi-clipboard-list-outline',
+        children: platforms.list.map((p) => ({
+          title: p.name,
+          to: `/platforms/${p.id}`,
+          icon: p.icon || 'mdi-puzzle-outline',
+          platformId: p.id,
+        })),
+      },
+      { title: '凭据', to: '/credentials', icon: 'mdi-key-variant' },
+      { title: '题库', to: '/questions', icon: 'mdi-database-outline' },
+    ],
+  })
   if (auth.isAdmin) {
     groups.push({
       title: '管理',
@@ -82,7 +140,27 @@ const PAGE_TITLES = {
   users: '用户',
   settings: '设置',
 }
-const currentTitle = computed(() => PAGE_TITLES[route.name] || 'OmniTask')
+const currentTitle = computed(() => {
+  if (route.name === 'platform') {
+    const platform = platforms.platform(route.params.id)
+    if (!platform) return '平台'
+    return platform.version ? `${platform.name} v${platform.version}` : platform.name
+  }
+  return PAGE_TITLES[route.name] || 'OmniTask'
+})
+
+function githubIssuesUrl(source) {
+  const match = String(source || '').match(/github\.com[/:]([^/]+)\/([^/#?]+)/i)
+  if (!match) return ''
+  const repo = match[2].replace(/\.git$/i, '')
+  return `https://github.com/${match[1]}/${repo}/issues/new`
+}
+
+const feedbackUrl = computed(() => {
+  if (route.name !== 'platform') return ''
+  return githubIssuesUrl(platforms.platform(route.params.id)?.source_url)
+})
+
 const avatarLetter = computed(() => (auth.username || '?').charAt(0).toUpperCase())
 const isDark = computed(() => theme.global.name.value === 'dark')
 
@@ -112,12 +190,37 @@ onMounted(() => {
 })
 
 watch(
+  () => auth.user?.id,
+  (id) => {
+    if (id) loadPreferences()
+    else pinnedPlatformIds.value = []
+  },
+  { immediate: true },
+)
+
+watch(
   () => route.path,
   (path) => {
     if (path.startsWith('/platforms')) {
-      openGroups['/tasks'] = true
+      if (navSource !== 'pin') {
+        openGroups['/tasks'] = true
+      }
+      navSource = ''
     } else if (path !== '/tasks') {
       openGroups['/tasks'] = false
+      navSource = ''
+    } else {
+      navSource = ''
+    }
+    if (path.startsWith('/platforms/') && route.params.id) {
+      const id = String(route.params.id)
+      const pinKey = `pin:${id}`
+      const taskKey = `task:${id}`
+      if (activeNavKey.value !== pinKey && activeNavKey.value !== taskKey) {
+        activeNavKey.value = taskKey
+      }
+    } else {
+      activeNavKey.value = ''
     }
   },
   { immediate: true },
@@ -164,25 +267,58 @@ watch(
                       <v-list-item
                         v-for="child in item.children"
                         :key="child.to"
-                        :to="child.to"
                         :prepend-icon="child.icon"
                         :title="child.title"
+                        :active="child.platformId ? activeNavKey === 'task:' + child.platformId : undefined"
                         color="primary"
                         rounded="xl"
                         class="ps-8"
-                      />
+                        @click="child.platformId && navigatePlatform(child.platformId, 'task')"
+                      >
+                        <template #append>
+                          <v-btn
+                            icon
+                            size="small"
+                            variant="text"
+                            :color="isPinned(child.platformId) ? 'primary' : undefined"
+                            @click.stop.prevent="togglePin(child.platformId)"
+                          >
+                            <v-icon
+                              :icon="isPinned(child.platformId) ? 'mdi-pin' : 'mdi-pin-outline'"
+                              size="small"
+                            />
+                          </v-btn>
+                        </template>
+                      </v-list-item>
                     </div>
                   </v-expand-transition>
                 </template>
                 <v-list-item
                   v-else
-                  :to="item.to"
+                  :to="item.platformId ? undefined : item.to"
                   :prepend-icon="item.icon"
                   :title="item.title"
-                  :value="item.to"
+                  :value="item.platformId ? undefined : item.to"
+                  :active="item.platformId ? activeNavKey === 'pin:' + item.platformId : undefined"
                   color="primary"
                   rounded="xl"
-                />
+                  @click="item.platformId && navigatePlatform(item.platformId, 'pin')"
+                >
+                  <template v-if="item.platformId" #append>
+                    <v-btn
+                      icon
+                      size="small"
+                      variant="text"
+                      :color="isPinned(item.platformId) ? 'primary' : undefined"
+                      @click.stop.prevent="togglePin(item.platformId)"
+                    >
+                      <v-icon
+                        :icon="isPinned(item.platformId) ? 'mdi-pin' : 'mdi-pin-outline'"
+                        size="small"
+                      />
+                    </v-btn>
+                  </template>
+                </v-list-item>
               </template>
             </template>
           </v-list>
@@ -221,6 +357,19 @@ watch(
           {{ currentTitle }}
         </v-app-bar-title>
         <v-spacer />
+
+        <v-btn
+          v-if="feedbackUrl"
+          icon
+          variant="text"
+          :href="feedbackUrl"
+          target="_blank"
+          rel="noopener noreferrer"
+          aria-label="反馈脚本问题"
+          title="反馈脚本问题"
+        >
+          <v-icon icon="mdi-bug-outline" />
+        </v-btn>
 
         <v-btn icon variant="text" :title="isDark ? '切换浅色' : '切换深色'" @click="toggleTheme">
           <v-icon :icon="isDark ? 'mdi-weather-sunny' : 'mdi-weather-night'" />

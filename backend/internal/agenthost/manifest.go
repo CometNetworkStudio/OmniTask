@@ -58,6 +58,8 @@ type Field struct {
 	Max         any        `json:"max"`
 	Step        any        `json:"step"`
 	Multiline   bool       `json:"multiline"`
+	Important   bool       `json:"important"`
+	Sort        string     `json:"sort"`
 }
 
 // ResultSchema 声明结果如何渲染：table（数组/对象表格）、links（链接）或 keyvalue（默认）。

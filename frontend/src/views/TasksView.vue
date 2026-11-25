@@ -280,7 +280,7 @@ async function removeRow(item) {
           <v-card-title class="text-title-large">新建任务</v-card-title>
         </v-card-item>
         <v-card-text>
-          <v-form @submit.prevent="createTask">
+          <v-form class="d-flex flex-column ga-4" @submit.prevent="createTask">
             <v-select
               v-model="form.platform"
               :items="platforms.options"
@@ -298,11 +298,15 @@ async function removeRow(item) {
               @update:model-value="onActionChange"
             />
 
-            <v-divider class="my-4" />
-            <div class="text-title-small mb-2">执行参数</div>
-            <ParamFields :fields="paramSchema" :values="form.params" />
+            <v-divider />
+            <div>
+              <div class="text-title-small mb-3">执行参数</div>
+              <div class="d-flex flex-column ga-4">
+                <ParamFields :fields="paramSchema" :values="form.params" />
+              </div>
+            </div>
 
-            <div class="d-flex justify-end ga-2 mt-4">
+            <div class="d-flex justify-end ga-2">
               <v-btn variant="text" @click="dialog = false">取消</v-btn>
               <v-btn type="submit" color="primary" :loading="submitting">创建</v-btn>
             </div>

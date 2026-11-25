@@ -28,6 +28,29 @@ func (h *UserHandler) Me(ctx *gin.Context) {
 	v1.HandleSuccess(ctx, resp)
 }
 
+func (h *UserHandler) Preferences(ctx *gin.Context) {
+	resp, err := h.svc.Preferences(ctx, GetUserIdFromCtx(ctx))
+	if err != nil {
+		v1.HandleError(ctx, statusFor(err), err, nil)
+		return
+	}
+	v1.HandleSuccess(ctx, resp)
+}
+
+func (h *UserHandler) UpdatePreferences(ctx *gin.Context) {
+	var req v1.UpdatePreferencesRequest
+	if err := ctx.ShouldBindJSON(&req); err != nil {
+		v1.HandleError(ctx, http.StatusBadRequest, v1.ErrBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	resp, err := h.svc.UpdatePreferences(ctx, GetUserIdFromCtx(ctx), &req)
+	if err != nil {
+		v1.HandleError(ctx, statusFor(err), err, nil)
+		return
+	}
+	v1.HandleSuccess(ctx, resp)
+}
+
 func (h *UserHandler) List(ctx *gin.Context) {
 	page, _ := strconv.Atoi(ctx.DefaultQuery("page", "1"))
 	size, _ := strconv.Atoi(ctx.DefaultQuery("size", "0"))

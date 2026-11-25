@@ -20,6 +20,8 @@ type PlatformField struct {
 	Max         any              `json:"max,omitempty"`
 	Step        any              `json:"step,omitempty"`
 	Multiline   bool             `json:"multiline"`
+	Important   bool             `json:"important,omitempty"`
+	Sort        string           `json:"sort,omitempty"`
 }
 
 type PlatformResult struct {
@@ -48,6 +50,8 @@ type PlatformResponse struct {
 	ID          string             `json:"id"`
 	Name        string             `json:"name"`
 	Version     string             `json:"version"`
+	Author      string             `json:"author"`
+	SourceURL   string             `json:"source_url"`
 	Icon        string             `json:"icon"`
 	Runtime     string             `json:"runtime"`
 	Status      string             `json:"status"`

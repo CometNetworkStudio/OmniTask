@@ -18,6 +18,13 @@ type User struct {
 	UpdatedAt    time.Time
 }
 
+// UserPreference 保存用户级界面偏好（当前用于侧边栏置顶平台）。
+type UserPreference struct {
+	UserID          string `gorm:"primaryKey;size:32"`
+	PinnedPlatforms string `gorm:"type:text;not null"` // JSON 数组
+	UpdatedAt       time.Time
+}
+
 // Credential 是用户在某平台的一份凭据，同一用户同一平台可有多份（受平台配置上限约束）。
 // Label/Preview 为非敏感的展示信息（Preview 由后端脱敏生成），Cipher/Nonce 为密文。
 type Credential struct {

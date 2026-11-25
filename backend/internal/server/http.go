@@ -126,6 +126,8 @@ func NewHTTPServer(
 		authed.DELETE("/scripts/:id", deps.ScriptHandler.Uninstall)
 
 		authed.GET("/me", deps.UserHandler.Me)
+		authed.GET("/me/preferences", deps.UserHandler.Preferences)
+		authed.PUT("/me/preferences", deps.UserHandler.UpdatePreferences)
 		authed.GET("/users", deps.UserHandler.List)
 		authed.POST("/users/:id/role", deps.UserHandler.UpdateRole)
 		authed.POST("/users/:id/enable", deps.UserHandler.SetEnabled)

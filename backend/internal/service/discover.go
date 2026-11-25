@@ -176,13 +176,15 @@ func (s *DiscoverService) manifest(ctx context.Context, platform string) *agenth
 func toPlatformResponse(script *model.Script) v1.PlatformResponse {
 	resp := v1.PlatformResponse{
 		ID: script.ID, Name: script.Name, Version: script.Version,
-		Status: script.Status, Actions: []v1.PlatformAction{},
+		SourceURL: script.SourceURL,
+		Status:    script.Status, Actions: []v1.PlatformAction{},
 		Params: []v1.PlatformField{}, Credentials: []v1.PlatformField{},
 	}
 	var m agenthost.Manifest
 	if script.Manifest == "" || json.Unmarshal([]byte(script.Manifest), &m) != nil {
 		return resp
 	}
+	resp.Author = m.Author
 	resp.Runtime = m.Runtime
 	resp.Icon = m.Icon
 	for _, a := range m.Actions {
@@ -219,6 +221,7 @@ func toPlatformField(f agenthost.Field) v1.PlatformField {
 		Key: f.Key, Label: f.Label, Type: f.Type, Default: f.Default,
 		Required: f.Required, Placeholder: f.Placeholder, Help: f.Help,
 		Min: f.Min, Max: f.Max, Step: f.Step, Multiline: f.Multiline,
+		Important: f.Important, Sort: f.Sort,
 	}
 	for _, opt := range f.Options {
 		out.Options = append(out.Options, v1.PlatformOption{Label: opt.Label, Value: opt.Value})

@@ -116,6 +116,7 @@ func NewDB(conf *viper.Viper, l *log.Logger) *gorm.DB {
 			&model.User{}, &model.Credential{}, &model.Task{},
 			&model.TaskEvent{}, &model.Question{}, &model.Script{}, &model.ScriptInstallJob{},
 			&model.PlatformCache{}, &model.CredentialAccessLog{}, &model.PlatformConfig{},
+			&model.UserPreference{},
 		); err != nil {
 			panic(err)
 		}

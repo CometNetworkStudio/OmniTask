@@ -27,6 +27,7 @@ func (m *MigrateServer) Start(ctx context.Context) error {
 		&model.Task{},
 		&model.TaskEvent{},
 		&model.Question{},
+		&model.UserPreference{},
 	); err != nil {
 		m.log.Error("migrate error", zap.Error(err))
 		return err

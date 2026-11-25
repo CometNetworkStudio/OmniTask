@@ -443,6 +443,21 @@ func (repo *UserRepository) SetEnabled(ctx context.Context, id string, enabled b
 		Updates(map[string]interface{}{"enabled": enabled, "updated_at": time.Now()}).Error
 }
 
+func (repo *UserRepository) GetPreference(ctx context.Context, userID string) (*model.UserPreference, error) {
+	var pref model.UserPreference
+	if err := repo.r.DB(ctx).Where("user_id = ?", userID).First(&pref).Error; err != nil {
+		return nil, err
+	}
+	return &pref, nil
+}
+
+func (repo *UserRepository) SavePreference(ctx context.Context, pref *model.UserPreference) error {
+	return repo.r.DB(ctx).Clauses(clause.OnConflict{
+		Columns:   []clause.Column{{Name: "user_id"}},
+		DoUpdates: clause.AssignmentColumns([]string{"pinned_platforms", "updated_at"}),
+	}).Create(pref).Error
+}
+
 type PlatformCacheRepository struct{ r *Repository }
 
 func NewPlatformCacheRepository(r *Repository) *PlatformCacheRepository {
