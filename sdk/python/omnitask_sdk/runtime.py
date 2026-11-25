@@ -39,6 +39,7 @@ def serve(target=None) -> None:
     target：可选。传入 ``run(action, params, credentials)`` 生成器即旧式；
     不传则使用 ``@action`` 注册的动作。discover 使用 ``@listing`` 注册的函数。
     """
+    _force_utf8_stdio()
     handlers = None if callable(target) else registered_actions()
     listers = registered_listings()
     for line in sys.stdin:
@@ -87,9 +88,12 @@ def serve(target=None) -> None:
 
 
 def _run_legacy(run_func, action_id, params, credentials, task_id) -> dict:
+    result: dict = {}
     for event in run_func(action_id, params, credentials):
         _emit_progress(task_id, event)
-    return {}
+        if isinstance(event, dict) and isinstance(event.get("result"), dict) and event["result"]:
+            result = event["result"]
+    return result
 
 
 def _run_action(handlers, action_id, params, credentials, task_id, cancel_event=None) -> dict:
@@ -192,6 +196,21 @@ def _raw_error(task_id: str, message: str) -> None:
     )
 
 
+def _force_utf8_stdio() -> None:
+    """Windows 管道默认使用本地编码（如 cp936），统一强制 UTF-8。"""
+    for stream in (sys.stdin, sys.stdout, sys.stderr):
+        try:
+            stream.reconfigure(encoding="utf-8")
+        except Exception:  # noqa: BLE001 - 某些被替换的流没有 reconfigure
+            pass
+
+
 def _emit(obj: dict) -> None:
-    sys.stdout.write(json.dumps(obj, ensure_ascii=False) + "\n")
-    sys.stdout.flush()
+    data = json.dumps(obj, ensure_ascii=False) + "\n"
+    buffer = getattr(sys.stdout, "buffer", None)
+    if buffer is not None:
+        buffer.write(data.encode("utf-8"))
+        buffer.flush()
+    else:
+        sys.stdout.write(data)
+        sys.stdout.flush()

@@ -154,6 +154,10 @@ func (h *Host) scriptEnv(env []string, script Script, workspace, taskID, proxy s
 		}
 		env = setEnv(env, "PYTHONPATH", path)
 	}
+	// Windows 下脚本 stdout/stdin 走管道时默认本地编码（如 cp936），
+	// 与 Host 的 UTF-8 JSON 不一致，会产出 U+FFFD 乱码。
+	env = setEnv(env, "PYTHONUTF8", "1")
+	env = setEnv(env, "PYTHONIOENCODING", "utf-8")
 	if h.bankAddr != "" {
 		env = setEnv(env, "OMNITASK_BANK_ADDR", h.bankAddr)
 		env = setEnv(env, "OMNITASK_BANK_MODE", "grpc")
