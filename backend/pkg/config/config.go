@@ -46,7 +46,7 @@ agent:
   task_timeout: 0s
   global_concurrency: 4
   platform_concurrency: 2
-  auto_install_deps: false
+  auto_install_deps: true
   pip_index_url: ""
   autostart: true
   bin: ""

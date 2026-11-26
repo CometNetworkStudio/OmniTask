@@ -18,6 +18,8 @@ agent:
   global_concurrency: 4
   platform_concurrency: 2
   autostart: false
+  auto_install_deps: true
+  pip_index_url: "https://pypi.tuna.tsinghua.edu.cn/simple"
   workspaces_dir: ../workspaces
   rate_dir: ../rate
   max_processes: 8

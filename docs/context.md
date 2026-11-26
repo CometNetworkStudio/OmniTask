@@ -341,6 +341,7 @@ cd frontend && npm run build
 - 删除 Nunu 遗留：`backend/cmd/task`、`backend/cmd/migration`、`backend/scripts/`；精简 `backend/Makefile`。
 - 补测试：`internal/service`（pagination/user，in-memory SQLite）、`pkg/authz`（Casbin RBAC）。
 - 依赖自动安装：安装脚本时若含 `requirements.txt` 且有 `agent.auto_install_deps: true`，在脚本目录建独立 `.venv` 并 pip 安装（`agent.pip_index_url` 可配加速源）；Host **优先使用脚本自带 `.venv` 的解释器**。
+- 2026-11 调整：默认开启 `auto_install_deps`（部署/本地配置与默认模板），安装进度显示「安装依赖」阶段；部署配置的 pip 源指向清华镜像。
 - 脚本页安装增加 indeterminate 进度条与步骤文案；安装请求超时放宽到 10 分钟。
 - 抽屉宽度改回 Vuetify 默认（移除 `width="280"`）。
 
