@@ -1,7 +1,8 @@
 # OmniTask full 模式（Docker Compose）
-# 首次启动后 server 会为空白的 jwt.key/master_key 生成随机值并回写本文件。
+# 首次启动后 server 会为空白 master_key 生成随机值并回写本文件。
 # 生产环境请同时修改 MySQL 密码，并同步修改 data.db.user.dsn。
 mode: full
+env: prod
 
 http:
   host: 0.0.0.0
@@ -41,9 +42,18 @@ agent:
   keep_versions: 3
 
 security:
+  # open / invite / closed；公开部署建议 invite 或 closed。
   registration: open
-  jwt:
-    key: ""
+  invite_code: ""
+  allow_first_user_admin: true
+  auth_rate_limit_per_minute: 20
+  login_max_failures: 5
+  login_window_minutes: 15
+  session_ttl_hours: 168
+  cookie_secure: auto
+  cookie_same_site: lax
+  cookie_domain: ""
+  ws_allowed_origins: ""
   master_key: ""
 
 data:
@@ -64,6 +74,8 @@ pagination:
   max: 1000
 task:
   max_active_per_user: 20
+  daily_tasks_per_user: 0
+  max_pending_per_user: 0
   max_pending: 500
 discovery:
   min_interval: 60

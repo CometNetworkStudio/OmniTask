@@ -21,6 +21,7 @@ backend/storage/logs/
 # deploy secrets (not in repo)
 backend/config/deploy.yml
 backend/config/*.overrides.*
+deploy/docker-compose/config.prod.yml
 /backend/migrate
 /scripts/
 /scripts-src/

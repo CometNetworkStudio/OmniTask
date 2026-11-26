@@ -21,8 +21,6 @@ agent:
   keep_versions: 3
 
 security:
-  jwt:
-    key: ""
   master_key: ""
 
 log:

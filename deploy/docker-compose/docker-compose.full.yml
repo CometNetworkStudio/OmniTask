@@ -40,13 +40,16 @@ services:
     container_name: omnitask-server
     restart: unless-stopped
     init: true
+    environment:
+      OMNITASK_ADMIN_USER: ${OMNITASK_ADMIN_USER:-admin}
+      OMNITASK_ADMIN_PASSWORD: ${OMNITASK_ADMIN_PASSWORD:-}
     depends_on:
       omnitask-db:
         condition: service_healthy
       omnitask-redis:
         condition: service_healthy
     volumes:
-      - ./config.full.yml:/config-template/config.yml:ro
+      - ${OMNITASK_CONFIG_TEMPLATE:-./config.full.yml}:/config-template/config.yml:ro
       - omnitask-server-config:/config
       - omnitask-data:/data
     healthcheck:
@@ -101,7 +104,7 @@ services:
       omnitask-server:
         condition: service_healthy
     ports:
-      - "${OMNITASK_PORT:-4096}:80"
+      - "${OMNITASK_BIND:-127.0.0.1}:${OMNITASK_PORT:-4096}:80"
     volumes:
       - ./nginx.conf:/etc/nginx/conf.d/default.conf:ro
 
