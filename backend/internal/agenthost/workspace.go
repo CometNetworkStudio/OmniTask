@@ -141,6 +141,29 @@ func envValue(env []string, key string) string {
 	return ""
 }
 
+// baseEnv 只传递脚本运行所需的系统变量，避免把服务端密钥、数据库连接等泄漏给脚本。
+func baseEnv() []string {
+	keys := []string{
+		"PATH", "Path", "PATHEXT", "SystemRoot", "SYSTEMROOT", "WINDIR", "windir",
+		"SystemDrive", "ComSpec", "COMSPEC", "NUMBER_OF_PROCESSORS",
+		"PROCESSOR_ARCHITECTURE", "OS", "LANG", "LC_ALL", "LC_CTYPE", "TZ",
+		"HTTP_PROXY", "HTTPS_PROXY", "NO_PROXY", "http_proxy", "https_proxy", "no_proxy",
+	}
+	seen := map[string]bool{}
+	out := make([]string, 0, len(keys))
+	for _, key := range keys {
+		upper := strings.ToUpper(key)
+		if seen[upper] {
+			continue
+		}
+		seen[upper] = true
+		if value, ok := os.LookupEnv(key); ok {
+			out = append(out, key+"="+value)
+		}
+	}
+	return out
+}
+
 // scriptEnv 注入任务工作区、SDK、题库和代理环境。
 func (h *Host) scriptEnv(env []string, script Script, workspace, taskID, proxy string) []string {
 	env = setEnv(env, "OMNITASK_TASK_ID", taskID)
@@ -175,6 +198,8 @@ func (h *Host) scriptEnv(env []string, script Script, workspace, taskID, proxy s
 	env = setEnv(env, "TMP", tmp)
 	env = setEnv(env, "HOME", home)
 	env = setEnv(env, "USERPROFILE", home)
+	env = setEnv(env, "APPDATA", filepath.Join(workspace, ".config"))
+	env = setEnv(env, "LOCALAPPDATA", filepath.Join(workspace, ".cache"))
 	env = setEnv(env, "XDG_CACHE_HOME", filepath.Join(workspace, ".cache"))
 	env = setEnv(env, "XDG_CONFIG_HOME", filepath.Join(workspace, ".config"))
 	return env

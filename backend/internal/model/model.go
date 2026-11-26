@@ -70,7 +70,7 @@ type CredentialAccessLog struct {
 
 type Task struct {
 	ID           string `gorm:"primaryKey;size:32"`
-	UserID       string `gorm:"index;size:32;not null"`
+	UserID       string `gorm:"index:idx_tasks_user_created,priority:1;size:32;not null"`
 	Platform     string `gorm:"size:32;not null"`
 	Action       string `gorm:"size:64;not null"`
 	CredentialID string `gorm:"index;size:32"`
@@ -81,8 +81,33 @@ type Task struct {
 	Error        string `gorm:"type:text"`
 	StartedAt    *time.Time
 	FinishedAt   *time.Time
-	CreatedAt    time.Time
+	CreatedAt    time.Time `gorm:"index:idx_tasks_user_created,priority:2"`
 	UpdatedAt    time.Time
+}
+
+// Session 是服务端保存的登录会话。Cookie 只携带随机令牌，库里存 SHA-256 摘要，
+// 因此随时可以按会话或按用户吊销，禁用账号也会在下次请求立即生效。
+type Session struct {
+	ID         string `gorm:"primaryKey;size:32"`
+	UserID     string `gorm:"index:idx_sessions_user;size:32;not null"`
+	TokenHash  string `gorm:"uniqueIndex:uk_sessions_token;size:64;not null"`
+	IP         string `gorm:"size:64;not null;default:''"`
+	UserAgent  string `gorm:"size:255;not null;default:''"`
+	CreatedAt  time.Time
+	LastSeenAt time.Time `gorm:"not null"`
+	ExpiresAt  time.Time `gorm:"index:idx_sessions_expires;not null"`
+	RevokedAt  *time.Time
+}
+
+// LoginAttempt 记录登录尝试，用于账号锁定和后台安全页；绝不保存密码。
+type LoginAttempt struct {
+	ID        string    `gorm:"primaryKey;size:32"`
+	Username  string    `gorm:"index:idx_login_attempts_user_time,priority:1;size:64;not null"`
+	IP        string    `gorm:"size:64;not null;default:''"`
+	UserAgent string    `gorm:"size:255;not null;default:''"`
+	Success   bool      `gorm:"not null;default:false"`
+	Reason    string    `gorm:"size:64;not null;default:''"`
+	CreatedAt time.Time `gorm:"index:idx_login_attempts_time;index:idx_login_attempts_user_time,priority:2"`
 }
 
 type TaskEvent struct {

@@ -2,10 +2,13 @@
 import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { credentialsApi } from '@/api/services/credentials'
+import { securityApi } from '@/api/services/security'
 import { useAuthStore } from '@/stores/auth'
 import { usePlatformsStore } from '@/stores/platforms'
 import { useUiStore } from '@/stores/ui'
 import { formatTime } from '@/utils/format'
+import AdminConfigPanel from '@/components/AdminConfigPanel.vue'
+import AdminSecurityPanel from '@/components/AdminSecurityPanel.vue'
 import DataTable from '@/components/DataTable.vue'
 import TabsPanel from '@/components/TabsPanel.vue'
 
@@ -15,20 +18,31 @@ const auth = useAuthStore()
 const platforms = usePlatformsStore()
 const ui = useUiStore()
 
-const SECTIONS = [
-  { value: 'profile', title: '个人', icon: 'mdi-account-outline' },
-  { value: 'security', title: '安全', icon: 'mdi-shield-lock-outline' },
-  { value: 'agreement', title: '协议', icon: 'mdi-file-document-outline' },
-]
-const VALUES = SECTIONS.map((s) => s.value)
+const sections = computed(() => {
+  const list = [
+    { value: 'profile', title: '个人', icon: 'mdi-account-outline' },
+    { value: 'security', title: '账号安全', icon: 'mdi-shield-lock-outline' },
+  ]
+  if (auth.isAdmin) {
+    list.push(
+      { value: 'admin-security', title: '站点安全', icon: 'mdi-shield-account-outline' },
+      { value: 'admin-config', title: '站点配置', icon: 'mdi-tune-variant' },
+    )
+  }
+  list.push({ value: 'agreement', title: '协议', icon: 'mdi-file-document-outline' })
+  return list
+})
+const values = computed(() => sections.value.map((item) => item.value))
 
 const tab = computed({
-  get: () => (VALUES.includes(route.query.tab) ? route.query.tab : 'profile'),
+  get: () => (values.value.includes(route.query.tab) ? route.query.tab : 'profile'),
   set: (value) => router.replace({ query: { ...route.query, tab: value } }),
 })
 
 const logs = ref([])
 const logsLoading = ref(false)
+const sessions = ref([])
+const sessionsLoading = ref(false)
 
 const roleLabel = computed(() => (auth.isAdmin ? '管理员' : '普通用户'))
 const PURPOSE_LABELS = { task: '任务执行', discover: '平台列表刷新', update: '编辑凭据' }
@@ -37,6 +51,13 @@ const logHeaders = [
   { title: '平台', key: 'platform' },
   { title: '用途', key: 'purpose' },
   { title: '关联', key: 'ref_id' },
+]
+const sessionHeaders = [
+  { title: '设备', key: 'user_agent' },
+  { title: 'IP', key: 'ip' },
+  { title: '最近活跃', key: 'last_seen_at' },
+  { title: '到期', key: 'expires_at' },
+  { title: '', key: 'actions', sortable: false, align: 'end' },
 ]
 
 async function loadLogs() {
@@ -50,13 +71,54 @@ async function loadLogs() {
   }
 }
 
+async function loadSessions() {
+  sessionsLoading.value = true
+  try {
+    sessions.value = await securityApi.mySessions()
+  } catch (err) {
+    ui.notify(err.message, 'error')
+  } finally {
+    sessionsLoading.value = false
+  }
+}
+
+function loadSecurity() {
+  loadLogs()
+  loadSessions()
+}
+
+async function revokeSession(item) {
+  try {
+    await securityApi.revokeMySession(item.id)
+    if (item.current) {
+      auth.clear()
+      router.push('/login')
+      return
+    }
+    ui.notify('已退出该设备')
+    loadSessions()
+  } catch (err) {
+    ui.notify(err.message, 'error')
+  }
+}
+
+async function revokeOtherSessions() {
+  try {
+    await securityApi.revokeOtherSessions()
+    ui.notify('已退出其他设备')
+    loadSessions()
+  } catch (err) {
+    ui.notify(err.message, 'error')
+  }
+}
+
 onMounted(() => {
   platforms.load().catch(() => {})
-  if (tab.value === 'security') loadLogs()
+  if (tab.value === 'security') loadSecurity()
 })
 
 watch(tab, (value) => {
-  if (value === 'security') loadLogs()
+  if (value === 'security') loadSecurity()
 })
 </script>
 
@@ -64,7 +126,7 @@ watch(tab, (value) => {
   <v-container>
     <div class="text-headline-small mb-4">设置</div>
 
-    <TabsPanel v-model="tab" :tabs="SECTIONS">
+    <TabsPanel v-model="tab" :tabs="sections">
       <template #profile>
         <v-card>
           <v-list lines="two">
@@ -76,6 +138,51 @@ watch(tab, (value) => {
       </template>
 
       <template #security>
+        <v-card class="mb-6">
+          <v-card-item>
+            <v-card-title class="text-title-large">登录设备</v-card-title>
+            <v-card-subtitle>会话保存在服务端，可随时退出任意设备</v-card-subtitle>
+          </v-card-item>
+          <v-card-text>
+            <div class="d-flex justify-end mb-2">
+              <v-btn
+                variant="text"
+                color="primary"
+                size="small"
+                :disabled="sessions.length <= 1"
+                @click="revokeOtherSessions"
+              >
+                退出其他设备
+              </v-btn>
+            </div>
+            <DataTable
+              :headers="sessionHeaders"
+              :items="sessions"
+              :loading="sessionsLoading"
+              :paginated="false"
+              item-value="id"
+            >
+              <template #item.user_agent="{ item }">
+                <div class="d-flex align-center ga-2">
+                  <span class="text-truncate">{{ item.user_agent || '未知设备' }}</span>
+                  <v-chip v-if="item.current" size="small" color="primary" variant="tonal">当前</v-chip>
+                </div>
+              </template>
+              <template #item.ip="{ item }">{{ item.ip || '-' }}</template>
+              <template #item.last_seen_at="{ item }">{{ formatTime(item.last_seen_at) }}</template>
+              <template #item.expires_at="{ item }">{{ formatTime(item.expires_at) }}</template>
+              <template #item.actions="{ item }">
+                <v-btn size="small" variant="text" color="error" @click="revokeSession(item)">
+                  退出
+                </v-btn>
+              </template>
+              <template #no-data>
+                <div class="pa-6 text-medium-emphasis">暂无登录设备</div>
+              </template>
+            </DataTable>
+          </v-card-text>
+        </v-card>
+
         <v-card>
           <v-card-item>
             <v-card-title class="text-title-large">凭据访问记录</v-card-title>
@@ -106,6 +213,14 @@ watch(tab, (value) => {
             </DataTable>
           </v-card-text>
         </v-card>
+      </template>
+
+      <template v-if="auth.isAdmin" #admin-security>
+        <AdminSecurityPanel :active="tab === 'admin-security'" />
+      </template>
+
+      <template v-if="auth.isAdmin" #admin-config>
+        <AdminConfigPanel :active="tab === 'admin-config'" />
       </template>
 
       <template #agreement>

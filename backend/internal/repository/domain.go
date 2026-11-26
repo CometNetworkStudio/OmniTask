@@ -39,6 +39,17 @@ func (repo *UserRepository) Count(ctx context.Context) (int64, error) {
 	return total, err
 }
 
+func (repo *UserRepository) GetByIDs(ctx context.Context, ids []string) ([]model.User, error) {
+	if len(ids) == 0 {
+		return nil, nil
+	}
+	var users []model.User
+	if err := repo.r.DB(ctx).Where("id IN ?", ids).Find(&users).Error; err != nil {
+		return nil, err
+	}
+	return users, nil
+}
+
 type CredentialRepository struct{ r *Repository }
 
 func NewCredentialRepository(r *Repository) *CredentialRepository {
@@ -207,6 +218,20 @@ func (repo *TaskRepository) CountByStatuses(ctx context.Context, statuses ...str
 	var count int64
 	err := repo.r.DB(ctx).Model(&model.Task{}).
 		Where("status IN ?", statuses).Count(&count).Error
+	return count, err
+}
+
+func (repo *TaskRepository) CountCreatedSince(ctx context.Context, userID string, since time.Time) (int64, error) {
+	var count int64
+	err := repo.r.DB(ctx).Model(&model.Task{}).
+		Where("user_id = ? AND created_at >= ?", userID, since).Count(&count).Error
+	return count, err
+}
+
+func (repo *TaskRepository) CountPendingByUser(ctx context.Context, userID string) (int64, error) {
+	var count int64
+	err := repo.r.DB(ctx).Model(&model.Task{}).
+		Where("user_id = ? AND status IN ?", userID, []string{"pending", "queued"}).Count(&count).Error
 	return count, err
 }
 

@@ -1,26 +1,38 @@
 <script setup>
-import { reactive, ref } from 'vue'
+import { computed, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
+import { useMetaStore } from '@/stores/meta'
 import { useUiStore } from '@/stores/ui'
 
 const auth = useAuthStore()
+const meta = useMetaStore()
 const ui = useUiStore()
 const router = useRouter()
 
-const form = reactive({ username: '', password: '', confirm: '' })
+const form = reactive({ username: '', password: '', confirm: '', invite_code: '' })
 const loading = ref(false)
 const error = ref('')
+const closed = computed(() => meta.registration === 'closed')
 
 async function submit() {
+  if (closed.value) return
   if (form.password !== form.confirm) {
     error.value = '两次密码不一致'
+    return
+  }
+  if (meta.inviteRequired && !form.invite_code.trim()) {
+    error.value = '请输入邀请码'
     return
   }
   loading.value = true
   error.value = ''
   try {
-    await auth.register({ username: form.username, password: form.password })
+    await auth.register({
+      username: form.username,
+      password: form.password,
+      invite_code: form.invite_code.trim(),
+    })
     ui.notify('注册成功')
     router.push('/')
   } catch (err) {
@@ -40,31 +52,43 @@ async function submit() {
             <v-card-title class="text-title-large">注册 OmniTask</v-card-title>
           </v-card-item>
           <v-card-text>
-            <v-alert v-if="error" type="error" variant="tonal" class="mb-4">{{ error }}</v-alert>
-            <v-form @submit.prevent="submit">
-              <v-text-field
-                v-model="form.username"
-                label="用户名"
-                prepend-inner-icon="mdi-account-outline"
-                hint="3-64 个字符"
-              />
-              <v-text-field
-                v-model="form.password"
-                label="密码"
-                type="password"
-                prepend-inner-icon="mdi-lock-outline"
-                hint="至少 6 位"
-              />
-              <v-text-field
-                v-model="form.confirm"
-                label="确认密码"
-                type="password"
-                prepend-inner-icon="mdi-lock-check-outline"
-              />
-              <v-btn type="submit" color="primary" block :loading="loading" class="mt-2">
-                注册
-              </v-btn>
-            </v-form>
+            <v-alert v-if="closed" type="info" variant="tonal">
+              当前实例已关闭注册。如需账号，请联系管理员。
+            </v-alert>
+            <template v-else>
+              <v-alert v-if="error" type="error" variant="tonal" class="mb-4">{{ error }}</v-alert>
+              <v-form @submit.prevent="submit">
+                <v-text-field
+                  v-model="form.username"
+                  label="用户名"
+                  prepend-inner-icon="mdi-account-outline"
+                  hint="3-64 个字符"
+                />
+                <v-text-field
+                  v-model="form.password"
+                  label="密码"
+                  type="password"
+                  prepend-inner-icon="mdi-lock-outline"
+                  hint="至少 8 位"
+                />
+                <v-text-field
+                  v-model="form.confirm"
+                  label="确认密码"
+                  type="password"
+                  prepend-inner-icon="mdi-lock-check-outline"
+                />
+                <v-text-field
+                  v-if="meta.inviteRequired"
+                  v-model="form.invite_code"
+                  label="邀请码"
+                  prepend-inner-icon="mdi-ticket-confirmation-outline"
+                  hint="当前实例需要邀请码"
+                />
+                <v-btn type="submit" color="primary" block :loading="loading" class="mt-2">
+                  注册
+                </v-btn>
+              </v-form>
+            </template>
           </v-card-text>
           <v-card-actions class="justify-center">
             <span class="text-medium-emphasis">已有账号？</span>

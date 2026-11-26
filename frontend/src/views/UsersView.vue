@@ -57,7 +57,6 @@ async function setRole(item, role) {
     await usersApi.setRole(item.id, role)
     item.role = role
     ui.notify('角色已更新')
-    auth.fetchMe().catch(() => {})
   } catch (err) {
     ui.notify(err.message, 'error')
     await load()

@@ -8,6 +8,7 @@ import (
 
 	v1 "backend/api/v1"
 	"github.com/gin-gonic/gin"
+	"github.com/spf13/viper"
 )
 
 type rateBucket struct {
@@ -18,14 +19,28 @@ type rateBucket struct {
 // IPRateLimit 对单个 IP 做固定窗口限流，用于登录/注册等无鉴权接口。
 // limit <= 0 表示关闭。计数保存在进程内，lite 单实例足够；多实例部署需改用共享存储。
 func IPRateLimit(limit int, window time.Duration) gin.HandlerFunc {
-	if limit <= 0 || window <= 0 {
-		return func(ctx *gin.Context) { ctx.Next() }
+	return IPRateLimitFunc(func() int { return limit }, window)
+}
+
+// IPRateLimitConf 每次请求读取配置，管理端修改后无需重启即可生效。
+func IPRateLimitConf(conf *viper.Viper, key string, window time.Duration) gin.HandlerFunc {
+	return IPRateLimitFunc(func() int { return conf.GetInt(key) }, window)
+}
+
+func IPRateLimitFunc(limit func() int, window time.Duration) gin.HandlerFunc {
+	if limit == nil {
+		limit = func() int { return 0 }
 	}
 	var (
 		mu      sync.Mutex
 		buckets = map[string]*rateBucket{}
 	)
 	return func(ctx *gin.Context) {
+		max := limit()
+		if max <= 0 || window <= 0 {
+			ctx.Next()
+			return
+		}
 		now := time.Now()
 		key := ctx.ClientIP()
 
@@ -41,7 +56,7 @@ func IPRateLimit(limit int, window time.Duration) gin.HandlerFunc {
 			buckets[key] = bucket
 		}
 		bucket.count++
-		allowed := bucket.count <= limit
+		allowed := bucket.count <= max
 		retryAfter := int(time.Until(bucket.reset).Seconds()) + 1
 		mu.Unlock()
 

@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"time"
 
 	v1 "backend/api/v1"
 	"backend/internal/agenthost"
@@ -100,6 +101,26 @@ func (s *TaskService) Create(ctx context.Context, userID string, req *v1.TaskCre
 		}
 		if count >= int64(limit) {
 			return nil, v1.ErrTaskLimit
+		}
+	}
+	if limit := s.conf.GetInt("task.daily_tasks_per_user"); limit > 0 {
+		now := time.Now()
+		start := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
+		count, err := s.repo.CountCreatedSince(ctx, userID, start)
+		if err != nil {
+			return nil, err
+		}
+		if count >= int64(limit) {
+			return nil, v1.ErrDailyTaskLimit
+		}
+	}
+	if limit := s.conf.GetInt("task.max_pending_per_user"); limit > 0 {
+		count, err := s.repo.CountPendingByUser(ctx, userID)
+		if err != nil {
+			return nil, err
+		}
+		if count >= int64(limit) {
+			return nil, v1.ErrPendingTaskLimit
 		}
 	}
 	if limit := s.conf.GetInt("task.max_pending"); limit > 0 {

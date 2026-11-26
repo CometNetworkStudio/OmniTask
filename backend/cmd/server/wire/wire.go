@@ -12,8 +12,8 @@ import (
 	"backend/internal/ws"
 	"backend/pkg/app"
 	"backend/pkg/authz"
+	"backend/pkg/config"
 	"backend/pkg/crypto"
-	"backend/pkg/jwt"
 	"backend/pkg/log"
 	grpcserver "backend/pkg/server/grpc"
 	"backend/pkg/server/http"
@@ -35,14 +35,17 @@ var repositorySet = wire.NewSet(
 	repository.NewScriptRepository,
 	repository.NewScriptInstallJobRepository,
 	repository.NewPlatformCacheRepository,
+	repository.NewSessionRepository,
+	repository.NewLoginAttemptRepository,
 )
 
 var serviceSet = wire.NewSet(
 	sid.NewSid,
-	jwt.NewJwt,
+	config.NewStore,
 	crypto.FromConfig,
 	authz.NewEnforcer,
 	ws.NewHub,
+	service.NewSessionService,
 	service.NewAuthService,
 	service.NewPlatformConfigService,
 	service.NewCredentialService,
@@ -65,6 +68,7 @@ var handlerSet = wire.NewSet(
 	handler.NewPlatformHandler,
 	handler.NewUserHandler,
 	handler.NewWSHandler,
+	handler.NewConfigHandler,
 )
 
 // build App

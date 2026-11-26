@@ -20,6 +20,7 @@ backend/storage/logs/
 
 # deploy secrets (not in repo)
 backend/config/deploy.yml
+backend/config/*.overrides.*
 /backend/migrate
 /scripts/
 /scripts-src/

@@ -170,9 +170,9 @@ function toggleTheme() {
   localStorage.setItem('omnitask_theme', next)
 }
 
-function logout() {
+async function logout() {
   userMenu.value = false
-  auth.logout()
+  await auth.logout()
   ui.notify('已退出登录', 'info')
   router.push({ name: 'login' })
 }
@@ -184,7 +184,6 @@ function go(path) {
 
 onMounted(() => {
   if (auth.isAuthenticated) {
-    auth.fetchMe().catch(() => {})
     platforms.load().catch(() => {})
   }
 })

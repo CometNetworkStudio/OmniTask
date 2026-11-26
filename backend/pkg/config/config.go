@@ -5,10 +5,14 @@ import (
 	"encoding/hex"
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/spf13/viper"
 )
+
+// activePath 记录本次进程加载的主配置文件，管理端可视化配置会写同目录的 overrides 文件。
+var activePath string
 
 const defaultConfigName = "config.yaml"
 
@@ -53,9 +57,22 @@ agent:
   keep_failed_workspaces: true
   keep_versions: 3
 security:
+  # open：公开注册；invite：需要邀请码；closed：关闭注册。
   registration: open
-  jwt:
-    key: ""
+  # invite 模式下的邀请码；留空则 invite 模式无法注册。
+  invite_code: ""
+  # 是否允许首个注册用户自动成为管理员。官方托管建议 false，并用环境变量预创建管理员。
+  allow_first_user_admin: true
+  # 会话有效期（小时）与 Cookie 属性。cookie_secure 支持 true/false/auto。
+  session_ttl_hours: 168
+  cookie_secure: auto
+  cookie_same_site: lax
+  cookie_domain: ""
+  # 登录失败锁定：窗口内失败达到上限后暂时拒绝该用户名登录。0 表示关闭。
+  login_max_failures: 5
+  login_window_minutes: 15
+  # WebSocket 允许的跨域来源，逗号分隔；为空时仅同源。
+  ws_allowed_origins: ""
   # 当前主密钥（默认版本 1）。生产环境建议改用环境变量 OMNITASK_MASTER_KEY。
   master_key: ""
   # 轮换用：版本号 -> 密钥。非空时只读此映射，必须包含旧密钥版本。
@@ -83,6 +100,10 @@ pagination:
   max: 1000
 task:
   max_active_per_user: 20
+  # 单用户每日创建任务上限，0 表示不限。
+  daily_tasks_per_user: 0
+  # 单用户待处理任务上限，0 表示不限。
+  max_pending_per_user: 0
   max_pending: 500
 discovery:
   min_interval: 60
@@ -106,9 +127,31 @@ func NewConfig(p string) *viper.Viper {
 	if envConf == defaultConfigName {
 		ensureDefaultConfig(envConf)
 	}
+	activePath = envConf
 	conf := getConfig(envConf)
 	postProcess(conf, envConf)
+	// 可视化配置写入独立的 overrides 文件，主配置文件里的注释不会被覆盖。
+	mergeOverride(conf, envConf)
 	return conf
+}
+
+func overridePathFor(path string) string {
+	ext := filepath.Ext(path)
+	if ext == "" {
+		return path + ".overrides.yaml"
+	}
+	return strings.TrimSuffix(path, ext) + ".overrides" + ext
+}
+
+func mergeOverride(conf *viper.Viper, path string) {
+	file, err := os.Open(overridePathFor(path))
+	if err != nil {
+		return
+	}
+	defer file.Close()
+	if err := conf.MergeConfig(file); err != nil {
+		fmt.Println("warn: merge config override failed:", err)
+	}
 }
 
 func getConfig(path string) *viper.Viper {
@@ -137,10 +180,6 @@ func postProcess(conf *viper.Viper, path string) {
 	if conf.GetString("mode") == "" {
 		conf.Set("mode", "lite")
 	}
-	if conf.GetString("security.jwt.key") == "" {
-		conf.Set("security.jwt.key", randomHex(32))
-		persist = true
-	}
 	if conf.GetString("security.master_key") == "" && os.Getenv("OMNITASK_MASTER_KEY") == "" {
 		conf.Set("security.master_key", randomHex(32))
 		persist = true
@@ -162,10 +201,18 @@ func postProcess(conf *viper.Viper, path string) {
 		"agent.keep_failed_workspaces":          true,
 		"agent.keep_versions":                   3,
 		"task.max_active_per_user":              20,
+		"task.daily_tasks_per_user":             0,
+		"task.max_pending_per_user":             0,
 		"task.max_pending":                      500,
 		"http.trusted_proxies":                  "",
 		"security.credential_audit_fail_closed": false,
 		"security.auth_rate_limit_per_minute":   20,
+		"security.allow_first_user_admin":       true,
+		"security.session_ttl_hours":            168,
+		"security.cookie_secure":                "auto",
+		"security.cookie_same_site":             "lax",
+		"security.login_max_failures":           5,
+		"security.login_window_minutes":         15,
 	}
 	for key, value := range defaults {
 		if !conf.IsSet(key) {
@@ -182,7 +229,7 @@ func postProcess(conf *viper.Viper, path string) {
 		if err := conf.WriteConfigAs(path); err != nil {
 			fmt.Println("warn: persist config failed:", err)
 		}
-		// 配置里含 JWT 与主密钥，尽量收紧权限；只读挂载失败可忽略。
+		// 配置里含主密钥，尽量收紧权限；只读挂载失败可忽略。
 		_ = os.Chmod(path, 0o600)
 	}
 }

@@ -3,6 +3,7 @@ package agenthost
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -36,6 +37,17 @@ func TestCopyWorkspaceSkipsRuntimeAndCache(t *testing.T) {
 	for _, rel := range []string{".venv", "__pycache__", "node_modules", "main.pyc"} {
 		if _, err := os.Stat(filepath.Join(dst, rel)); err == nil {
 			t.Fatalf("%s should be skipped", rel)
+		}
+	}
+}
+
+func TestBaseEnvDropsSecrets(t *testing.T) {
+	t.Setenv("OMNITASK_MASTER_KEY", "super-secret")
+	t.Setenv("OMNITASK_DB_DSN", "root:password@tcp(db)/omnitask")
+	t.Setenv("PATH", "/usr/bin")
+	for _, item := range baseEnv() {
+		if strings.HasPrefix(item, "OMNITASK_MASTER_KEY=") || strings.HasPrefix(item, "OMNITASK_DB_DSN=") {
+			t.Fatalf("sensitive variable leaked: %s", item)
 		}
 	}
 }

@@ -3,12 +3,24 @@ import axios from 'axios'
 const http = axios.create({
   baseURL: import.meta.env.VITE_API_BASE || `${import.meta.env.BASE_URL}api/v1`,
   timeout: 15000,
+  withCredentials: true,
 })
 
+const CSRF_COOKIE = 'omnitask_csrf'
+const CSRF_HEADER = 'X-CSRF-Token'
+const SAFE_METHODS = ['GET', 'HEAD', 'OPTIONS']
+
+function readCookie(name) {
+  const prefix = `${name}=`
+  const row = document.cookie.split('; ').find((item) => item.startsWith(prefix))
+  return row ? decodeURIComponent(row.slice(prefix.length)) : ''
+}
+
 http.interceptors.request.use((config) => {
-  const token = localStorage.getItem('omnitask_token')
-  if (token) {
-    config.headers.Authorization = `Bearer ${token}`
+  const method = String(config.method || 'get').toUpperCase()
+  if (!SAFE_METHODS.includes(method)) {
+    const token = readCookie(CSRF_COOKIE)
+    if (token) config.headers[CSRF_HEADER] = token
   }
   return config
 })
@@ -25,10 +37,9 @@ http.interceptors.response.use(
     return body
   },
   (err) => {
-    if (err.response?.status === 401) {
-      localStorage.removeItem('omnitask_token')
-      localStorage.removeItem('omnitask_user')
-      if (window.location.pathname !== '/login') {
+    if (err.response?.status === 401 && !err.config?.skipAuthRedirect) {
+      const path = window.location.pathname
+      if (!['/login', '/register'].includes(path)) {
         window.location.assign('/login')
       }
     }

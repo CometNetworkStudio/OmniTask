@@ -22,9 +22,9 @@ import (
 // @license.name  MIT
 // @license.url   https://opensource.org/licenses/MIT
 // @host      localhost:8080
-// @securityDefinitions.apiKey Bearer
-// @in header
-// @name Authorization
+// @securityDefinitions.apiKey CookieAuth
+// @in cookie
+// @name omnitask_session
 // @externalDocs.description  OpenAPI
 // @externalDocs.url          https://swagger.io/resources/open-api/
 func main() {

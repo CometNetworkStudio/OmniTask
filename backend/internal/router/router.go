@@ -3,7 +3,6 @@ package router
 import (
 	"backend/internal/handler"
 	"backend/internal/service"
-	"backend/pkg/jwt"
 	"backend/pkg/log"
 	"github.com/casbin/casbin/v3"
 	"github.com/spf13/viper"
@@ -12,7 +11,8 @@ import (
 type RouterDeps struct {
 	Logger            *log.Logger
 	Config            *viper.Viper
-	JWT               *jwt.JWT
+	Auth              *service.AuthService
+	Sessions          *service.SessionService
 	Casbin            *casbin.Enforcer
 	PlatformConfig    *service.PlatformConfigService
 	AuthHandler       *handler.AuthHandler
@@ -23,4 +23,5 @@ type RouterDeps struct {
 	UserHandler       *handler.UserHandler
 	PlatformHandler   *handler.PlatformHandler
 	WSHandler         *handler.WSHandler
+	ConfigHandler     *handler.ConfigHandler
 }

@@ -20,8 +20,10 @@ import (
 func NewHTTPServer(
 	deps router.RouterDeps,
 ) *http.Server {
-	// 启动时按已安装脚本补齐平台默认配置。
+	// 启动时按已安装脚本补齐平台默认配置，并清理过期会话、创建引导管理员。
 	deps.PlatformConfig.Bootstrap(context.Background())
+	deps.Sessions.Cleanup(context.Background())
+	deps.Auth.BootstrapAdmin(context.Background())
 
 	if deps.Config.GetString("env") == "prod" {
 		gin.SetMode(gin.ReleaseMode)
@@ -88,17 +90,21 @@ func NewHTTPServer(
 	})
 
 	v1Group := s.Group("/api/v1")
+	v1Group.Use(middleware.CSRF(deps.Config))
 	{
+		v1Group.GET("/meta", deps.AuthHandler.Meta)
+
 		auth := v1Group.Group("/auth")
-		auth.Use(middleware.IPRateLimit(deps.Config.GetInt("security.auth_rate_limit_per_minute"), time.Minute))
+		auth.Use(middleware.IPRateLimitConf(deps.Config, "security.auth_rate_limit_per_minute", time.Minute))
 		auth.POST("/register", deps.AuthHandler.Register)
 		auth.POST("/login", deps.AuthHandler.Login)
 
 		authed := v1Group.Group("")
 		authed.Use(
-			middleware.StrictAuth(deps.JWT, deps.Logger),
+			middleware.SessionAuth(deps.Sessions, deps.Config, deps.Logger),
 			middleware.Authorize(deps.Casbin, deps.Logger),
 		)
+		authed.POST("/auth/logout", deps.AuthHandler.Logout)
 		authed.POST("/credentials", deps.CredentialHandler.Create)
 		authed.PUT("/credentials/:id", deps.CredentialHandler.Update)
 		authed.DELETE("/credentials/:id", deps.CredentialHandler.Archive)
@@ -128,16 +134,28 @@ func NewHTTPServer(
 		authed.GET("/me", deps.UserHandler.Me)
 		authed.GET("/me/preferences", deps.UserHandler.Preferences)
 		authed.PUT("/me/preferences", deps.UserHandler.UpdatePreferences)
+		authed.GET("/me/sessions", deps.UserHandler.MySessions)
+		authed.DELETE("/me/sessions", deps.UserHandler.RevokeOtherSessions)
+		authed.DELETE("/me/sessions/:id", deps.UserHandler.RevokeMySession)
 		authed.GET("/users", deps.UserHandler.List)
 		authed.POST("/users/:id/role", deps.UserHandler.UpdateRole)
 		authed.POST("/users/:id/enable", deps.UserHandler.SetEnabled)
+
+		authed.GET("/admin/security", deps.UserHandler.AdminOverview)
+		authed.GET("/admin/sessions", deps.UserHandler.AdminSessions)
+		authed.DELETE("/admin/sessions/:id", deps.UserHandler.AdminRevokeSession)
+		authed.POST("/admin/users/:id/revoke-sessions", deps.UserHandler.AdminRevokeUserSessions)
+		authed.GET("/admin/login-attempts", deps.UserHandler.AdminLoginAttempts)
+		authed.GET("/admin/config", deps.ConfigHandler.Get)
+		authed.PUT("/admin/config", deps.ConfigHandler.Update)
+		authed.POST("/admin/config/reload", deps.ConfigHandler.Reload)
 
 		authed.GET("/platforms", deps.PlatformHandler.List)
 		authed.GET("/platforms/:id/items", deps.PlatformHandler.Items)
 		authed.POST("/platforms/:id/discover", deps.PlatformHandler.Refresh)
 
 		ws := v1Group.Group("/ws")
-		ws.Use(middleware.NoStrictAuth(deps.JWT, deps.Logger))
+		ws.Use(middleware.SessionAuth(deps.Sessions, deps.Config, deps.Logger))
 		ws.GET("", deps.WSHandler.Handle)
 	}
 

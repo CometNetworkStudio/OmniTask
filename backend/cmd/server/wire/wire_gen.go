@@ -15,8 +15,8 @@ import (
 	"backend/internal/ws"
 	"backend/pkg/app"
 	"backend/pkg/authz"
+	"backend/pkg/config"
 	"backend/pkg/crypto"
-	"backend/pkg/jwt"
 	"backend/pkg/log"
 	"backend/pkg/server/grpc"
 	"backend/pkg/server/http"
@@ -28,7 +28,6 @@ import (
 // Injectors from wire.go:
 
 func NewWire(viperViper *viper.Viper, logger *log.Logger) (*app.App, func(), error) {
-	jwtJWT := jwt.NewJwt(viperViper)
 	db := repository.NewDB(viperViper, logger)
 	enforcer, err := authz.NewEnforcer(db, logger)
 	if err != nil {
@@ -40,8 +39,11 @@ func NewWire(viperViper *viper.Viper, logger *log.Logger) (*app.App, func(), err
 	platformConfigService := service.NewPlatformConfigService(platformConfigRepository, scriptRepository, logger)
 	userRepository := repository.NewUserRepository(repositoryRepository)
 	sidSid := sid.NewSid()
-	authService := service.NewAuthService(userRepository, sidSid, jwtJWT, viperViper, logger)
-	authHandler := handler.NewAuthHandler(authService, logger)
+	sessionRepository := repository.NewSessionRepository(repositoryRepository)
+	loginAttemptRepository := repository.NewLoginAttemptRepository(repositoryRepository)
+	sessionService := service.NewSessionService(sessionRepository, loginAttemptRepository, userRepository, sidSid, viperViper, logger)
+	authService := service.NewAuthService(userRepository, sessionService, sidSid, viperViper, logger)
+	authHandler := handler.NewAuthHandler(authService, viperViper, logger)
 	credentialRepository := repository.NewCredentialRepository(repositoryRepository)
 	credentialAccessLogRepository := repository.NewCredentialAccessLogRepository(repositoryRepository)
 	taskRepository := repository.NewTaskRepository(repositoryRepository)
@@ -65,15 +67,18 @@ func NewWire(viperViper *viper.Viper, logger *log.Logger) (*app.App, func(), err
 	scriptHandler := handler.NewScriptHandler(scriptService, logger)
 	taskService := service.NewTaskService(taskRepository, scriptRepository, scriptService, credentialService, sidSid, viperViper, logger)
 	taskHandler := handler.NewTaskHandler(taskService, orchestrator, logger)
-	userService := service.NewUserService(userRepository, viperViper, logger)
-	userHandler := handler.NewUserHandler(userService, logger)
+	userService := service.NewUserService(userRepository, sessionService, viperViper, logger)
+	userHandler := handler.NewUserHandler(userService, sessionService, viperViper, logger)
 	discoverService := service.NewDiscoverService(platformCacheRepository, scriptRepository, scriptService, credentialService, agentClient, viperViper, sidSid, logger)
 	platformHandler := handler.NewPlatformHandler(discoverService, logger)
-	wsHandler := handler.NewWSHandler(hub, progressStore, logger)
+	wsHandler := handler.NewWSHandler(hub, progressStore, taskService, viperViper, logger)
+	configStore := config.NewStore(viperViper)
+	configHandler := handler.NewConfigHandler(configStore, logger)
 	routerDeps := router.RouterDeps{
 		Logger:            logger,
 		Config:            viperViper,
-		JWT:               jwtJWT,
+		Auth:              authService,
+		Sessions:          sessionService,
 		Casbin:            enforcer,
 		PlatformConfig:    platformConfigService,
 		AuthHandler:       authHandler,
@@ -84,6 +89,7 @@ func NewWire(viperViper *viper.Viper, logger *log.Logger) (*app.App, func(), err
 		UserHandler:       userHandler,
 		PlatformHandler:   platformHandler,
 		WSHandler:         wsHandler,
+		ConfigHandler:     configHandler,
 	}
 	httpServer := server.NewHTTPServer(routerDeps)
 	jobServer := server.NewJobServer(logger)
@@ -95,11 +101,11 @@ func NewWire(viperViper *viper.Viper, logger *log.Logger) (*app.App, func(), err
 
 // wire.go:
 
-var repositorySet = wire.NewSet(repository.NewDB, repository.NewRedis, repository.NewRepository, repository.NewUserRepository, repository.NewCredentialRepository, repository.NewCredentialAccessLogRepository, repository.NewPlatformConfigRepository, repository.NewTaskRepository, repository.NewQuestionRepository, repository.NewScriptRepository, repository.NewScriptInstallJobRepository, repository.NewPlatformCacheRepository)
+var repositorySet = wire.NewSet(repository.NewDB, repository.NewRedis, repository.NewRepository, repository.NewUserRepository, repository.NewCredentialRepository, repository.NewCredentialAccessLogRepository, repository.NewPlatformConfigRepository, repository.NewTaskRepository, repository.NewQuestionRepository, repository.NewScriptRepository, repository.NewScriptInstallJobRepository, repository.NewPlatformCacheRepository, repository.NewSessionRepository, repository.NewLoginAttemptRepository)
 
-var serviceSet = wire.NewSet(sid.NewSid, jwt.NewJwt, crypto.FromConfig, authz.NewEnforcer, ws.NewHub, service.NewAuthService, service.NewPlatformConfigService, service.NewCredentialService, service.NewTaskService, service.NewQuestionService, service.NewScriptService, service.NewDiscoverService, service.NewUserService, service.NewAgentClient, service.NewProgressStore, service.NewOrchestrator)
+var serviceSet = wire.NewSet(sid.NewSid, config.NewStore, crypto.FromConfig, authz.NewEnforcer, ws.NewHub, service.NewSessionService, service.NewAuthService, service.NewPlatformConfigService, service.NewCredentialService, service.NewTaskService, service.NewQuestionService, service.NewScriptService, service.NewDiscoverService, service.NewUserService, service.NewAgentClient, service.NewProgressStore, service.NewOrchestrator)
 
-var handlerSet = wire.NewSet(handler.NewAuthHandler, handler.NewCredentialHandler, handler.NewTaskHandler, handler.NewQuestionHandler, handler.NewScriptHandler, handler.NewPlatformHandler, handler.NewUserHandler, handler.NewWSHandler)
+var handlerSet = wire.NewSet(handler.NewAuthHandler, handler.NewCredentialHandler, handler.NewTaskHandler, handler.NewQuestionHandler, handler.NewScriptHandler, handler.NewPlatformHandler, handler.NewUserHandler, handler.NewWSHandler, handler.NewConfigHandler)
 
 // build App
 func newApp(

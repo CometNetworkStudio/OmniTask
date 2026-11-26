@@ -1,42 +1,60 @@
 import { defineStore } from 'pinia'
 import { authApi } from '@/api/services/auth'
 
-const TOKEN_KEY = 'omnitask_token'
-const USER_KEY = 'omnitask_user'
+let bootPromise = null
 
 export const useAuthStore = defineStore('auth', {
   state: () => ({
-    token: localStorage.getItem(TOKEN_KEY) || '',
-    user: JSON.parse(localStorage.getItem(USER_KEY) || 'null'),
+    user: null,
+    loaded: false,
   }),
   getters: {
-    isAuthenticated: (state) => Boolean(state.token),
+    isAuthenticated: (state) => Boolean(state.user),
     isAdmin: (state) => state.user?.role === 'admin',
     username: (state) => state.user?.username || '',
   },
   actions: {
     async login(payload) {
-      this.setSession(await authApi.login(payload))
+      const data = await authApi.login(payload)
+      this.user = data.user
+      this.loaded = true
     },
     async register(payload) {
-      this.setSession(await authApi.register(payload))
+      const data = await authApi.register(payload)
+      this.user = data.user
+      this.loaded = true
     },
-    async fetchMe() {
-      const data = await authApi.me()
-      this.user = { id: data.id, username: data.username, role: data.role || 'user' }
-      localStorage.setItem(USER_KEY, JSON.stringify(this.user))
+    // bootstrap 在路由守卫中调用，通过服务端会话确认当前用户，避免信任本地缓存。
+    async bootstrap(force = false) {
+      if (this.loaded && !force) return this.user
+      if (bootPromise) return bootPromise
+      bootPromise = authApi
+        .me()
+        .then((data) => {
+          this.user = { id: data.id, username: data.username, role: data.role || 'user' }
+          return this.user
+        })
+        .catch(() => {
+          this.user = null
+          return null
+        })
+        .finally(() => {
+          this.loaded = true
+          bootPromise = null
+        })
+      return bootPromise
     },
-    setSession(data) {
-      this.token = data.token
-      this.user = { id: data.user_id, username: data.username, role: data.role || 'user' }
-      localStorage.setItem(TOKEN_KEY, this.token)
-      localStorage.setItem(USER_KEY, JSON.stringify(this.user))
+    async logout() {
+      try {
+        await authApi.logout()
+      } catch {
+        // 会话可能已经过期，本地状态仍需清理
+      }
+      this.clear()
     },
-    logout() {
-      this.token = ''
+    clear() {
       this.user = null
-      localStorage.removeItem(TOKEN_KEY)
-      localStorage.removeItem(USER_KEY)
+      this.loaded = true
     },
   },
 })

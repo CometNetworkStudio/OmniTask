@@ -28,6 +28,8 @@ func (m *MigrateServer) Start(ctx context.Context) error {
 		&model.TaskEvent{},
 		&model.Question{},
 		&model.UserPreference{},
+		&model.Session{},
+		&model.LoginAttempt{},
 	); err != nil {
 		m.log.Error("migrate error", zap.Error(err))
 		return err

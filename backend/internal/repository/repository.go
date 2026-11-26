@@ -116,12 +116,15 @@ func NewDB(conf *viper.Viper, l *log.Logger) *gorm.DB {
 			&model.User{}, &model.Credential{}, &model.Task{},
 			&model.TaskEvent{}, &model.Question{}, &model.Script{}, &model.ScriptInstallJob{},
 			&model.PlatformCache{}, &model.CredentialAccessLog{}, &model.PlatformConfig{},
-			&model.UserPreference{},
+			&model.UserPreference{}, &model.Session{}, &model.LoginAttempt{},
 		); err != nil {
 			panic(err)
 		}
 	}
-	db = db.Debug()
+	// 生产环境关闭 GORM SQL 明细，避免把令牌摘要、凭据密文和业务数据写进日志。
+	if conf.GetString("env") != "prod" {
+		db = db.Debug()
+	}
 
 	// Connection Pool config
 	sqlDB, err := db.DB()

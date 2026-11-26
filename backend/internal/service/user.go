@@ -16,13 +16,14 @@ import (
 )
 
 type UserService struct {
-	repo   *repository.UserRepository
-	conf   *viper.Viper
-	logger *log.Logger
+	repo     *repository.UserRepository
+	sessions *SessionService
+	conf     *viper.Viper
+	logger   *log.Logger
 }
 
-func NewUserService(repo *repository.UserRepository, conf *viper.Viper, logger *log.Logger) *UserService {
-	return &UserService{repo: repo, conf: conf, logger: logger}
+func NewUserService(repo *repository.UserRepository, sessions *SessionService, conf *viper.Viper, logger *log.Logger) *UserService {
+	return &UserService{repo: repo, sessions: sessions, conf: conf, logger: logger}
 }
 
 func (s *UserService) Me(ctx context.Context, userID string) (*v1.UserResponse, error) {
@@ -74,6 +75,12 @@ func (s *UserService) SetEnabled(ctx context.Context, id string, enabled bool) (
 	}
 	if err := s.repo.SetEnabled(ctx, id, enabled); err != nil {
 		return nil, err
+	}
+	// 禁用账号立即失效所有会话，不再依赖令牌过期。
+	if !enabled && s.sessions != nil {
+		if err := s.sessions.RevokeUser(ctx, id); err != nil {
+			s.logger.Warn("revoke disabled user sessions failed: " + err.Error())
+		}
 	}
 	return s.Me(ctx, id)
 }

@@ -2,9 +2,11 @@
 import { reactive, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
+import { useMetaStore } from '@/stores/meta'
 import { useUiStore } from '@/stores/ui'
 
 const auth = useAuthStore()
+const meta = useMetaStore()
 const ui = useUiStore()
 const router = useRouter()
 const route = useRoute()
@@ -58,9 +60,11 @@ async function submit() {
               </v-btn>
             </v-form>
           </v-card-text>
-          <v-card-actions class="justify-center">
+          <v-card-actions v-if="meta.registration !== 'closed'" class="justify-center">
             <span class="text-medium-emphasis">还没有账号？</span>
-            <v-btn variant="text" color="primary" to="/register">注册</v-btn>
+            <v-btn variant="text" color="primary" to="/register">
+              {{ meta.registration === 'invite' ? '使用邀请码注册' : '注册' }}
+            </v-btn>
           </v-card-actions>
         </v-card>
       </v-col>

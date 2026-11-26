@@ -31,7 +31,7 @@ func newTestUserService(t *testing.T) (*UserService, *repository.UserRepository)
 	}
 	repo := repository.NewRepository(logger, db)
 	userRepo := repository.NewUserRepository(repo)
-	return NewUserService(userRepo, conf, logger), userRepo
+	return NewUserService(userRepo, nil, conf, logger), userRepo
 }
 
 func TestUserServiceLifecycle(t *testing.T) {

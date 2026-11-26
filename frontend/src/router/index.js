@@ -1,4 +1,6 @@
 import { createRouter, createWebHistory } from 'vue-router'
+import { useAuthStore } from '@/stores/auth'
+import { useMetaStore } from '@/stores/meta'
 
 const routes = [
   { path: '/login', name: 'login', component: () => import('@/views/LoginView.vue'), meta: { public: true } },
@@ -13,6 +15,7 @@ const routes = [
   { path: '/scripts', name: 'scripts', component: () => import('@/views/ScriptsView.vue'), meta: { requiresAdmin: true } },
   { path: '/scripts/:id', name: 'script-detail', component: () => import('@/views/ScriptDetailView.vue'), meta: { requiresAdmin: true } },
   { path: '/users', name: 'users', component: () => import('@/views/UsersView.vue'), meta: { requiresAdmin: true } },
+  { path: '/security', redirect: { path: '/settings', query: { tab: 'admin-security' } } },
   { path: '/', redirect: '/home' },
   { path: '/:pathMatch(.*)*', redirect: '/home' },
 ]
@@ -22,16 +25,21 @@ const router = createRouter({
   routes,
 })
 
-router.beforeEach((to) => {
-  const token = localStorage.getItem('omnitask_token')
-  const user = JSON.parse(localStorage.getItem('omnitask_user') || 'null')
-  if (!to.meta.public && !token) {
-    return { name: 'login', query: { redirect: to.fullPath } }
-  }
-  if (to.meta.public && token) {
+router.beforeEach(async (to) => {
+  const auth = useAuthStore()
+  const meta = useMetaStore()
+  await Promise.all([auth.bootstrap(), meta.load()])
+
+  if (to.meta.public && auth.isAuthenticated) {
     return { name: 'home' }
   }
-  if (to.meta.requiresAdmin && user?.role !== 'admin') {
+  if (!to.meta.public && !auth.isAuthenticated) {
+    return { name: 'login', query: { redirect: to.fullPath } }
+  }
+  if (to.name === 'register' && meta.registration === 'closed') {
+    return { name: 'login' }
+  }
+  if (to.meta.requiresAdmin && !auth.isAdmin) {
     return { name: 'home' }
   }
   return true

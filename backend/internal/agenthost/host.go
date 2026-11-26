@@ -288,7 +288,7 @@ func (h *Host) Execute(req *agentv1.ExecuteRequest, stream agentv1.AgentService_
 
 	cmd := exec.Command(runtimePath, commandArgs(script.Manifest)...)
 	cmd.Dir = workspace
-	cmd.Env = h.scriptEnv(os.Environ(), script, workspace, taskID, req.GetProxy())
+	cmd.Env = h.scriptEnv(baseEnv(), script, workspace, taskID, req.GetProxy())
 
 	stdin, err := cmd.StdinPipe()
 	if err != nil {
@@ -479,7 +479,7 @@ func (h *Host) Discover(ctx context.Context, req *agentv1.DiscoverRequest) (*age
 
 	cmd := exec.CommandContext(ctx, runtimePath, commandArgs(script.Manifest)...)
 	cmd.Dir = workspace
-	cmd.Env = h.scriptEnv(os.Environ(), script, workspace, label, req.GetProxy())
+	cmd.Env = h.scriptEnv(baseEnv(), script, workspace, label, req.GetProxy())
 
 	stdin, err := cmd.StdinPipe()
 	if err != nil {
