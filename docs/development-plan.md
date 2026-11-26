@@ -26,7 +26,7 @@
 - `sdk/python/`：平台脚本 Python SDK（`core/`、`runtime.py`、`gen/`、`tests/`），依赖在 `sdk/python/.venv`。
 - `proto/agent/v1/agent.proto`：`AgentService.Health/Execute(server-streaming)` + `QuestionBank.Lookup/Save`。
 - `backend/internal/model/model.go`：冻结 `User/Credential/Task/TaskEvent/Question` 五张表 schema。
-- `.env.example`：约定主密钥、JWT、Agent/QuestionBank gRPC 地址、LLM、限流与脚本凭据。
+- `.env.example`：约定主密钥、Agent/QuestionBank gRPC 地址、LLM、限流与脚本凭据。
 - `sdk/python/core/`：公共层 config/events/http/ratelimit/bank/llm（单测通过）。
 - 平台脚本：已迁出为独立仓库（`CometNetworkStudio/{cidaren,welearn}`），由 Go Host 以子进程运行；旧 `run_cli.py` 已移除。
 - 文档：`README.md`、`docs/`（reference-analysis / development-plan / script-protocol / integration-guide / build-and-run 等）。
@@ -111,8 +111,8 @@
 
 **已实现**
 - `internal/repository/domain.go`：`UserRepository` / `CredentialRepository` / `TaskRepository` / `QuestionRepository`（GORM，凭据/题库 upsert）。
-- `internal/service/{auth,credential,task,question}.go`：bcrypt+JWT 注册登录；AES-256-GCM 凭据加解密（`pkg/crypto`，密钥 `OMNITASK_MASTER_KEY`）；任务 CRUD；题库 Lookup/Save/List。
-- `internal/handler/domain.go` + `router` + `server/http.go`：`/api/v1/auth/register|login`、`/api/v1/credentials`、`/api/v1/tasks`、`/api/v1/questions(+/lookup)`；JWT 中间件保护。
+- `internal/service/{auth,credential,task,question}.go`：bcrypt + 服务端会话注册登录；AES-256-GCM 凭据加解密（`pkg/crypto`，密钥 `OMNITASK_MASTER_KEY`）；任务 CRUD；题库 Lookup/Save/List。
+- `internal/handler/domain.go` + `router` + `server/http.go`：`/api/v1/auth/register|login`、`/api/v1/credentials`、`/api/v1/tasks`、`/api/v1/questions(+/lookup)`；会话中间件保护。
 - 迁移接入 5 张表；配置切到 MySQL(3380) `omnitask` + Redis(6350)；wire 重新生成。
 
 **验收记录**
@@ -125,7 +125,7 @@
 **模型（`internal/model/`）**：`User`、`Credential`、`Task`、`TaskEvent`、`Question`。
 **repository**：GORM + gorm/gen；`CredentialRepository`、`TaskRepository`、`QuestionRepository`、`UserRepository`。
 **service**
-- `auth`：注册/登录（bcrypt）+ JWT。
+- `auth`：注册/登录（bcrypt + 服务端会话 Cookie）。
 - `credential`：AES-256-GCM 加解密，密钥 `OMNITASK_MASTER_KEY`（env）；入库密文+nonce。
 - `task`：增删查、状态机。
 - `question`：Lookup/Save、去重（`platform+question_key` 唯一）。
@@ -165,9 +165,9 @@
 ### P4 前端（已完成）
 
 **已实现**（严格遵守 `AGENTS.md` 前端 UI 规则）
-- 基础设施：Vuetify 4 + 自定义 Theme（`main.js`，颜色/圆角/默认值走 Theme）、Pinia、Vue Router（登录守卫）、Axios 封装 `api/http.js`（JWT 注入、响应解包、401 跳登录）、Vite 代理 `/api`（含 ws）。
+- 基础设施：Vuetify 4 + 自定义 Theme（`main.js`，颜色/圆角/默认值走 Theme）、Pinia、Vue Router（登录守卫）、Axios 封装 `api/http.js`（Cookie 会话、CSRF 头、响应解包、401 跳登录）、Vite 代理 `/api`（含 ws）。
 - 分层：`api/services/{auth,credentials,tasks,questions}.js`；页面不直接使用 axios。
-- Store：`stores/auth.js`（token/用户，localStorage 持久化）、`stores/ui.js`（snackbar）。
+- Store：`stores/auth.js`（内存用户状态，启动时通过 `/me` 恢复会话）、`stores/ui.js`（snackbar）。
 - 页面：登录、注册、任务列表（`v-data-table` + 新建任务对话框，参数按平台 schema 动态渲染，覆盖 `docs/parameters.md`）、任务详情（`/api/v1/ws` 实时进度时间线）、凭据管理（按平台动态字段）、题库（平台筛选 + 表格）。
 - `src/config/platforms.js`：平台/动作/参数/凭据字段 schema；`src/ws/taskSocket.js`：WebSocket 客户端。
 - 合规检查：无内联 `style=`、无 `<style>`、页面无 axios、组件无硬编码颜色。

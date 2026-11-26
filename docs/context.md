@@ -14,7 +14,7 @@
 
 市面上有人掌握这些"信息差"（本质是 GitHub 上一些开源脚本）并借此牟利，而需求很大。本项目的目标是把这些能力**聚合到一个平台**：用户在前端一次配置，后端编排任务并下发指令，Agent（Python）自动执行，用户可实时查看进度，无需再开着浏览器页面、守着电脑或手机。
 
-**项目定位：个人自用**（不做支付/多租户 SaaS，但架构上保留可扩展性）。
+**项目定位：官方免费实例 + 自托管**（面向学生免费开放，不做支付；架构上保留可扩展性）。
 
 ---
 
@@ -23,7 +23,8 @@
 | 项 | 决策 | 备注 |
 |----|------|------|
 | 项目名 | **OmniTask / 万务通** | |
-| 产品形态 | **个人自用** | 不做支付、不做复杂多租户 |
+| 产品形态 | **官方免费实例 + 自托管** | 官方实例免费开放；不做支付、不做复杂多租户 |
+| 官方实例 | **app.omnitasks.top** | 主域 `omnitasks.top` 为静态门户；用户注册即用 |
 | Agent 部署 | **服务器集中式** | 所有 Agent 跑在服务器，剥离 GUI，headless |
 | 脚本来源 | **独立重写（未复制原码）** | 协议事实经所有者授权从参考源码提取，见 `docs/reference-analysis.md` |
 | 开源自用 | **全部 MIT 开源** | 自己写、自己开源，杜绝原项目授权问题 |
@@ -314,7 +315,7 @@ cd frontend && npm run build
 - cidaren 11003 风控（运营项，需人工安全验证）。
 
 ## 21. P0 加固完成（2026-09）
-- **产品方向：小范围多用户**。P0 已完成，剩余项见 `docs/todo.md`（完成后可清空）。
+- **产品方向：官方免费实例（小范围多用户起步）**。P0 已完成，剩余项见 `docs/todo.md`（完成后可清空）。
 - 任务生命周期：`POST /api/v1/tasks/:id/cancel`、`/retry`、`DELETE /api/v1/tasks/:id`；编排器持取消句柄，取消时中断 Host 子进程；启动把 `running/queued` 置 `interrupted`；`agent.task_timeout` 可配超时。
 - 注册控制 `security.registration: open|closed`；生产默认关闭 Swagger（`http.swagger`）；CORS 白名单 `http.cors_origins`（默认同源）。
 - 自检：`./omnitask.sh check`（后端 build/vet/test + 前端 build + SDK 测试）；GitHub Actions `.github/workflows/ci.yml`。
@@ -458,3 +459,38 @@ cd frontend && npm run build
 - **标题**：`/platforms/:id` 的应用栏标题改为「平台名 + 脚本版本」（如 `WeLearn v0.1.6`），平台卡内副标题改为脚本作者。
 - **反馈**：`PlatformResponse` 增加 `author`、`source_url`；应用栏在主题按钮左侧新增 bug 图标，仅当前平台来自 GitHub 时显示，跳转到脚本仓库的 `issues/new`。demo 等非 GitHub 来源不显示。
 - **验证**：WeLearn 标题 `WeLearn v0.1.6`、作者 `CometNetworkStudio`、反馈链接 `https://github.com/CometNetworkStudio/welearn/issues/new`；首页无反馈按钮；demo 显示作者但不显示反馈。
+
+## 41. 门户首页与官方免费实例（2026-11）
+- **域名**：主域 `omnitasks.top` 部署静态门户；应用实例 `app.omnitasks.top`（Vue + Go 同源反代）。选 `app` 因短、通用，后续拆管理后台可用 `admin`。官方实例免费开放，同时保留自托管。
+- **门户入口**：Header、Hero、部署区、CTA、Footer 均提供「在线使用」，统一指向 `https://app.omnitasks.top/`；部署区左侧为官方实例卡，右侧为 lite / full 自托管方式。
+- **信任口径**：官方实例不主动查看、提取、导出或另作他用用户凭据；不出售、不共享数据；通过加密、权限隔离、日志脱敏与审计尽力防护，但不排除被黑客攻击等事件导致泄露，无法承诺绝不泄露；支持删除凭据与任务记录。页面明确「最稳妥仍是自己部署」，并建议设置独立密码。
+- **使用规则**：官方实例仅限个人学习使用，禁止代刷牟利、批量注册、攻击或滥用；并发与频率做合理限制。
+- **实现**：`C:\Users\zym\Desktop\omnitask-portal`（独立静态站，不并入主仓库）；纯 HTML + CSS，无运行期 JS、无外部字体或 CDN；沿用应用主题（primary `#1867C0`、背景 `#F4F6F8`、MD3 圆角与层次），支持系统深浅色。
+- **品牌**：采用新七巧板 Logo；门户使用透明 `logo.png`，门户与前端 favicon 统一为白色圆角图标套件（ico / 32 / 180 / 192 / 512），原 chevron 内联标志已移除。
+- **SEO**：canonical `https://omnitasks.top/`；sitemap/robots 同步真实域名；JSON-LD 增加 `Organization`、`WebSite`、官方实例 `SoftwareApplication` 与 8 条 FAQ。
+- **验证**：本地静态服务 Lighthouse Accessibility / Best Practices / SEO 均为 100，Performance 99–100；390px 与 1440px 无横向溢出。
+
+
+
+## 41. Cookie 会话鉴权与 P0 安全能力（2026-11）
+- **鉴权**：完全移除 JWT，改为服务端会话。Cookie `omnitask_session` 为 `HttpOnly`、`SameSite=Lax`，`Secure` 按 TLS 或 `X-Forwarded-Proto` 自动判断；数据库只存令牌 SHA-256 摘要。禁用账号、修改角色、吊销会话都在下次请求立即生效。
+- **CSRF**：非安全方法要求 `X-CSRF-Token` 与 `omnitask_csrf` 双提交 Cookie 一致，并校验 `Origin`；登录/注册只校验 `Origin`。
+- **元数据**：新增公开 `GET /api/v1/meta`，返回注册模式、邀请码/验证码能力、会话与任务配额，前端按能力渲染注册页与限额提示。
+- **注册与管理员**：`security.registration` 支持 `open/invite/closed`，`security.invite_code` 为邀请码；`security.allow_first_user_admin` 控制首个用户是否自动成为管理员；支持 `OMNITASK_ADMIN_USER`/`OMNITASK_ADMIN_PASSWORD` 启动时创建管理员。
+- **登录防护**：连续失败达到 `security.login_max_failures`（默认 5）后在 `login_window_minutes`（默认 15）内拒绝登录；登录尝试写入 `login_attempts`，失败计数从最近一次成功登录之后重新计算，历史记录保留供审计。未知用户也执行一次 bcrypt，减少用户名枚举。
+- **任务配额**：新增 `task.daily_tasks_per_user` 与 `task.max_pending_per_user`，0 表示不限；`tasks` 增加 `(user_id, created_at)` 索引。
+- **脚本环境**：Host 不再把服务端完整环境变量传给脚本，只传系统白名单与 `OMNITASK_*`，避免主密钥、数据库配置泄漏。
+- **日志**：`env=prod` 时关闭 GORM SQL 明细，避免令牌摘要、凭据密文与业务数据进入日志；同时生产环境默认关闭 Swagger。
+- **管理安全页**：管理员侧边栏新增「安全」，可查看注册方式、会话数、失败登录、锁定与配额，吊销任意会话或某用户全部会话；普通用户可在设置页查看登录设备并退出其他设备。
+- **迁移**：`000012_sessions` 创建 `sessions`、`login_attempts` 和任务索引；升级后旧 JWT 登录状态失效，需要重新登录。
+- **验证**：Cookie 注册/登录/登出、CSRF 403/200、失败锁定 429、管理员吊销即时 401、安全页与会话列表均已在生产构建上验证。
+
+## 42. 管理设置合并与可视化配置（2026-11）
+- **设置页**：移除侧边栏「安全」入口，管理员的安全与配置能力合并到「设置」页新增的「站点安全」「站点配置」标签；普通用户保留「个人」「账号安全」「协议」。
+- **站点安全**：展示注册方式、活跃会话、失败登录、锁定策略和任务配额，可吊销任意会话；卡片间距统一加大。
+- **站点配置**：只暴露注册、会话、登录防护、任务配额、发现间隔等安全可热更新字段，不暴露主密钥、数据库、Redis、Agent 等敏感配置。
+- **覆盖文件**：可视化修改写入主配置同目录的 `*.overrides.yml`（如 `deploy.overrides.yml`），不重写主配置、不丢失注释；启动时自动合并，已在 `.gitignore` 中排除。
+- **热更新**：保存后立即应用到运行中的 viper，注册方式、邀请码、登录锁定、认证限流、会话 Cookie、任务配额、发现间隔均无需重启；会话有效期仅对新登录生效。监听地址、数据库、Agent、日志和密钥仍需重启，页面单独列出。
+- **手动重载**：配置页提供「重新读取文件」，修改主配置或覆盖文件后可立即刷新可编辑字段，无需重启。
+- **接口**：`GET /api/v1/admin/config`、`PUT /api/v1/admin/config`、`POST /api/v1/admin/config/reload`，仅管理员可用，更新日志只记录键名不记录值。
+- **验证**：可视化修改登录失败窗口后 `/admin/security` 立即反映；覆盖文件只包含实际修改的键；主配置保持不变；设置页标签、站点安全数据与卡片间距均已在生产构建验证。
