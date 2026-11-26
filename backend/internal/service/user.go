@@ -141,10 +141,12 @@ func sanitizePinnedPlatforms(values []string) []string {
 
 func toUserResponse(user *model.User) *v1.UserResponse {
 	return &v1.UserResponse{
-		ID:        user.ID,
-		Username:  user.Username,
-		Role:      user.Role,
-		Enabled:   user.Enabled,
-		CreatedAt: user.CreatedAt,
+		ID:              user.ID,
+		Username:        user.Username,
+		Role:            user.Role,
+		Enabled:         user.Enabled,
+		TermsVersion:    user.TermsVersion,
+		TermsAcceptedAt: user.TermsAcceptedAt,
+		CreatedAt:       user.CreatedAt,
 	}
 }

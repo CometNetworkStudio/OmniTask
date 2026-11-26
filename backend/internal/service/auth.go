@@ -48,6 +48,9 @@ func NewAuthService(
 
 // Register 创建用户并直接建立会话。invite 模式下必须提供正确邀请码。
 func (s *AuthService) Register(ctx context.Context, req *v1.RegisterRequest, ip, userAgent string) (*v1.LoginResponse, string, error) {
+	if !req.AcceptTerms || strings.TrimSpace(req.TermsVersion) != v1.CurrentTermsVersion {
+		return nil, "", v1.ErrTermsRequired
+	}
 	mode := strings.TrimSpace(s.conf.GetString("security.registration"))
 	if mode == "" {
 		mode = "open"
@@ -86,7 +89,12 @@ func (s *AuthService) Register(ctx context.Context, req *v1.RegisterRequest, ip,
 	if err != nil {
 		return nil, "", err
 	}
-	user := &model.User{ID: id, Username: username, PasswordHash: string(hash), Role: "user", Enabled: true}
+	now := time.Now()
+	user := &model.User{
+		ID: id, Username: username, PasswordHash: string(hash),
+		Role: "user", Enabled: true,
+		TermsVersion: v1.CurrentTermsVersion, TermsAcceptedAt: &now,
+	}
 	if total, err := s.userRepo.Count(ctx); err == nil && total == 0 {
 		if s.conf.GetBool("security.allow_first_user_admin") {
 			user.Role = "admin" // 自托管默认保留首个用户为管理员

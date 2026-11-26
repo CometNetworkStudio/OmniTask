@@ -9,13 +9,15 @@ import "time"
 //   - 凭据密文只存 cipher+nonce，禁止任何明文列。
 
 type User struct {
-	ID           string `gorm:"primaryKey;size:32"`
-	Username     string `gorm:"uniqueIndex;size:64;not null"`
-	PasswordHash string `gorm:"size:255;not null"`
-	Role         string `gorm:"size:32;not null;default:user"`
-	Enabled      bool   `gorm:"not null;default:true"`
-	CreatedAt    time.Time
-	UpdatedAt    time.Time
+	ID              string `gorm:"primaryKey;size:32"`
+	Username        string `gorm:"uniqueIndex;size:64;not null"`
+	PasswordHash    string `gorm:"size:255;not null"`
+	Role            string `gorm:"size:32;not null;default:user"`
+	Enabled         bool   `gorm:"not null;default:true"`
+	TermsVersion    string `gorm:"size:32;not null;default:''"`
+	TermsAcceptedAt *time.Time
+	CreatedAt       time.Time
+	UpdatedAt       time.Time
 }
 
 // UserPreference 保存用户级界面偏好（当前用于侧边栏置顶平台）。

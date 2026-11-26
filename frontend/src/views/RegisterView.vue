@@ -4,13 +4,20 @@ import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { useMetaStore } from '@/stores/meta'
 import { useUiStore } from '@/stores/ui'
+import { TERMS_VERSION } from '@/content/legal'
 
 const auth = useAuthStore()
 const meta = useMetaStore()
 const ui = useUiStore()
 const router = useRouter()
 
-const form = reactive({ username: '', password: '', confirm: '', invite_code: '' })
+const form = reactive({
+  username: '',
+  password: '',
+  confirm: '',
+  invite_code: '',
+  accepted: false,
+})
 const loading = ref(false)
 const error = ref('')
 const closed = computed(() => meta.registration === 'closed')
@@ -25,6 +32,10 @@ async function submit() {
     error.value = '请输入邀请码'
     return
   }
+  if (!form.accepted) {
+    error.value = '请先阅读并同意用户协议和隐私政策'
+    return
+  }
   loading.value = true
   error.value = ''
   try {
@@ -32,6 +43,8 @@ async function submit() {
       username: form.username,
       password: form.password,
       invite_code: form.invite_code.trim(),
+      accept_terms: true,
+      terms_version: meta.termsVersion || TERMS_VERSION,
     })
     ui.notify('注册成功')
     router.push('/')
@@ -84,6 +97,20 @@ async function submit() {
                   prepend-inner-icon="mdi-ticket-confirmation-outline"
                   hint="当前实例需要邀请码"
                 />
+                <v-checkbox v-model="form.accepted" color="primary" hide-details class="mt-2">
+                  <template #label>
+                    <span class="text-body-small">
+                      我已阅读并同意
+                      <router-link class="text-primary" to="/terms" target="_blank" @click.stop>
+                        《用户协议》
+                      </router-link>
+                      和
+                      <router-link class="text-primary" to="/privacy" target="_blank" @click.stop>
+                        《隐私政策》
+                      </router-link>
+                    </span>
+                  </template>
+                </v-checkbox>
                 <v-btn type="submit" color="primary" block :loading="loading" class="mt-2">
                   注册
                 </v-btn>

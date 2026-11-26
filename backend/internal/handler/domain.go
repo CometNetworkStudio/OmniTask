@@ -89,6 +89,7 @@ func (h *AuthHandler) Meta(ctx *gin.Context) {
 	v1.HandleSuccess(ctx, &v1.MetaResponse{
 		Version:           "0.1.0",
 		Env:               env,
+		TermsVersion:      v1.CurrentTermsVersion,
 		Registration:      registration,
 		InviteRequired:    registration == "invite",
 		Captcha:           false,
@@ -324,7 +325,8 @@ func statusFor(err error) int {
 	case errors.Is(err, v1.ErrUserAlreadyExists), errors.Is(err, v1.ErrUnsupportedPlatform),
 		errors.Is(err, v1.ErrBadRequest), errors.Is(err, v1.ErrCredentialEncrypt),
 		errors.Is(err, v1.ErrTaskNotCancelable), errors.Is(err, v1.ErrRegistrationClosed),
-		errors.Is(err, v1.ErrInvalidTaskParams), errors.Is(err, v1.ErrInviteInvalid):
+		errors.Is(err, v1.ErrInvalidTaskParams), errors.Is(err, v1.ErrInviteInvalid),
+		errors.Is(err, v1.ErrTermsRequired):
 		return http.StatusBadRequest
 	default:
 		return http.StatusInternalServerError

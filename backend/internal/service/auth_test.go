@@ -53,11 +53,17 @@ func TestRegisterInviteAndFirstAdmin(t *testing.T) {
 	})
 	ctx := context.Background()
 
-	_, _, err := auth.Register(ctx, &v1.RegisterRequest{Username: "alice", Password: "password1", InviteCode: "wrong"}, "1.1.1.1", "test")
+	_, _, err := auth.Register(ctx, &v1.RegisterRequest{
+		Username: "alice", Password: "password1", InviteCode: "wrong",
+		AcceptTerms: true, TermsVersion: v1.CurrentTermsVersion,
+	}, "1.1.1.1", "test")
 	if !errors.Is(err, v1.ErrInviteInvalid) {
 		t.Fatalf("expected invite error, got %v", err)
 	}
-	resp, token, err := auth.Register(ctx, &v1.RegisterRequest{Username: "alice", Password: "password1", InviteCode: "let-me-in"}, "1.1.1.1", "test")
+	resp, token, err := auth.Register(ctx, &v1.RegisterRequest{
+		Username: "alice", Password: "password1", InviteCode: "let-me-in",
+		AcceptTerms: true, TermsVersion: v1.CurrentTermsVersion,
+	}, "1.1.1.1", "test")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -80,7 +86,10 @@ func TestLoginLockoutAndDisabledUser(t *testing.T) {
 	})
 	ctx := context.Background()
 
-	if _, _, err := auth.Register(ctx, &v1.RegisterRequest{Username: "bob", Password: "password1"}, "1.1.1.1", "test"); err != nil {
+	if _, _, err := auth.Register(ctx, &v1.RegisterRequest{
+		Username: "bob", Password: "password1",
+		AcceptTerms: true, TermsVersion: v1.CurrentTermsVersion,
+	}, "1.1.1.1", "test"); err != nil {
 		t.Fatal(err)
 	}
 	for i := 0; i < 3; i++ {
@@ -105,10 +114,40 @@ func TestLoginLockoutAndDisabledUser(t *testing.T) {
 	}
 }
 
+func TestRegisterRequiresTermsAndStoresConsent(t *testing.T) {
+	auth, _, users := newTestAuthService(t, nil)
+	ctx := context.Background()
+
+	_, _, err := auth.Register(ctx, &v1.RegisterRequest{
+		Username: "dave", Password: "password1", TermsVersion: v1.CurrentTermsVersion,
+	}, "1.1.1.1", "test")
+	if !errors.Is(err, v1.ErrTermsRequired) {
+		t.Fatalf("missing checkbox should fail, got %v", err)
+	}
+
+	resp, _, err := auth.Register(ctx, &v1.RegisterRequest{
+		Username: "dave", Password: "password1",
+		AcceptTerms: true, TermsVersion: v1.CurrentTermsVersion,
+	}, "1.1.1.1", "test")
+	if err != nil {
+		t.Fatal(err)
+	}
+	user, err := users.GetByID(ctx, resp.User.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if user.TermsVersion != v1.CurrentTermsVersion || user.TermsAcceptedAt == nil {
+		t.Fatalf("consent not stored: %+v", user)
+	}
+}
+
 func TestLogoutRevokesSession(t *testing.T) {
 	auth, sessions, _ := newTestAuthService(t, nil)
 	ctx := context.Background()
-	_, token, err := auth.Register(ctx, &v1.RegisterRequest{Username: "carol", Password: "password1"}, "1.1.1.1", "test")
+	_, token, err := auth.Register(ctx, &v1.RegisterRequest{
+		Username: "carol", Password: "password1",
+		AcceptTerms: true, TermsVersion: v1.CurrentTermsVersion,
+	}, "1.1.1.1", "test")
 	if err != nil {
 		t.Fatal(err)
 	}

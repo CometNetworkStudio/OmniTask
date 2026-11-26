@@ -66,6 +66,12 @@ async function submit() {
               {{ meta.registration === 'invite' ? '使用邀请码注册' : '注册' }}
             </v-btn>
           </v-card-actions>
+          <v-card-text class="pt-0 text-center text-body-small text-medium-emphasis">
+            登录即表示你已阅读并同意
+            <router-link class="text-primary" to="/terms">《用户协议》</router-link>
+            和
+            <router-link class="text-primary" to="/privacy">《隐私政策》</router-link>
+          </v-card-text>
         </v-card>
       </v-col>
     </v-row>

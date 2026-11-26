@@ -1,9 +1,14 @@
 package v1
 
+// CurrentTermsVersion 是当前用户协议与隐私政策的版本号，注册时必须明确同意。
+const CurrentTermsVersion = "2026-11-26"
+
 type RegisterRequest struct {
-	Username   string `json:"username" binding:"required,min=3,max=64"`
-	Password   string `json:"password" binding:"required,min=8,max=128"`
-	InviteCode string `json:"invite_code" binding:"max=128"`
+	Username     string `json:"username" binding:"required,min=3,max=64"`
+	Password     string `json:"password" binding:"required,min=8,max=128"`
+	InviteCode   string `json:"invite_code" binding:"max=128"`
+	AcceptTerms  bool   `json:"accept_terms"`
+	TermsVersion string `json:"terms_version" binding:"max=32"`
 }
 
 type LoginRequest struct {

@@ -75,6 +75,14 @@ OMNITASK_ADMIN_PASSWORD='至少 8 位的强密码'
 - 非安全方法需要携带 `X-CSRF-Token`，值来自 `omnitask_csrf` Cookie。
 - WebSocket 同样使用会话 Cookie，并要求任务归属或管理员权限。
 
+## 协议与合规
+
+- 应用内公开页面：`/terms`、`/privacy`，未登录可访问；设置页「协议」展示同一版本。
+- 门户：`https://omnitasks.top/legal.html`，包含用户协议、隐私政策、数据保留与删除规则、滥用投诉和封禁流程。
+- 注册必须勾选同意，后端记录协议版本与同意时间。
+- 滥用和隐私请求加入 QQ 频道 `https://pd.qq.com/s/N834h64oek`（频道号 `pd84113918`），敏感信息不要发到公开 Issue。
+- 修改协议时同步更新后端 `CurrentTermsVersion`、前端 `frontend/src/content/legal.js` 和门户 `legal.html`。
+
 ## 管理员设置
 
 管理员在「设置」页会看到额外的「站点安全」「站点配置」标签：

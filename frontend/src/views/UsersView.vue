@@ -19,6 +19,7 @@ const headers = [
   { title: '用户名', key: 'username' },
   { title: '角色', key: 'role' },
   { title: '状态', key: 'enabled', sortable: false },
+  { title: '协议', key: 'terms_version', sortable: false },
   { title: '注册时间', key: 'created_at' },
 ]
 
@@ -116,6 +117,12 @@ async function setEnabled(item, enabled) {
             :disabled="isSelf(item)"
             @update:model-value="(value) => setEnabled(item, value)"
           />
+        </template>
+        <template #item.terms_version="{ item }">
+          <v-chip v-if="item.terms_version" size="small" variant="tonal" color="success">
+            {{ item.terms_version }}
+          </v-chip>
+          <span v-else class="text-medium-emphasis">未记录</span>
         </template>
         <template #item.created_at="{ item }">
           {{ formatTime(item.created_at) }}

@@ -11,6 +11,7 @@ export const useMetaStore = defineStore('meta', {
   getters: {
     registration: (state) => state.data?.registration || 'open',
     inviteRequired: (state) => Boolean(state.data?.invite_required),
+    termsVersion: (state) => state.data?.terms_version || '',
     captcha: (state) => Boolean(state.data?.captcha),
     limits: (state) => state.data?.limits || {},
     features: (state) => state.data?.features || {},

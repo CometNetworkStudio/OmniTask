@@ -34,4 +34,5 @@ var (
 	ErrDailyTaskLimit       = newError(1022, "今日任务次数已达上限")
 	ErrPendingTaskLimit     = newError(1023, "待处理任务已达上限")
 	ErrCSRFInvalid          = newError(1024, "请求校验失败，请刷新页面后重试")
+	ErrTermsRequired        = newError(1025, "请先阅读并同意用户协议和隐私政策")
 )

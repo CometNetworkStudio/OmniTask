@@ -5,6 +5,8 @@ import { useMetaStore } from '@/stores/meta'
 const routes = [
   { path: '/login', name: 'login', component: () => import('@/views/LoginView.vue'), meta: { public: true } },
   { path: '/register', name: 'register', component: () => import('@/views/RegisterView.vue'), meta: { public: true } },
+  { path: '/terms', name: 'terms', component: () => import('@/views/LegalView.vue'), meta: { public: true, allowAuthenticated: true, doc: 'terms' } },
+  { path: '/privacy', name: 'privacy', component: () => import('@/views/LegalView.vue'), meta: { public: true, allowAuthenticated: true, doc: 'privacy' } },
   { path: '/home', name: 'home', component: () => import('@/views/HomeView.vue') },
   { path: '/tasks', name: 'tasks', component: () => import('@/views/TasksView.vue') },
   { path: '/tasks/:id', name: 'task-detail', component: () => import('@/views/TaskDetailView.vue') },
@@ -30,7 +32,7 @@ router.beforeEach(async (to) => {
   const meta = useMetaStore()
   await Promise.all([auth.bootstrap(), meta.load()])
 
-  if (to.meta.public && auth.isAuthenticated) {
+  if (to.meta.public && auth.isAuthenticated && !to.meta.allowAuthenticated) {
     return { name: 'home' }
   }
   if (!to.meta.public && !auth.isAuthenticated) {

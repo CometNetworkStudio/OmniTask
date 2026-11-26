@@ -4,17 +4,21 @@ import { useRoute, useRouter } from 'vue-router'
 import { credentialsApi } from '@/api/services/credentials'
 import { securityApi } from '@/api/services/security'
 import { useAuthStore } from '@/stores/auth'
+import { useMetaStore } from '@/stores/meta'
 import { usePlatformsStore } from '@/stores/platforms'
 import { useUiStore } from '@/stores/ui'
 import { formatTime } from '@/utils/format'
+import { CONTACT_QQ_NUMBER, CONTACT_QQ_URL, LEGAL_DOCS, TERMS_VERSION } from '@/content/legal'
 import AdminConfigPanel from '@/components/AdminConfigPanel.vue'
 import AdminSecurityPanel from '@/components/AdminSecurityPanel.vue'
 import DataTable from '@/components/DataTable.vue'
+import LegalDocument from '@/components/LegalDocument.vue'
 import TabsPanel from '@/components/TabsPanel.vue'
 
 const route = useRoute()
 const router = useRouter()
 const auth = useAuthStore()
+const meta = useMetaStore()
 const platforms = usePlatformsStore()
 const ui = useUiStore()
 
@@ -224,22 +228,66 @@ watch(tab, (value) => {
       </template>
 
       <template #agreement>
-        <v-card class="mb-3">
-          <v-card-item>
-            <v-card-title class="text-title-large">免责声明</v-card-title>
-          </v-card-item>
-          <v-card-text class="text-body-medium">
-            本项目仅供个人学习与技术研究使用。请遵守各平台服务条款与学校相关规定，因使用本项目产生的一切后果由使用者自行承担。本项目不包含第三方平台脚本代码，脚本由作者独立发布并自负责任。
-          </v-card-text>
-        </v-card>
+        <v-alert type="info" variant="tonal" class="mb-4">
+          当前协议版本 {{ meta.termsVersion || TERMS_VERSION }}。未登录时也可以通过
+          <router-link class="text-primary" to="/terms">/terms</router-link>
+          和
+          <router-link class="text-primary" to="/privacy">/privacy</router-link>
+          查看完整内容。
+        </v-alert>
+
+        <v-expansion-panels
+          model-value="terms"
+          variant="accordion"
+          rounded="xl"
+          elevation="2"
+          class="mb-4 overflow-hidden"
+        >
+          <v-expansion-panel value="terms">
+            <v-expansion-panel-title>用户协议</v-expansion-panel-title>
+            <v-expansion-panel-text>
+              <LegalDocument :doc="LEGAL_DOCS.terms" />
+            </v-expansion-panel-text>
+          </v-expansion-panel>
+          <v-expansion-panel value="privacy">
+            <v-expansion-panel-title>隐私政策</v-expansion-panel-title>
+            <v-expansion-panel-text>
+              <LegalDocument :doc="LEGAL_DOCS.privacy" />
+            </v-expansion-panel-text>
+          </v-expansion-panel>
+        </v-expansion-panels>
+
         <v-card>
           <v-card-item>
-            <v-card-title class="text-title-large">凭据与隐私</v-card-title>
+            <v-card-title class="text-title-large">投诉与联系</v-card-title>
+            <v-card-subtitle>滥用举报、隐私请求、账号申诉</v-card-subtitle>
           </v-card-item>
           <v-card-text class="text-body-medium">
-            <p class="mb-2">OmniTask 需要代你登录目标平台，因此任何部署实例在任务运行时都能在技术上解密你的凭据。加密（AES-256-GCM）只能防止数据库/备份泄露，防不住恶意运维。</p>
-            <p class="mb-2">请只使用你信任的实例，不要使用来路不明的公开部署；担心风险请自行本地部署。</p>
-            <p>建议为各平台使用独立密码，避免与邮箱、银行等账号相同。每次凭据解密都会记录在「安全」标签页，供你自查。</p>
+            <p class="mb-2">
+              QQ 频道：
+              <a
+                class="text-primary"
+                :href="CONTACT_QQ_URL"
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                加入一起讨论
+              </a>
+            </p>
+            <p class="mb-2">频道号：{{ CONTACT_QQ_NUMBER }}</p>
+            <p class="mb-2">
+              GitHub：
+              <a
+                class="text-primary"
+                href="https://github.com/CometNetworkStudio/OmniTask/issues/new"
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                提交 Issue
+              </a>
+              ，请勿在公开渠道发布密码、Cookie、令牌或他人隐私。
+            </p>
+            <p>受理与封禁流程见用户协议第六、七节，数据保留与删除规则见隐私政策第四节。</p>
           </v-card-text>
         </v-card>
       </template>

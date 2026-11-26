@@ -12,6 +12,7 @@ type MetaLimits struct {
 type MetaResponse struct {
 	Version           string          `json:"version"`
 	Env               string          `json:"env"`
+	TermsVersion      string          `json:"terms_version"`
 	Registration      string          `json:"registration"`
 	InviteRequired    bool            `json:"invite_required"`
 	Captcha           bool            `json:"captcha"`
