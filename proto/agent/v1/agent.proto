@@ -24,7 +24,7 @@ message ScriptInfo {
   string author = 4;
   string icon = 5;
   string runtime = 6;
-  string manifest = 7; // 原始 script.json
+  string manifest = 7; // 原始 omnitask.json
   string hash = 8;     // manifest sha256
   bool available = 9;
   string error = 10;   // 运行时不可用原因

@@ -26,14 +26,14 @@
     ├── active.json              # {"active":"<version>","previous":"<version>"}
     └── versions/
         └── <version>/
-            ├── script.json      # 必须
+            ├── omnitask.json      # 必须
             ├── main.py          # entry（示例）
             └── ...
 ```
 
-兼容旧的扁平布局 `<scripts_dir>/<script-id>/script.json`；安装新脚本时自动使用版本化布局。
+兼容旧的扁平布局 `<scripts_dir>/<script-id>/omnitask.json`；安装新脚本时自动使用版本化布局。
 
-`script.json`（推荐完整写法）：
+`omnitask.json`（推荐完整写法）：
 
 ```json
 {

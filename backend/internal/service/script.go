@@ -8,7 +8,6 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -270,7 +269,7 @@ func (s *ScriptService) hasBackup(id string) bool {
 	if err != nil || active.Previous == "" {
 		return false
 	}
-	_, err = os.Stat(filepath.Join(s.versionDir(id, active.Previous), "script.json"))
+	_, err = os.Stat(filepath.Join(s.versionDir(id, active.Previous), agenthost.ManifestFileName))
 	return err == nil
 }
 
@@ -280,7 +279,7 @@ func (s *ScriptService) Rollback(ctx context.Context, id string) (*v1.ScriptResp
 	if err != nil || active.Previous == "" {
 		return nil, fmt.Errorf("%w: 没有可回滚的版本", v1.ErrBadRequest)
 	}
-	if _, err := os.Stat(filepath.Join(s.versionDir(id, active.Previous), "script.json")); err != nil {
+	if _, err := os.Stat(filepath.Join(s.versionDir(id, active.Previous), agenthost.ManifestFileName)); err != nil {
 		return nil, fmt.Errorf("%w: 上一版本文件不存在", v1.ErrBadRequest)
 	}
 	active.Active, active.Previous = active.Previous, active.Active
@@ -439,7 +438,7 @@ func (s *ScriptService) install(ctx context.Context, rawURL, ref string, report 
 	rawManifest := bytes.TrimPrefix(buf, []byte{0xEF, 0xBB, 0xBF})
 	var manifest agenthost.Manifest
 	if err := json.Unmarshal(rawManifest, &manifest); err != nil {
-		return nil, fmt.Errorf("解析 script.json 失败: %w", err)
+		return nil, fmt.Errorf("解析 %s 失败: %w", agenthost.ManifestFileName, err)
 	}
 	if err := agenthost.ValidateManifest(&manifest); err != nil {
 		return nil, err
@@ -786,7 +785,7 @@ func findManifest(root string) (string, error) {
 		if err != nil {
 			return err
 		}
-		if !info.IsDir() && info.Name() == "script.json" {
+		if !info.IsDir() && info.Name() == agenthost.ManifestFileName {
 			found = path
 			return filepath.SkipAll
 		}
@@ -796,7 +795,7 @@ func findManifest(root string) (string, error) {
 		return "", err
 	}
 	if found == "" {
-		return "", errors.New("压缩包中未找到 script.json")
+		return "", fmt.Errorf("压缩包中未找到 %s", agenthost.ManifestFileName)
 	}
 	return found, nil
 }

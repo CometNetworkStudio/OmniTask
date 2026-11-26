@@ -82,7 +82,7 @@ go build -o omnitask-agent  ./cmd/agent
 
 - 包装仓：保留原项目，加一个 `adapter.py` 映射 action。
 - 装饰器：`from omnitask_sdk import action, serve`，几行代码接入。
-- CLI 桥：已有命令行工具，只写 `script.json`。
+- CLI 桥：已有命令行工具，只写 `omnitask.json`。
 
 ```bash
 pip install "git+https://github.com/CometNetworkStudio/OmniTask.git#subdirectory=sdk/python"

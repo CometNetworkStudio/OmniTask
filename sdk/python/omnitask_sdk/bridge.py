@@ -1,6 +1,6 @@
 """CLI 桥：把已有命令行项目「零代码」接入 OmniTask。
 
-在脚本仓库只写 ``script.json``（无需自己的 Python 代码）：
+在脚本仓库只写 ``omnitask.json``（无需自己的 Python 代码）：
 
     {
       "id": "some-cli", "name": "某 CLI 项目", "runtime": "python3",
@@ -13,7 +13,7 @@
     }
 
 Host 会以 cwd=脚本目录、``python -m omnitask_sdk.bridge`` 启动本桥；
-本桥读取 ``./script.json`` 找到对应 ``command`` 执行，并把子进程输出转为事件。
+本桥读取 ``./omnitask.json`` 找到对应 ``command`` 执行，并把子进程输出转为事件。
 命令行参数支持 ``{key}`` 占位符（取自 params / credentials / action / task_id）。
 
 进度：默认识别形如 ``[progress] 42 正在处理`` 的输出行；可用 manifest 的
@@ -37,6 +37,8 @@ import re
 import signal
 import subprocess
 import sys
+
+MANIFEST = "omnitask.json"
 
 DEFAULT_PROGRESS_RE = re.compile(r"\[progress\]\s*(\d+)\s*(.*)")
 STEP_RE = re.compile(r"\[step\]\s*(\S+)\s+(running|succeeded|failed|skipped)\s*(.*)")
@@ -168,7 +170,7 @@ def _load_manifest() -> dict:
         roots.append(os.environ["OMNITASK_SCRIPT_DIR"])
     roots.append(os.getcwd())
     for root in roots:
-        path = os.path.join(root, "script.json")
+        path = os.path.join(root, MANIFEST)
         try:
             with open(path, encoding="utf-8-sig") as handle:
                 return json.load(handle)

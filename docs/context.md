@@ -229,7 +229,7 @@ cd frontend && npm run build
 - **角色/权限**：仅 `admin` / `user` 两角色；后端引入 **Casbin**（RESTful model，`keyMatch2`），按 `(role, route, method)` 鉴权；**首个注册用户自动为 admin**；「脚本」页仅 admin 可见。前端同一套，按角色条件渲染。
 - **数据库迁移**：full 用 **golang-migrate**（`internal/migration`，embed SQL；`server -migrate` 或 `data.db.migrate_on_start`）；lite 用 AutoMigrate。
 - **README**：根目录改为面向 GitHub 的展示型 README；原上下文存档移至 `docs/context.md`；接入文档 `docs/integration-guide.md`。
-- **脚本插件化方向**：`manifest(script.json)` + gRPC 契约（`AgentService.Execute` 已是通用）；仅**管理员**安装、固定 commit、安装前审核；脚本独立仓库、**不入主库并 gitignore**；恶意脚本风险由使用者自辨，平台声明免责。
+- **脚本插件化方向**：`manifest(omnitask.json)` + gRPC 契约（`AgentService.Execute` 已是通用）；仅**管理员**安装、固定 commit、安装前审核；脚本独立仓库、**不入主库并 gitignore**；恶意脚本风险由使用者自辨，平台声明免责。
 - **前端规则**：MD3 圆角（`elevated`+`rounded=xl`，card `elevation=2`）、含输入对话框 `persistent`、统一 `v-snackbar-queue`（见 `AGENTS.md`）。
 - **部署**：`./omnitask.sh deploy` 一键构建+迁移+重启；公网 `https://<your-host>:4096/omnitask/`；nginx 497 回退到 HTTPS。
 
@@ -237,7 +237,7 @@ cd frontend && npm run build
 
 - **采用方案 C**：Go Host（`cmd/agent`，可与 backend 同构）+ 子进程脚本 + **stdio NDJSON** 协议；脚本任意语言，可独立单跑。
 - 运行时缺失（如未装 Python）→ Host 预检标记不可用并提示；接受“检测并提示用户装 Python”。
-- 脚本 manifest `script.json` 含 `runtime/entry/requires/actions/params/credentials`；规范见 `docs/script-protocol.md`。
+- 脚本 manifest `omnitask.json` 含 `runtime/entry/requires/actions/params/credentials`；规范见 `docs/script-protocol.md`。
 - 安装：后端接收 GitHub 链接 → 下载 zip 到 `scripts/<id>/`（预留加速源，前端拼接）；仅管理员；固定 commit。
 - 多机 Agent：**暂不做**（未来再加 `agent_id`/心跳）。
 - full/lite 双模式：待脚本化稳定后做；lite 用 `github.com/glebarez/sqlite`（纯 Go）+ 无 Redis；密钥明文入 `config.yaml`（拍板）。
@@ -281,7 +281,7 @@ cd frontend && npm run build
 ## 19. 脚本生态：SDK 正式化 + 三种接入（2026-09）
 - 不强制文件名：manifest 支持 `entry`（文件）或 `module`（`python -m`），二者均任意。
 - Python SDK 正式化：`sdk/python` 包名 `omnitask_sdk`，`pyproject.toml` 可 `pip install git+...#subdirectory=sdk/python`；protobuf 生成物随包提交（`omnitask_sdk/gen`）。
-- 三种接入：A 包装仓（`adapter.py`，原项目零改）、B 装饰器 `@action`+`serve`、C CLI 桥（仅 `script.json`，`module: omnitask_sdk.bridge` + `actions[].command` + `progress_regex`）。
+- 三种接入：A 包装仓（`adapter.py`，原项目零改）、B 装饰器 `@action`+`serve`、C CLI 桥（仅 `omnitask.json`，`module: omnitask_sdk.bridge` + `actions[].command` + `progress_regex`）。
 - 新增 `AdapterContext`（params/credentials/progress/log/result）。
 - Host：支持 manifest `module`；SDK 运行时支持生成器与装饰器两种。
 - Makefile `proto-py` 输出改到 `sdk/python/omnitask_sdk/gen` 并修正生成文件导入。
@@ -353,7 +353,7 @@ cd frontend && npm run build
 
 ## 26. 接入学习通（chaoxing，GPL-3.0，隔离）(2026-09)
 - 选用**方案 A（GPL 隔离）**：`CometNetworkStudio/chaoxing`（fork 自 `Samueli924/chaoxing`，GPL-3.0）作为**独立脚本仓库**，不并入 MIT 主库；通过进程边界接入。
-- 该 fork 新增：`omnitask_entry.py`（stdio 适配器，生成临时 config.ini 调 main.py、合并 stderr、解析 `NN%` 进度）、`script.json`（manifest：动作 study/learning_count、凭据账号密码、参数 course_list/speed/jobs/…）；`requirements.txt` 追加 `omnitask-sdk`。已推送。
+- 该 fork 新增：`omnitask_entry.py`（stdio 适配器，生成临时 config.ini 调 main.py、合并 stderr、解析 `NN%` 进度）、`omnitask.json`（manifest：动作 study/learning_count、凭据账号密码、参数 course_list/speed/jobs/…）；`requirements.txt` 追加 `omnitask-sdk`。已推送。
 - 关键适配点：该工具日志/进度走 **stderr**（loguru+tqdm）→ 适配器 `stderr=STDOUT` 捕获；`course_list` 为空会交互式 `input()` → 适配器传 `all` 规避。
 - 验证：OmniTask 脚本页安装成功；Host `Health` 识别 `chaoxing`；任务链路 后端→Host→适配器→main.py 正常（因未装 chaoxing 依赖按预期 `failed`）。
 - 实机运行需：`agent.auto_install_deps: true`（安装其较重依赖，含 ddddocr）或手动装；建议 Python 3.13。
@@ -378,7 +378,7 @@ cd frontend && npm run build
 - **文档**：新增 `docs/script-development.md`，同步协议、接入指南、SDK README。
 
 ## 29. 脚本管理闭环（2026-11）
-- **Host 实时清单**：proto 新增 `ListScripts`，返回完整 manifest、sha256、运行时路径与可用性；后端 `ScriptService.Sync` 以 Host 为准刷新注册表，改 `script.json` 无需重装，Host 不可达时不误标缺失。
+- **Host 实时清单**：proto 新增 `ListScripts`，返回完整 manifest、sha256、运行时路径与可用性；后端 `ScriptService.Sync` 以 Host 为准刷新注册表，改 `omnitask.json` 无需重装，Host 不可达时不误标缺失。
 - **脚本详情**：`GET /api/v1/scripts/:id` 返回 manifest、动作、来源、ref、commit、hash、状态、最近错误；前端新增 `/scripts/:id` 详情页。
 - **平台内调试**：`POST /api/v1/scripts/:id/debug` 直接运行脚本并返回组件事件，仅管理员；前端详情页提供参数、凭据与事件面板。
 - **安装管理**：安装任务落库 `script_install_jobs`（迁移 000008），重启可查；`scripts` 增加 `ref/commit_sha/manifest_hash/last_error`；新增 `POST /scripts/:id/reinstall` 与 `POST /scripts/:id/rollback`，安装前保留上一版本，前端支持「重新安装 / 回滚」。
@@ -504,3 +504,11 @@ cd frontend && npm run build
 - **门户**：`omnitask-portal/legal.html` 提供同一版本协议，门户导航和页脚增加协议、隐私、滥用投诉入口。
 - **运营流程**：公开联系渠道为 QQ 频道 `https://pd.qq.com/s/N834h64oek`（频道号 `pd84113918`）；核验通常不超过 3 个工作日；可采取警告、限权、吊销会话、暂停或永久封禁、下架脚本、轮换邀请码和限制来源 IP；申诉窗口 7 日。
 - **验证**：未登录访问 `/terms`、`/privacy` 正常；未勾选协议注册返回 400 且不建号；勾选后成功并写入版本与时间；门户 `legal.html` 可访问且包含协议、隐私和投诉内容。
+
+## 44. 脚本 manifest 更名为 omnitask.json（2026-11）
+- **决策**：项目刚开源，只有一个正式接入脚本，直接放弃 `script.json` 兼容，统一改为 `omnitask.json`，避免长期维护双文件名。
+- **后端**：`agenthost.ManifestFileName` 统一常量；脚本扫描、版本校验、回滚、压缩包查找和错误提示全部使用 `omnitask.json`。
+- **SDK**：`omnitask-sdk` 的 CLI 和 bridge 只读取 `omnitask.json`。
+- **文档**：README、脚本协议、开发指南、接入指南和参数说明全部同步。
+- **官方脚本**：WeLearn 仓库已将 manifest 重命名为 `omnitask.json` 并推送。
+- **升级影响**：旧 Host 无法加载新脚本，旧脚本也无法被新 Host 加载；项目刚开源，当前只有 WeLearn 一个正式脚本，直接更新即可。新脚本目录必须包含 `omnitask.json`。

@@ -21,7 +21,7 @@ from pathlib import Path
 
 from . import __version__
 
-MANIFEST = "script.json"
+MANIFEST = "omnitask.json"
 ALLOWED_STATUS = {"running", "succeeded", "failed", "skipped"}
 
 
@@ -29,7 +29,7 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="omnitask-script", description="OmniTask 脚本开发工具")
     sub = parser.add_subparsers(dest="command", required=True)
 
-    check = sub.add_parser("check", help="校验 script.json 与入口文件")
+    check = sub.add_parser("check", help="校验 omnitask.json 与入口文件")
     check.add_argument("dir", nargs="?", default=".", help="脚本目录，默认当前目录")
 
     run = sub.add_parser("run", help="本地模拟 Host 执行一次脚本")
@@ -41,7 +41,7 @@ def main(argv: list[str] | None = None) -> int:
     run.add_argument("--task-id", default="local-dev", help="模拟任务 id")
     run.add_argument("--timeout", type=float, default=0, help="超时秒数，0 表示不限")
 
-    sub.add_parser("schema", help="输出 script.json 的 JSON Schema")
+    sub.add_parser("schema", help="输出 omnitask.json 的 JSON Schema")
 
     args = parser.parse_args(argv)
     if args.command == "check":

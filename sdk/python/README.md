@@ -37,7 +37,7 @@ if __name__ == "__main__":
     serve()
 ```
 
-`script.json`：`{"protocol":2,"id":"x","name":"X","runtime":"python3","entry":"<你的文件>.py","actions":[{"id":"study","name":"学习"}]}`
+`omnitask.json`：`{"protocol":2,"id":"x","name":"X","runtime":"python3","entry":"<你的文件>.py","actions":[{"id":"study","name":"学习"}]}`
 
 ### B. 生成器（兼容旧写法）
 
@@ -52,7 +52,7 @@ serve(run)
 
 ### C. CLI 桥（零代码接入已有命令行项目）
 
-在脚本仓库**只写 `script.json`**，把自己的命令填进 action：
+在脚本仓库**只写 `omnitask.json`**，把自己的命令填进 action：
 
 ```json
 {

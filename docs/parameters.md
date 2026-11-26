@@ -1,6 +1,6 @@
 # 任务参数（用户可自定义）
 
-> 参数的**唯一事实来源是各脚本的 `script.json` manifest**（`params` / `credentials`）。
+> 参数的**唯一事实来源是各脚本的 `omnitask.json` manifest**（`params` / `credentials`）。
 > 前端按 manifest 动态生成表单；后端原样透传给 Host → 脚本。
 > 本文仅列出官方 `cidaren` / `welearn` 脚本的参数作为参考。
 > 实现：`sdk/python/core/params.py`（脚本内默认值 < `.env` 基础设施 < 任务 params）。

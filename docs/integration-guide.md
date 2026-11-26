@@ -11,9 +11,9 @@ OmniTask 的平台能力来自**可插拔脚本**。脚本是**独立项目**，
 
 | 你的情况 | 推荐方式 | 需要写的代码 |
 |---|---|---|
-| 已有成熟项目（不想动它） | **A. 包装仓** | 一个 `adapter.py` + `script.json` |
+| 已有成熟项目（不想动它） | **A. 包装仓** | 一个 `adapter.py` + `omnitask.json` |
 | 新写脚本 / 愿意加几行 | **B. 装饰器** | 在已有文件加 `@action` + `serve()` |
-| 已有命令行工具 | **C. CLI 桥** | **零代码**，只写 `script.json` |
+| 已有命令行工具 | **C. CLI 桥** | **零代码**，只写 `omnitask.json` |
 
 三种方式最终都由 OmniTask 的 Go Host 以子进程运行（stdio JSON），见协议文档。
 
@@ -29,7 +29,7 @@ pip install "git+https://github.com/CometNetworkStudio/OmniTask.git#subdirectory
 
 ```
 omnitask-mytool/
-├── script.json          # manifest
+├── omnitask.json          # manifest
 ├── adapter.py           # 把 OmniTask 的 action 映射到你的项目
 └── requirements.txt     # 例如 mytool @ git+https://github.com/you/mytool
 ```
@@ -51,7 +51,7 @@ if __name__ == "__main__":
     serve()
 ```
 
-`script.json`：`entry` 指向 `adapter.py`（名字任意）。
+`omnitask.json`：`entry` 指向 `adapter.py`（名字任意）。
 
 ## 4. 方式 B：装饰器（新脚本）
 
@@ -77,7 +77,7 @@ if __name__ == "__main__":
 
 ## 5. 方式 C：CLI 桥（零代码）
 
-脚本仓库**只放 `script.json`**，把你的命令填进去：
+脚本仓库**只放 `omnitask.json`**，把你的命令填进去：
 
 ```json
 {
@@ -96,7 +96,7 @@ if __name__ == "__main__":
 - 输出标记：`[progress] 42 处理中`、`[step] login running 登录`、`[metric] correct 正确率 96 %`、`[log] warn ...`；
 - 其余输出按 info 日志展示；退出码 0=成功。
 
-## 6. manifest（`script.json`）
+## 6. manifest（`omnitask.json`）
 
 字段规范见 `docs/script-protocol.md`。要点：
 - **入口任意**：`entry`（文件）或 `module`（`python -m`）二选一；**没有 `runner.py` 这种硬性要求**。
@@ -129,7 +129,7 @@ python -m omnitask_sdk.cli run --action study --param cid=2416 --credential toke
 
 ## 9. 发布与接入
 
-1. 在 GitHub 建脚本仓库（含 `script.json`）。
+1. 在 GitHub 建脚本仓库（含 `omnitask.json`）。
 2. 管理员的 OmniTask「脚本」页填仓库地址（可选加速源如 `https://gh-proxy.com/`）。
 3. 后端把 zip 下载解压到运行目录 `scripts/<id>/`，Host 热扫描生效。
 4. 之后即可在任务页选择该平台。
@@ -161,11 +161,11 @@ python -m omnitask_sdk.cli run --action study --param cid=2416 --credential toke
 我的项目情况：<简述，例如“已有 CLI：mytool run --cid X”或“已有函数 lib.start(...)”>
 
 请选择最省事的接入方式并产出：
-- 若已有 CLI：只写 script.json，用 "module":"omnitask_sdk.bridge" 与 actions[].command，不要写代码。
+- 若已有 CLI：只写 omnitask.json，用 "module":"omnitask_sdk.bridge" 与 actions[].command，不要写代码。
 - 若已有库：写一个 adapter.py（文件名任意），用 @action("...") 包装，ctx.progress 上报进度，ctx.credentials 取凭据。
 - 若新写：用 @action + serve()，入口文件名自定。
 要求：
-1. script.json 使用 protocol 2，id/name/version/actions/params/credentials 完整。
+1. omnitask.json 使用 protocol 2，id/name/version/actions/params/credentials 完整。
 2. 用 ctx.progress_of / ctx.step / ctx.log / ctx.metric / ctx.result 展示执行过程。
 3. 凭据只用 ctx.credentials，禁止打印/落盘。
 4. 不要复制任何 GPL/无协议项目源码；独立实现，MIT 开源。

@@ -7,7 +7,7 @@ OmniTask 编译后生成两个程序：
 | 程序 | 源码入口 | 作用 |
 |------|----------|------|
 | **omnitask-server** | `backend/cmd/server/main.go` | 主服务：HTTP API（前缀 `/api/v1`）+ WebSocket + 任务编排 + `QuestionBank` gRPC，并在 `/` 托管内嵌的前端 SPA。也负责**数据库迁移**（`-migrate` 或 `data.db.migrate_on_start`） |
-| **omnitask-agent** | `backend/cmd/agent/main.go` | 脚本 Host：扫描脚本目录，按 `script.json` 以**子进程 + stdio JSON** 运行平台脚本（实现在 `backend/internal/agenthost`），对后端暴露 gRPC `AgentService` |
+| **omnitask-agent** | `backend/cmd/agent/main.go` | 脚本 Host：扫描脚本目录，按 `omnitask.json` 以**子进程 + stdio JSON** 运行平台脚本（实现在 `backend/internal/agenthost`），对后端暴露 gRPC `AgentService` |
 
 > 产物里的 `omnitask-agent-windows-amd64.exe` 就是上表的 Host，编译自 **`backend/cmd/agent`**，入口 **`backend/cmd/agent/main.go`**；它**不是**仓库根目录的 `sdk/python/`（那是 Python 脚本 SDK）。
 

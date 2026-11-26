@@ -58,7 +58,7 @@ func TestActiveVersionDir(t *testing.T) {
 	if err := os.MkdirAll(version, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(version, "script.json"), []byte(`{"id":"x"}`), 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(version, "omnitask.json"), []byte(`{"id":"x"}`), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	if err := os.WriteFile(filepath.Join(root, "active.json"), []byte(`{"active":"abc"}`), 0o644); err != nil {

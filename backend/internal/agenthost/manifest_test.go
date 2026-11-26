@@ -45,10 +45,10 @@ func TestLoadScriptsSkipsInvalidAndHandlesBOM(t *testing.T) {
 		t.Fatal(err)
 	}
 	manifest := "\xEF\xBB\xBF" + `{"protocol":2,"id":"good","name":"Good","runtime":"python3","entry":"main.py","actions":[{"id":"run","name":"Run"}]}`
-	if err := os.WriteFile(filepath.Join(good, "script.json"), []byte(manifest), 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(good, "omnitask.json"), []byte(manifest), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(bad, "script.json"), []byte(`{"id":"bad"}`), 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(bad, "omnitask.json"), []byte(`{"id":"bad"}`), 0o644); err != nil {
 		t.Fatal(err)
 	}
 

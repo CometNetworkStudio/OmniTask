@@ -10,7 +10,10 @@ import (
 	"path/filepath"
 )
 
-const ProtocolVersion = 2
+const (
+	ProtocolVersion  = 2
+	ManifestFileName = "omnitask.json"
+)
 
 type Option struct {
 	Label string `json:"label"`
@@ -86,7 +89,7 @@ type Discovery struct {
 	Primary  string            `json:"primary"`   // 卡片视图主字段（列 key），缺省用第一列
 }
 
-// Manifest 对应脚本目录下的 script.json。
+// Manifest 对应脚本目录下的 omnitask.json。
 type Manifest struct {
 	Protocol      int        `json:"protocol"` // 0/1 视为旧协议；当前为 2
 	ID            string     `json:"id"`
@@ -123,16 +126,16 @@ type activeVersion struct {
 // ValidateManifest 做安装/加载时的基础校验；返回第一条可读错误。
 func ValidateManifest(m *Manifest) error {
 	if m.Protocol > ProtocolVersion {
-		return fmt.Errorf("script.json 协议版本 %d 高于当前支持版本 %d", m.Protocol, ProtocolVersion)
+		return fmt.Errorf("%s 协议版本 %d 高于当前支持版本 %d", ManifestFileName, m.Protocol, ProtocolVersion)
 	}
 	if m.ID == "" {
-		return fmt.Errorf("script.json 缺少 id")
+		return fmt.Errorf("%s 缺少 id", ManifestFileName)
 	}
 	if m.Runtime == "" {
-		return fmt.Errorf("%s: script.json 缺少 runtime", m.ID)
+		return fmt.Errorf("%s: %s 缺少 runtime", m.ID, ManifestFileName)
 	}
 	if m.Entry == "" && m.Module == "" {
-		return fmt.Errorf("%s: script.json 需要 entry 或 module", m.ID)
+		return fmt.Errorf("%s: %s 需要 entry 或 module", m.ID, ManifestFileName)
 	}
 	p := m.Protocol
 	if p == 0 {
@@ -187,7 +190,7 @@ func validateFields(fields []Field, scope string) error {
 	return nil
 }
 
-// LoadScripts 扫描 scripts_dir 下每个子目录的 script.json。
+// LoadScripts 扫描 scripts_dir 下每个子目录的 omnitask.json。
 // 单个脚本损坏时跳过，不影响其他脚本加载。
 func LoadScripts(dir string) ([]Script, error) {
 	entries, err := os.ReadDir(dir)
@@ -204,7 +207,7 @@ func LoadScripts(dir string) ([]Script, error) {
 		if !ok {
 			versionDir, versionKey = root, ""
 		}
-		path := filepath.Join(versionDir, "script.json")
+		path := filepath.Join(versionDir, ManifestFileName)
 		buf, err := os.ReadFile(path)
 		if err != nil {
 			continue // 非脚本目录
@@ -230,7 +233,7 @@ func LoadScripts(dir string) ([]Script, error) {
 }
 
 // activeVersionDir 优先读取版本化布局；active.json 存在但无效时返回 false，
-// 由调用方回退到 legacy 的 <id>/script.json 布局。
+// 由调用方回退到 legacy 的 <id>/omnitask.json 布局。
 func activeVersionDir(root string) (string, string, bool) {
 	buf, err := os.ReadFile(filepath.Join(root, "active.json"))
 	if err != nil {
@@ -241,7 +244,7 @@ func activeVersionDir(root string) (string, string, bool) {
 		return "", "", false
 	}
 	dir := filepath.Join(root, "versions", active.Active)
-	if _, err := os.Stat(filepath.Join(dir, "script.json")); err != nil {
+	if _, err := os.Stat(filepath.Join(dir, ManifestFileName)); err != nil {
 		return "", "", false
 	}
 	return dir, active.Active, true

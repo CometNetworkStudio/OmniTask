@@ -12,11 +12,11 @@
 
 ```
 my-script/
-├── script.json
+├── omnitask.json
 └── main.py
 ```
 
-`script.json`：
+`omnitask.json`：
 
 ```json
 {
@@ -288,7 +288,7 @@ Host 取消时会先发送 `{"type":"cancel"}`，给脚本约 3 秒清理时间�
 
 ## 5. CLI 桥：零代码接入
 
-已有命令行工具时，只写 `script.json`，无需写 Python：
+已有命令行工具时，只写 `omnitask.json`，无需写 Python：
 
 ```json
 {
@@ -328,7 +328,7 @@ Host 取消时会先发送 `{"type":"cancel"}`，给脚本约 3 秒清理时间�
 - 更新前会保留上一版本，可在详情页「回滚」
 - 查看运行时状态与最近错误
 
-脚本详情和目标平台页都以 Host 实际加载的 manifest 为准，修改 `script.json` 后无需重装即可刷新 schema。
+脚本详情和目标平台页都以 Host 实际加载的 manifest 为准，修改 `omnitask.json` 后无需重装即可刷新 schema。
 
 ## 7. 任务工作区与并发
 
@@ -336,7 +336,7 @@ Host 取消时会先发送 `{"type":"cancel"}`，给脚本约 3 秒清理时间�
 
 ```text
 <workspaces_dir>/task-<task_id>/
-  script.json
+  omnitask.json
   main.py
   config.ini
   tmp/
@@ -498,6 +498,6 @@ config_path = workdir / "config.ini"
 
 检查是否调用了 `ctx.step` / `ctx.log`，并确认事件字段拼写正确。旧脚本需要按 v2 组件改造后才能获得完整展示。
 
-**修改了 script.json 但界面没变**
+**修改了 omnitask.json 但界面没变**
 
 重新安装脚本以刷新注册表 schema。
