@@ -10,7 +10,7 @@ http:
   swagger: false
   cors_origins: ""
   # nginx 位于 Docker 默认网段，信任其转发头以获取真实客户端 IP。
-  trusted_proxies: "172.16.0.0/12,192.168.0.0/16,10.0.0.0/8"
+  trusted_proxies: "172.16.0.0/12,192.168.0.0/16,10.0.0.0/8,127.0.0.1/32,::1/128"
   tls:
     enabled: false
     cert_file: ""
