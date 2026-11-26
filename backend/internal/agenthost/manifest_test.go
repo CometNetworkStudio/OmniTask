@@ -51,6 +51,14 @@ func TestLoadScriptsSkipsInvalidAndHandlesBOM(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(bad, "omnitask.json"), []byte(`{"id":"bad"}`), 0o644); err != nil {
 		t.Fatal(err)
 	}
+	legacy := filepath.Join(dir, "legacy")
+	if err := os.MkdirAll(legacy, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	legacyManifest := `{"protocol":2,"id":"legacy","name":"Legacy","runtime":"python3","entry":"main.py","actions":[{"id":"run","name":"Run"}]}`
+	if err := os.WriteFile(filepath.Join(legacy, "script.json"), []byte(legacyManifest), 0o644); err != nil {
+		t.Fatal(err)
+	}
 
 	scripts, err := LoadScripts(dir)
 	if err != nil {
