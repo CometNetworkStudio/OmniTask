@@ -12,9 +12,9 @@ echo.
 echo ================= OmniTask 工具箱 =================
 echo  1) 部署（构建前端+后端+Host，迁移，启动）[Windows]
 echo  2) 构建后端 server（选择目标平台）
-echo  3) 构建脚本 Host agent（选择目标平台）
+echo  3) 构建脚本 Host（选择目标平台）
 echo  4) 构建前端（dist，可内嵌进后端）
-echo  5) 构建全部（前端+server+agent，选择目标平台）
+echo  5) 构建全部（前端+server+Host，选择目标平台）
 echo  6) 自检（后端 build/vet/test + 前端构建 + SDK 测试）
 echo  0) 退出
 echo =================================================
@@ -22,7 +22,7 @@ set "choice="
 set /p "choice=请输入选项数字: "
 if "%choice%"=="1" ( call :deploy & goto menu )
 if "%choice%"=="2" ( call :ask_target & call :build_go server %TARGET% & goto menu )
-if "%choice%"=="3" ( call :ask_target & call :build_go agent %TARGET% & goto menu )
+if "%choice%"=="3" ( call :ask_target & call :build_go host %TARGET% & goto menu )
 if "%choice%"=="4" ( call :build_frontend & goto menu )
 if "%choice%"=="5" ( call :ask_target & call :build_all %TARGET% & goto menu )
 if "%choice%"=="6" ( call :check & goto menu )
@@ -42,7 +42,7 @@ if "%t%"=="2" set "TARGET=windows"
 if "%t%"=="3" set "TARGET=both"
 exit /b
 
-rem build_go <server|agent> <linux|windows|both>
+rem build_go <server|host> <linux|windows|both>
 :build_go
 set "GOCMD=%~1"
 set "GT=%~2"
@@ -83,7 +83,7 @@ exit /b
 :build_all
 call :build_frontend
 call :build_go server %1
-call :build_go agent %1
+call :build_go host %1
 echo 构建产物目录：%BUILD%
 dir /b "%BUILD%"
 exit /b
@@ -109,10 +109,10 @@ exit /b
 :deploy
 call :build_frontend
 call :build_go server windows
-call :build_go agent windows
+call :build_go host windows
 echo ==^> 迁移（lite 自动跳过，full 执行）
 "%BUILD%\omnitask-server-windows-amd64.exe" -migrate -conf config.yaml
-echo 启动 backend（首次运行会自动生成 config.yaml，lite 会自动拉起 agent）...
+echo 启动 backend（首次运行会自动生成 config.yaml，lite 会自动拉起 Host）...
 start "OmniTask backend" "%BUILD%\omnitask-server-windows-amd64.exe" -conf config.yaml
 echo 已在新窗口启动。浏览器打开 http://127.0.0.1:8080
 exit /b

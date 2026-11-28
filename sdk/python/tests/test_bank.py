@@ -5,7 +5,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-from omnitask_sdk.gen.agent.v1 import agent_pb2  # noqa: E402
+from omnitask_sdk.gen.host.v1 import host_pb2  # noqa: E402
 from omnitask_sdk.bank import GrpcBank  # noqa: E402
 
 
@@ -16,10 +16,10 @@ class FakeStub:
 
     def Lookup(self, request, timeout=None):
         if not self.found:
-            return agent_pb2.LookupResponse(found=False)
-        return agent_pb2.LookupResponse(
+            return host_pb2.LookupResponse(found=False)
+        return host_pb2.LookupResponse(
             found=True,
-            question=agent_pb2.Question(
+            question=host_pb2.Question(
                 platform=request.platform,
                 question_key=request.question_key,
                 stem="brutal",
@@ -33,24 +33,24 @@ class FakeStub:
 
     def Save(self, request, timeout=None):
         self.saved = request
-        return agent_pb2.SaveResponse(saved=True)
+        return host_pb2.SaveResponse(saved=True)
 
 
 class GrpcBankTest(unittest.TestCase):
     def test_lookup_mapping(self):
-        bank = GrpcBank("unused", stub=FakeStub(), pb2=agent_pb2)
+        bank = GrpcBank("unused", stub=FakeStub(), pb2=host_pb2)
         hit = bank.lookup("cidaren", "k1")
         self.assertEqual(hit["answer"], '{"mode": 11, "corrects": [0]}')
         self.assertEqual(hit["hit_count"], 3)
         self.assertEqual(hit["source"], "api")
 
     def test_lookup_miss(self):
-        bank = GrpcBank("unused", stub=FakeStub(found=False), pb2=agent_pb2)
+        bank = GrpcBank("unused", stub=FakeStub(found=False), pb2=host_pb2)
         self.assertIsNone(bank.lookup("cidaren", "missing"))
 
     def test_save_serializes_objects(self):
         stub = FakeStub()
-        bank = GrpcBank("unused", stub=stub, pb2=agent_pb2)
+        bank = GrpcBank("unused", stub=stub, pb2=host_pb2)
         ok = bank.save(
             {
                 "platform": "cidaren",

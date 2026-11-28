@@ -22,15 +22,15 @@ RUN go install google.golang.org/protobuf/cmd/protoc-gen-go@v1.36.11 \
  && go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@v1.6.1
 RUN protoc -I proto --go_out=backend --go_opt=module=backend \
       --go-grpc_out=backend --go-grpc_opt=module=backend \
-      proto/agent/v1/agent.proto
+      proto/host/v1/host.proto
 
 FROM backend AS server-build
 RUN rm -rf backend/internal/server/webdist && mkdir -p backend/internal/server/webdist
 COPY --from=web /src/frontend/dist ./backend/internal/server/webdist
 RUN cd backend && go build -trimpath -ldflags "-s -w" -o /out/omnitask-server ./cmd/server
 
-FROM backend AS agent-build
-RUN cd backend && go build -trimpath -ldflags "-s -w" -o /out/omnitask-agent ./cmd/agent
+FROM backend AS host-build
+RUN cd backend && go build -trimpath -ldflags "-s -w" -o /out/omnitask-host ./cmd/host
 
 FROM python:3.12-slim AS runtime
 RUN apt-get update \
@@ -46,12 +46,12 @@ RUN chmod +x /app/entrypoint.sh
 EXPOSE 8080 9000
 ENTRYPOINT ["/app/entrypoint.sh", "/config-template/config.yml", "/app/omnitask-server"]
 
-FROM runtime AS agent
+FROM runtime AS host
 COPY deploy/docker-compose/entrypoint.sh /app/entrypoint.sh
-COPY --from=agent-build /out/omnitask-agent /app/omnitask-agent
+COPY --from=host-build /out/omnitask-host /app/omnitask-host
 COPY sdk/python /sdk
 RUN chmod +x /app/entrypoint.sh
 ENV PYTHONPATH=/sdk
 VOLUME ["/data"]
 EXPOSE 50051
-ENTRYPOINT ["/app/entrypoint.sh", "/config-template/config.yml", "/app/omnitask-agent"]
+ENTRYPOINT ["/app/entrypoint.sh", "/config-template/config.yml", "/app/omnitask-host"]

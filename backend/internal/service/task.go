@@ -9,9 +9,9 @@ import (
 	"time"
 
 	v1 "backend/api/v1"
-	"backend/internal/agenthost"
 	"backend/internal/model"
 	"backend/internal/repository"
+	"backend/internal/scripthost"
 	"backend/pkg/log"
 	"backend/pkg/sid"
 	"github.com/spf13/viper"
@@ -58,14 +58,14 @@ func (s *TaskService) validateTask(ctx context.Context, req *v1.TaskCreateReques
 	if err != nil || script.Manifest == "" {
 		return nil
 	}
-	var m agenthost.Manifest
+	var m scripthost.Manifest
 	if err := json.Unmarshal([]byte(script.Manifest), &m); err != nil {
 		return nil
 	}
 	if len(m.Actions) == 0 {
 		return nil
 	}
-	var target *agenthost.Action
+	var target *scripthost.Action
 	for i := range m.Actions {
 		if m.Actions[i].ID == req.Action {
 			target = &m.Actions[i]

@@ -12,7 +12,7 @@ AGENTS.md
 /.script_backups
 frontend/node_modules
 frontend/dist
-backend/api/agent
+backend/api/host
 backend/internal/server/webdist
 backend/config/deploy.yml
 backend/config/local.yml

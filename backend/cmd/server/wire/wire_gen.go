@@ -54,22 +54,22 @@ func NewWire(viperViper *viper.Viper, logger *log.Logger) (*app.App, func(), err
 	}
 	credentialService := service.NewCredentialService(credentialRepository, credentialAccessLogRepository, taskRepository, platformCacheRepository, platformConfigService, cipher, sidSid, logger, viperViper)
 	credentialHandler := handler.NewCredentialHandler(credentialService, logger)
-	agentClient := service.NewAgentClient(viperViper, logger)
+	hostClient := service.NewHostClient(viperViper, logger)
 	client := repository.NewRedis(viperViper)
 	progressStore := service.NewProgressStore(client)
 	hub := ws.NewHub()
-	orchestrator := service.NewOrchestrator(taskRepository, credentialService, agentClient, progressStore, hub, sidSid, viperViper, logger)
+	orchestrator := service.NewOrchestrator(taskRepository, credentialService, hostClient, progressStore, hub, sidSid, viperViper, logger)
 	questionRepository := repository.NewQuestionRepository(repositoryRepository)
 	questionService := service.NewQuestionService(questionRepository, sidSid, viperViper, logger)
 	questionHandler := handler.NewQuestionHandler(questionService, logger)
 	scriptInstallJobRepository := repository.NewScriptInstallJobRepository(repositoryRepository)
-	scriptService := service.NewScriptService(scriptRepository, scriptInstallJobRepository, agentClient, viperViper, sidSid, logger)
+	scriptService := service.NewScriptService(scriptRepository, scriptInstallJobRepository, hostClient, viperViper, sidSid, logger)
 	scriptHandler := handler.NewScriptHandler(scriptService, logger)
 	taskService := service.NewTaskService(taskRepository, scriptRepository, scriptService, credentialService, sidSid, viperViper, logger)
 	taskHandler := handler.NewTaskHandler(taskService, orchestrator, logger)
 	userService := service.NewUserService(userRepository, sessionService, viperViper, logger)
 	userHandler := handler.NewUserHandler(userService, sessionService, viperViper, logger)
-	discoverService := service.NewDiscoverService(platformCacheRepository, scriptRepository, scriptService, credentialService, agentClient, viperViper, sidSid, logger)
+	discoverService := service.NewDiscoverService(platformCacheRepository, scriptRepository, scriptService, credentialService, hostClient, viperViper, sidSid, logger)
 	platformHandler := handler.NewPlatformHandler(discoverService, logger)
 	wsHandler := handler.NewWSHandler(hub, progressStore, taskService, viperViper, logger)
 	configStore := config.NewStore(viperViper)
@@ -103,7 +103,7 @@ func NewWire(viperViper *viper.Viper, logger *log.Logger) (*app.App, func(), err
 
 var repositorySet = wire.NewSet(repository.NewDB, repository.NewRedis, repository.NewRepository, repository.NewUserRepository, repository.NewCredentialRepository, repository.NewCredentialAccessLogRepository, repository.NewPlatformConfigRepository, repository.NewTaskRepository, repository.NewQuestionRepository, repository.NewScriptRepository, repository.NewScriptInstallJobRepository, repository.NewPlatformCacheRepository, repository.NewSessionRepository, repository.NewLoginAttemptRepository)
 
-var serviceSet = wire.NewSet(sid.NewSid, config.NewStore, crypto.FromConfig, authz.NewEnforcer, ws.NewHub, service.NewSessionService, service.NewAuthService, service.NewPlatformConfigService, service.NewCredentialService, service.NewTaskService, service.NewQuestionService, service.NewScriptService, service.NewDiscoverService, service.NewUserService, service.NewAgentClient, service.NewProgressStore, service.NewOrchestrator)
+var serviceSet = wire.NewSet(sid.NewSid, config.NewStore, crypto.FromConfig, authz.NewEnforcer, ws.NewHub, service.NewSessionService, service.NewAuthService, service.NewPlatformConfigService, service.NewCredentialService, service.NewTaskService, service.NewQuestionService, service.NewScriptService, service.NewDiscoverService, service.NewUserService, service.NewHostClient, service.NewProgressStore, service.NewOrchestrator)
 
 var handlerSet = wire.NewSet(handler.NewAuthHandler, handler.NewCredentialHandler, handler.NewTaskHandler, handler.NewQuestionHandler, handler.NewScriptHandler, handler.NewPlatformHandler, handler.NewUserHandler, handler.NewWSHandler, handler.NewConfigHandler)
 

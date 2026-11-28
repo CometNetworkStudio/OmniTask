@@ -1,5 +1,5 @@
 # generated protobuf (run: make proto)
-/backend/api/agent/
+/backend/api/host/
 
 # python
 sdk/python/.venv/

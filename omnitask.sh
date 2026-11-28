@@ -3,7 +3,7 @@
 # 用法：
 #   ./omnitask.sh                     # 进入数字菜单
 #   ./omnitask.sh deploy              # 非交互：部署
-#   ./omnitask.sh server|agent [linux|windows|both]
+#   ./omnitask.sh server|host [linux|windows|both]
 #   ./omnitask.sh frontend [base]     # base 默认 /
 #   ./omnitask.sh all [linux|windows|both]
 set -euo pipefail
@@ -14,7 +14,7 @@ WEB="$ROOT/backend/internal/server/webdist"
 BIN="${OMNITASK_BIN:-$ROOT/bin}"
 LOG="${OMNITASK_LOG:-$ROOT/logs}"
 PID_BACKEND="$BIN/backend.pid"
-PID_AGENT="$BIN/agent.pid"
+PID_HOST="$BIN/host.pid"
 GOCMD=(go build -trimpath -ldflags "-s -w")   # -s -w 去掉符号表/调试信息，减小体积
 mkdir -p "$BUILD" "$BIN" "$LOG"
 
@@ -28,12 +28,12 @@ build_frontend() {
   cp -r "$ROOT/frontend/dist/." "$WEB/"
 }
 
-# build_go <server|agent> <linux|windows|both>
+# build_go <server|host> <linux|windows|both>
 build_go() {
   local cmd="$1" target="$2" out
   case "$cmd" in
     server) out="omnitask-server" ;;
-    agent) out="omnitask-agent" ;;
+    host) out="omnitask-host" ;;
     *) echo "未知命令: $cmd"; return 1 ;;
   esac
   ( cd "$ROOT/backend"
@@ -77,7 +77,7 @@ build_all() {
   local target="$1"
   build_frontend
   build_go server "$target"
-  build_go agent "$target"
+  build_go host "$target"
   echo "构建产物目录：$BUILD"
   ls -1 "$BUILD"
 }
@@ -114,9 +114,9 @@ start_bg() {
 deploy() {
   echo "==> 部署"
   build_frontend /omnitask/
-  echo "==> 编译 backend / agent（原生）"
+  echo "==> 编译 backend / Host（原生）"
   build_native server "$BIN/omnitask-server"
-  build_native agent "$BIN/omnitask-agent"
+  build_native host "$BIN/omnitask-host"
 
   echo "==> 迁移"
   set -a
@@ -127,16 +127,16 @@ deploy() {
   ( cd "$ROOT/backend" && "$BIN/omnitask-server" -migrate -conf "$CONF" )
 
   if command -v systemctl >/dev/null 2>&1 && [ -f /etc/systemd/system/omnitask-server.service ]; then
-    echo "==> systemctl restart omnitask-server omnitask-agent"
+    echo "==> systemctl restart omnitask-server omnitask-host"
     systemctl restart omnitask-server
-    systemctl restart omnitask-agent
+    systemctl restart omnitask-host
   else
     echo "==> 重启 backend"
     stop_by_pidfile "$PID_BACKEND"
     start_bg "$PID_BACKEND" "$LOG/backend.log" "$BIN/omnitask-server" -conf "$CONF"
-    echo "==> 重启 agent"
-    stop_by_pidfile "$PID_AGENT"
-    start_bg "$PID_AGENT" "$LOG/agent.log" "$BIN/omnitask-agent" -conf "$CONF"
+    echo "==> 重启 Host"
+    stop_by_pidfile "$PID_HOST"
+    start_bg "$PID_HOST" "$LOG/host.log" "$BIN/omnitask-host" -conf "$CONF"
   fi
 
   sleep 2
@@ -148,9 +148,9 @@ menu() {
   echo "================ OmniTask 工具箱 ================"
   echo " 1) 部署（构建前端+后端+Host，迁移，重启）"
   echo " 2) 构建后端 server（选择目标平台）"
-  echo " 3) 构建脚本 Host agent（选择目标平台）"
+  echo " 3) 构建脚本 Host（选择目标平台）"
   echo " 4) 构建前端（dist，可内嵌进后端）"
-  echo " 5) 构建全部（前端+server+agent，选择目标平台）"
+  echo " 5) 构建全部（前端+server+Host，选择目标平台）"
   echo " 6) 自检（后端 build/vet/test + 前端构建 + SDK 测试）"
   echo " 0) 退出"
   echo "================================================="
@@ -161,7 +161,7 @@ if [ -n "${1:-}" ]; then
   case "$1" in
     deploy) deploy ;;
     server) build_go server "${2:-linux}" ;;
-    agent) build_go agent "${2:-linux}" ;;
+    host) build_go host "${2:-linux}" ;;
     frontend) build_frontend "${2:-}" ;;
     all) build_all "${2:-both}" ;;
     check) check ;;
@@ -177,7 +177,7 @@ while true; do
   case "${choice:-}" in
     1) deploy ;;
     2) build_go server "$(ask_target)" ;;
-    3) build_go agent "$(ask_target)" ;;
+    3) build_go host "$(ask_target)" ;;
     4) build_frontend ;;
     5) build_all "$(ask_target)" ;;
     6) check ;;

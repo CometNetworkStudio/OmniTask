@@ -2,7 +2,7 @@
 
 > 一处托管，万务自达
 
-面向大学生的**校园任务自动化聚合平台**。把重复、耗时的线上任务交给 Agent 自动完成，把时间还给学习本身。
+面向大学生的**校园任务自动化聚合平台**。把重复、耗时的线上任务交给 Host 自动完成，把时间还给学习本身。
 
 > ⚠️ 本文件是项目的"上下文存档"。聊天记录可能丢失，**任何重要决策、约定、待办都必须回写到本文件**，不要只留在对话里。
 
@@ -12,7 +12,7 @@
 
 大学生在校期间要面对：英语四六级、计算机二级、普通话考试、学科竞赛，以及学校布置的各类线上任务（学习通视频时长、词达人、WeLearn 课程作业与挂时长等）。这些任务重复、耗时。
 
-市面上有人掌握这些"信息差"（本质是 GitHub 上一些开源脚本）并借此牟利，而需求很大。本项目的目标是把这些能力**聚合到一个平台**：用户在前端一次配置，后端编排任务并下发指令，Agent（Python）自动执行，用户可实时查看进度，无需再开着浏览器页面、守着电脑或手机。
+市面上有人掌握这些"信息差"（本质是 GitHub 上一些开源脚本）并借此牟利，而需求很大。本项目的目标是把这些能力**聚合到一个平台**：用户在前端一次配置，后端编排任务并下发指令，Host（Python）自动执行，用户可实时查看进度，无需再开着浏览器页面、守着电脑或手机。
 
 **项目定位：官方免费实例 + 自托管**（面向学生免费开放，不做支付；架构上保留可扩展性）。
 
@@ -25,7 +25,7 @@
 | 项目名 | **OmniTask / 万务通** | |
 | 产品形态 | **官方免费实例 + 自托管** | 官方实例免费开放；不做支付、不做复杂多租户 |
 | 官方实例 | **app.omnitasks.top** | 主域 `omnitasks.top` 为静态门户；用户注册即用 |
-| Agent 部署 | **服务器集中式** | 所有 Agent 跑在服务器，剥离 GUI，headless |
+| Host 部署 | **服务器集中式** | 所有 Host 跑在服务器，剥离 GUI，headless |
 | 脚本来源 | **独立重写（未复制原码）** | 协议事实经所有者授权从参考源码提取，见 `docs/reference-analysis.md` |
 | 开源自用 | **全部 MIT 开源** | 自己写、自己开源，杜绝原项目授权问题 |
 | Go ↔ Python 通信 | **gRPC** | protobuf 强类型，支持 server-streaming 回传进度 |
@@ -34,18 +34,18 @@
 | 首批平台 | **词达人、WeLearn** | 后续扩展学习通等 |
 | 仓库布局 | **Nunu advanced 作 `backend/`**，根目录另建 `frontend/`、`sdk/python/`、`proto/` | 不采用 Nunu monorepo（其前端为 TS） |
 | 前端脚手架 | **Vite `vue` 模板（纯 JS）** + Pinia + Vue Router + Axios | 忽略 Nunu 自带 web（TS） |
-| 工具链版本 | Go 1.27.1 / Node 22.20.0 / Python 3.12 | Agent 用 `sdk/python/.venv` |
-| proto 生成 | `make proto`（Go→`backend/api/agent/v1`，Py→`sdk/python/gen`），产物 gitignore | |
+| 工具链版本 | Go 1.27.1 / Node 22.20.0 / Python 3.12 | Host 用 `sdk/python/.venv` |
+| proto 生成 | `make proto`（Go→`backend/api/host/v1`，Py→`sdk/python/gen`），产物 gitignore | |
 | 词达人凭据 | **仅接受 Token**（原项目无密码登录，靠 mitmproxy 抓取） | 见 `docs/reference-analysis.md` |
 | 词达人答题 | **题库 → LLM → SkipAnswer**；`VerifyAnswer.answer_corrects` 权威回写题库 | 源码核对：`answer_tag` 是提交码，非正确标记（原设想已修正） |
 | 开发期存储 | **Docker MySQL(3380) + Redis(6350)** | 复用 Nunu compose，避开系统端口 |
 | 用户体系 | **注册/登录 + JWT**（少用户） | |
 | 并发限流 | **全可配，默认低**（同账号串行，平台并发默认 2） | |
-| 服务端口 | 后端 HTTP **8080**、Agent gRPC **50051**、前端 dev **5173** | 本机 8000 被其他容器占用 |
+| 服务端口 | 后端 HTTP **8080**、Host gRPC **50051**、前端 dev **5173** | 本机 8000 被其他容器占用 |
 | 示例清理 | 删除 Nunu user 垂直示例、tests、mocks、占位 swagger json | 保留框架基础设施 |
 | 前端 UI | **Vuetify 4.2.1**（`npm i vuetify` 最新版）+ `@mdi/font` + `vite-plugin-vuetify` | 官方 MCP 已接入 opencode |
 | 答题 LLM | **DeepSeek**（OpenAI 兼容），key 走 env | 题库优先，省 token |
-| 题库架构 | 后端 gRPC `QuestionBank` 服务 + Agent 客户端 | Agent 不直连 MySQL |
+| 题库架构 | 后端 gRPC `QuestionBank` 服务 + Host 客户端 | Host 不直连 MySQL |
 | WeLearn 风控 | 无图形验证码（已确认） | 直接账密登录 |
 
 ### 授权风险（重要，已核实）
@@ -76,14 +76,14 @@
 - GORM + **gorm/gen**（自动生成结构体）
 - 脚手架：**Nunu**（https://github.com/go-nunu/nunu）
 
-### Agent
+### Host
 - Python 3.12+
 - gRPC（与 Go 通信）
 - 剥离原脚本 GUI，改为可被调用的无界面服务/库
 
 ### 通信
 - 前端 ↔ 后端：REST（Axios）+ WebSocket（进度实时推送）
-- 后端 ↔ Agent：**gRPC**（定义见 `proto/`）
+- 后端 ↔ Host：**gRPC**（定义见 `proto/`）
 
 ---
 
@@ -99,14 +99,14 @@
 └──────────────┬──────────────┘
                │ gRPC
 ┌──────────────▼──────────────┐
-│  Agent Python (实际执行)     │  各平台脚本，headless，可并发
+│  Host Python (实际执行)     │  各平台脚本，headless，可并发
 └─────────────────────────────┘
 ```
 
 职责边界（分层分工，务必保持）：
 - **前端只负责交互**，不直接碰任何平台。
 - **后端不执行脚本**，只做用户数据、任务生命周期与指令下发/进度汇总。
-- **Agent 只负责执行**，通过 gRPC 接收指令、回传进度，不直连数据库。
+- **Host 只负责执行**，通过 gRPC 接收指令、回传进度，不直连数据库。
 
 ---
 
@@ -119,12 +119,12 @@ OmniTask/
 ├── Makefile               # make proto / sdk-test / backend-run / frontend-dev
 ├── omnitask.sh/.bat       # 引导式工具箱（部署 / 交叉编译）
 ├── .env.example           # 环境变量模板（.env 为本机实际值，gitignore）
-├── proto/agent/v1/agent.proto   # gRPC 契约
+├── proto/host/v1/host.proto   # gRPC 契约
 ├── backend/               # Go 后端（Nunu，module=backend）
-│   ├── api/agent/v1/      # protoc 生成，gitignore，make proto 重建
-│   ├── cmd/{server,agent}/        # 主服务 / 脚本 Host
+│   ├── api/host/v1/      # protoc 生成，gitignore，make proto 重建
+│   ├── cmd/{server,host}/        # 主服务 / 脚本 Host
 │   ├── config/{local.yml, deploy.yml(gitignore), prod.yml(遗留)}
-│   ├── internal/{agenthost,handler,middleware,model,repository,service,router,server,ws}/
+│   ├── internal/{scripthost,handler,middleware,model,repository,service,router,server,ws}/
 │   ├── pkg/{config,crypto,authz,jwt,sid,log,server,...}/
 │   └── deploy/docker-compose/   # MySQL/Redis（full）
 ├── frontend/              # Vue3 + Vuetify(MD3) + Pinia + Router + Axios
@@ -132,7 +132,7 @@ OmniTask/
 ├── sdk/python/            # 平台脚本 Python SDK
 │   ├── core/              # http/ratelimit/bank/config/llm/params/events
 │   ├── runtime.py         # stdio JSON 运行时（serve）
-│   ├── gen/agent/v1/      # protoc 生成，gitignore
+│   ├── gen/host/v1/      # protoc 生成，gitignore
 │   └── tests/
 ├── scripts/<id>/          # 已安装脚本（gitignore）
 ├── build/                 # 交叉编译产物（gitignore）
@@ -158,8 +158,8 @@ OmniTask/
 
 1. 用户在前端登录 → 录入平台凭据（账号密码或 Token）。
 2. 后端加密存储凭据，创建"任务"记录（平台、类型、参数、状态）。
-3. 后端通过 gRPC 向 Agent 下发执行指令。
-4. Agent 执行脚本，通过 gRPC server-streaming 持续回传进度/结果。
+3. 后端通过 gRPC 向 Host 下发执行指令。
+4. Host 执行脚本，通过 gRPC server-streaming 持续回传进度/结果。
 5. 后端将进度落 Redis + 汇总，经 WebSocket 推给前端。
 6. 前端实时展示进度；完成/失败落库。
 
@@ -169,15 +169,15 @@ OmniTask/
 
 以下为默认取值，如有异议需修改并回写本文件：
 
-- [ ] **进度推送**：暂定 WebSocket（前端），gRPC server-streaming（Agent→后端）。gRPC 侧已在 proto/Agent 落地，WebSocket 待做。
+- [ ] **进度推送**：暂定 WebSocket（前端），gRPC server-streaming（Host→后端）。gRPC 侧已在 proto/Host 落地，WebSocket 待做。
 - [ ] **凭据存储**：暂定 AES-256-GCM 加密入库，密钥走环境变量。
 - [x] **原脚本 GUI**：全部剥离，改为 headless 服务/库。
 - [x] **Nunu layout**：采用 **advanced**（`backend/`，预留 job/task 层；其中 `web/` 占位已删）。
 - [ ] **gorm/gen 约定**：模型生成到 `internal/model`，query 生成到 `internal/repository/query`。
-- [x] **部署**：暂定 Docker Compose（mysql / redis / backend / agent / nginx）。
+- [x] **部署**：暂定 Docker Compose（mysql / redis / backend / host / nginx）。
 - [x] **认证方式**：注册/登录 + JWT（个人自用，少用户）。
 - [x] **预期并发量**：全可配，默认低（同账号串行、平台并发默认 2）。
-- [ ] **题库归属**：后端持有 MySQL 题库，Agent 不直连库（详见 `docs/development-plan.md`）。
+- [ ] **题库归属**：后端持有 MySQL 题库，Host 不直连库（详见 `docs/development-plan.md`）。
 
 ---
 
@@ -185,11 +185,11 @@ OmniTask/
 
 > 详细任务、验收与风险见 **`docs/development-plan.md`**。开发顺序：契约 → 平台协议(Python) → 后端 → 通讯 → 前端 → 集成 → 部署。
 
-- [x] M0：monorepo 骨架、Nunu 后端（`backend/`，8080）、Vue 前端（`frontend/`）、proto 契约、Python Agent gRPC 骨架（冒烟通过）
+- [x] M0：monorepo 骨架、Nunu 后端（`backend/`，8080）、Vue 前端（`frontend/`）、proto 契约、Python Host gRPC 骨架（冒烟通过）
 - [x] M0.5：契约补全——proto `QuestionBank.Lookup/Save`、`internal/model/model.go` 冻结 5 表 schema、`.env.example` 环境变量约定（`make proto` + Go build/vet + Python import 均通过）
-- [x] M1：平台协议层（Agent）——词达人、WeLearn 无界面实现 + `run_cli.py`；单元测试通过。**已真机联调**：词达人完成 List 04（196/196，题库回写 129 条，含人类思考延迟）；WeLearn 完成课程 2416 全部 144 个 SCO（挂时长 + 提交进度两种模式）
+- [x] M1：平台协议层（Host）——词达人、WeLearn 无界面实现 + `run_cli.py`；单元测试通过。**已真机联调**：词达人完成 List 04（196/196，题库回写 129 条，含人类思考延迟）；WeLearn 完成课程 2416 全部 144 个 SCO（挂时长 + 提交进度两种模式）
 - [x] M2：后端领域层——User/Credential/Task/Question repository + service（bcrypt+JWT、AES-256-GCM 凭据、任务/题库）+ REST（`/api/v1/auth|credentials|tasks|questions`）+ GORM 迁移（MySQL 3380 / Redis 6350）；curl 验收通过，凭据确认为密文
-- [x] M3：通讯层——Go gRPC 客户端（Agent 50051）+ `QuestionBank` gRPC 服务端（9000）+ 任务编排（pending→queued→running→终态、凭据解密、Redis 进度、TaskEvent）+ WebSocket `/api/v1/ws`；端到端联调通过（WebSocket 实时事件、成功/失败终态、题库 gRPC 读写）
+- [x] M3：通讯层——Go gRPC 客户端（Host 50051）+ `QuestionBank` gRPC 服务端（9000）+ 任务编排（pending→queued→running→终态、凭据解密、Redis 进度、TaskEvent）+ WebSocket `/api/v1/ws`；端到端联调通过（WebSocket 实时事件、成功/失败终态、题库 gRPC 读写）
 - [x] M4：前端——登录/注册、凭据管理、任务列表+参数表单创建、任务详情（WebSocket 实时进度）、题库；Vuetify 4 + 主题 + Pinia + api/service 层，严格遵循前端 UI 规则（`npm run build` 通过，Vite 代理联调通过）
 - [x] M5（部分完成）：已有 SDK/加密单测与多次真机联调；**缺**后端 service/handler 测试、CI、E2E 自动化、并发压测
 - [x] M6：部署与文档（单文件内嵌前端、Docker Compose、nginx 反代、lite/full、配置自动生成、TLS 可选、引导脚本）
@@ -198,7 +198,7 @@ OmniTask/
 
 ```bash
 make proto          # 生成 Go/Python proto 代码（产物已 gitignore）
-make sdk-test     # Python Agent gRPC 冒烟测试
+make sdk-test     # Python Host gRPC 冒烟测试
 cd backend && go build ./... && go vet ./...
 cd frontend && npm run build
 ```
@@ -207,14 +207,14 @@ cd frontend && npm run build
 
 ## 10. 开发约定
 
-- **语言**：前端 JavaScript（禁止引入 TS）；后端 Go；Agent Python。
+- **语言**：前端 JavaScript（禁止引入 TS）；后端 Go；Host Python。
 - **不抄原脚本代码**：只依据平台网络接口/协议自主实现，保留独立实现证据（见 `docs/reference-analysis.md`）。
 - **密钥/凭据永不入库明文、永不提交到仓库**。
 - **无注释除非必要**；命名与现有代码风格保持一致。
 - 每次重要改动后更新本 README 的 Decision Log 与 Roadmap。
 - 提交前运行：`make sdk-test`、`cd backend && go build ./...`、`cd frontend && npm run build`；改 proto 后先 `make proto`。
-- proto 生成产物（`backend/api/agent/`、`sdk/python/gen/`）不入库，由 `make proto` 重建。
-- Agent 依赖装在 `sdk/python/.venv`，不污染系统 Python。
+- proto 生成产物（`backend/api/host/`、`sdk/python/gen/`）不入库，由 `make proto` 重建。
+- Host 依赖装在 `sdk/python/.venv`，不污染系统 Python。
 
 ---
 
@@ -229,17 +229,17 @@ cd frontend && npm run build
 - **角色/权限**：仅 `admin` / `user` 两角色；后端引入 **Casbin**（RESTful model，`keyMatch2`），按 `(role, route, method)` 鉴权；**首个注册用户自动为 admin**；「脚本」页仅 admin 可见。前端同一套，按角色条件渲染。
 - **数据库迁移**：full 用 **golang-migrate**（`internal/migration`，embed SQL；`server -migrate` 或 `data.db.migrate_on_start`）；lite 用 AutoMigrate。
 - **README**：根目录改为面向 GitHub 的展示型 README；原上下文存档移至 `docs/context.md`；接入文档 `docs/integration-guide.md`。
-- **脚本插件化方向**：`manifest(omnitask.json)` + gRPC 契约（`AgentService.Execute` 已是通用）；仅**管理员**安装、固定 commit、安装前审核；脚本独立仓库、**不入主库并 gitignore**；恶意脚本风险由使用者自辨，平台声明免责。
+- **脚本插件化方向**：`manifest(omnitask.json)` + gRPC 契约（`HostService.Execute` 已是通用）；仅**管理员**安装、固定 commit、安装前审核；脚本独立仓库、**不入主库并 gitignore**；恶意脚本风险由使用者自辨，平台声明免责。
 - **前端规则**：MD3 圆角（`elevated`+`rounded=xl`，card `elevation=2`）、含输入对话框 `persistent`、统一 `v-snackbar-queue`（见 `AGENTS.md`）。
 - **部署**：`./omnitask.sh deploy` 一键构建+迁移+重启；公网 `https://<your-host>:4096/omnitask/`；nginx 497 回退到 HTTPS。
 
 ## 13. 脚本插件化决策（2026-09）
 
-- **采用方案 C**：Go Host（`cmd/agent`，可与 backend 同构）+ 子进程脚本 + **stdio NDJSON** 协议；脚本任意语言，可独立单跑。
+- **采用方案 C**：Go Host（`cmd/host`，可与 backend 同构）+ 子进程脚本 + **stdio NDJSON** 协议；脚本任意语言，可独立单跑。
 - 运行时缺失（如未装 Python）→ Host 预检标记不可用并提示；接受“检测并提示用户装 Python”。
 - 脚本 manifest `omnitask.json` 含 `runtime/entry/requires/actions/params/credentials`；规范见 `docs/script-protocol.md`。
 - 安装：后端接收 GitHub 链接 → 下载 zip 到 `scripts/<id>/`（预留加速源，前端拼接）；仅管理员；固定 commit。
-- 多机 Agent：**暂不做**（未来再加 `agent_id`/心跳）。
+- 多机 Host：**暂不做**（未来再加 `host_id`/心跳）。
 - full/lite 双模式：待脚本化稳定后做；lite 用 `github.com/glebarez/sqlite`（纯 Go）+ 无 Redis；密钥明文入 `config.yaml`（拍板）。
 
 ## 14. 脚本生态落地（2026-09）
@@ -261,20 +261,20 @@ cd frontend && npm run build
 - ✅ `go:embed` 前端 dist：后端单文件托管 SPA（`internal/server/static.go`），HTTP API 统一前缀 `/api/v1`，`/api/*` 未命中返回 404，其余走 SPA 回退。
 
 ## 16. 引导式构建脚本（2026-09）
-- 新增 `omnitask.sh`（Linux/macOS）与 `omnitask.bat`（Windows）引导式菜单：部署 / 编译 server·agent（可选 linux-amd64、windows-amd64、两者）/ 构建前端。
+- 新增 `omnitask.sh`（Linux/macOS）与 `omnitask.bat`（Windows）引导式菜单：部署 / 编译 server·host（可选 linux-amd64、windows-amd64、两者）/ 构建前端。
 - 交叉编译：`CGO_ENABLED=0 GOOS/GOARCH=amd64`（依赖全为纯 Go：glebarez/sqlite、mysql、casbin）；产物在 `build/`（gitignore）。
 - 部署逻辑已并入 `omnitask.sh`（非交互 `./omnitask.sh deploy`）与 `omnitask.bat`；`deploy.sh` 已删除。
 - Makefile 仅为开发辅助（proto 生成/nunu/测试），普通构建不需要。
 
 ## 17. 目录更名（2026-09）
-- 根目录 `agent/` → `sdk/python/`：定位为「Python 脚本 SDK 源头（core/runtime/gen/tests）」。
-- 删除历史遗留 `grpc_server.py`（旧 Python gRPC Agent）与 `test_smoke.py`；Host 已由 Go 实现（`backend/cmd/agent` + `backend/internal/agenthost`）。
-- `Makefile`：`proto-py` 输出到 `sdk/python/gen`；`agent-test` 更名为 `sdk-test`。
-- 配置：Host `agent.pythonpath` 默认 `sdk/python`；`local.yml`/`deploy.yml` 同步。
+- 根目录 `host/` → `sdk/python/`：定位为「Python 脚本 SDK 源头（core/runtime/gen/tests）」。
+- 删除历史遗留 `grpc_server.py`（旧 Python gRPC Host）与 `test_smoke.py`；Host 已由 Go 实现（`backend/cmd/host` + `backend/internal/scripthost`）。
+- `Makefile`：`proto-py` 输出到 `sdk/python/gen`；`host-test` 更名为 `sdk-test`。
+- 配置：Host `host.pythonpath` 默认 `sdk/python`；`local.yml`/`deploy.yml` 同步。
 - 新增 `sdk/python/README.md`（SDK 用法与接入）。
 
 ## 18. 迁移并入 server + HTTPS 配置（2026-09）
-- **迁移（方案A）**：删除 `cmd/migrate`，迁移逻辑移入 `internal/migration`（embed SQL）；由 `omnitask-server -migrate` 触发，或配置 `data.db.migrate_on_start: true` 启动时执行。产物由 3 个减为 **2 个**（server + agent）。
+- **迁移（方案A）**：删除 `cmd/migrate`，迁移逻辑移入 `internal/migration`（embed SQL）；由 `omnitask-server -migrate` 触发，或配置 `data.db.migrate_on_start: true` 启动时执行。产物由 3 个减为 **2 个**（server + host）。
 - **HTTPS**：`config.yaml` 新增 `http.tls.{enabled,cert_file,key_file}`，server 可自行终结 TLS（不做自签）。
 - **配置清理**：删除未使用的 `backend/config/prod.yml` 与过期的 `frontend/.env.development`。
 
@@ -303,11 +303,11 @@ cd frontend && npm run build
 **P1 体验/功能**
 - `/api/v1/me`（前端启动刷新角色）；用户管理（admin 改角色/禁用）。
 - 任务列表分页/筛选；脚本安装进度、指定 commit/tag、运行时缺失指引。
-- backend/agent systemd 化（服务器重启自启动）。
+- backend/host systemd 化（服务器重启自启动）。
 
 **P2 生态/长期**
 - 脚本依赖自动安装（隔离 venv）或明确提示；SDK 多语言示例；新平台（学习通等）。
-- 多机 Agent（已评估，暂不做）。
+- 多机 Host（已评估，暂不做）。
 
 ### 工程卫生
 - 已删除 Nunu 遗留 `backend/cmd/{task,migration}`、`backend/scripts/`；`backend/Makefile` 精简。
@@ -316,7 +316,7 @@ cd frontend && npm run build
 
 ## 21. P0 加固完成（2026-09）
 - **产品方向：官方免费实例（小范围多用户起步）**。P0 已完成，剩余项见 `docs/todo.md`（完成后可清空）。
-- 任务生命周期：`POST /api/v1/tasks/:id/cancel`、`/retry`、`DELETE /api/v1/tasks/:id`；编排器持取消句柄，取消时中断 Host 子进程；启动把 `running/queued` 置 `interrupted`；`agent.task_timeout` 可配超时。
+- 任务生命周期：`POST /api/v1/tasks/:id/cancel`、`/retry`、`DELETE /api/v1/tasks/:id`；编排器持取消句柄，取消时中断 Host 子进程；启动把 `running/queued` 置 `interrupted`；`host.task_timeout` 可配超时。
 - 注册控制 `security.registration: open|closed`；生产默认关闭 Swagger（`http.swagger`）；CORS 白名单 `http.cors_origins`（默认同源）。
 - 自检：`./omnitask.sh check`（后端 build/vet/test + 前端 build + SDK 测试）；GitHub Actions `.github/workflows/ci.yml`。
 - 前端：任务详情与列表支持取消/重试/删除。
@@ -331,7 +331,7 @@ cd frontend && npm run build
 ## 23. P1 收尾（2026-09）
 - 任务列表筛选：`GET /tasks?status=&platform=`（后端查询参数 + 前端下拉）。
 - 脚本安装支持 `ref`（分支/标签/commit，commit 走 codeload `/zip/<sha>`）；「运行时缺失」帮助弹窗。
-- **systemd 服务化**：`deploy/systemd/{omnitask-server,omnitask-agent}.service` + `install.sh`；已在本机 enable+active，`omnitask.sh deploy` 检测到 unit 后改用 `systemctl restart`。
+- **systemd 服务化**：`deploy/systemd/{omnitask-server,omnitask-host}.service` + `install.sh`；已在本机 enable+active，`omnitask.sh deploy` 检测到 unit 后改用 `systemctl restart`。
 - 产物与日志目录改为稳定路径 `bin/`、`logs/`（gitignore；不再用 /tmp，避免重启丢失）。
 - 抽屉仿 `AppLayout.vue`：去掉顶部 hero、分组导航、底部 append（主题/退出）、版权；`v-list-item` 加 `rounded="xl"`；允许必要 scoped CSS（滚动/隐藏滚动条/spacer/禁选）。
 - 剩余（见 `docs/todo.md`）：真实安装进度、脚本依赖自动安装。
@@ -340,7 +340,7 @@ cd frontend && npm run build
 ## 24. 清理与依赖自动安装（2026-09）
 - 删除 Nunu 遗留：`backend/cmd/task`、`backend/cmd/migration`、`backend/scripts/`；精简 `backend/Makefile`。
 - 补测试：`internal/service`（pagination/user，in-memory SQLite）、`pkg/authz`（Casbin RBAC）。
-- 依赖自动安装：安装脚本时若含 `requirements.txt` 且有 `agent.auto_install_deps: true`，在脚本目录建独立 `.venv` 并 pip 安装（`agent.pip_index_url` 可配加速源）；Host **优先使用脚本自带 `.venv` 的解释器**。
+- 依赖自动安装：安装脚本时若含 `requirements.txt` 且有 `host.auto_install_deps: true`，在脚本目录建独立 `.venv` 并 pip 安装（`host.pip_index_url` 可配加速源）；Host **优先使用脚本自带 `.venv` 的解释器**。
 - 2026-11 调整：默认开启 `auto_install_deps`（部署/本地配置与默认模板），安装进度显示「安装依赖」阶段；部署配置的 pip 源指向清华镜像。
 - 脚本页安装增加 indeterminate 进度条与步骤文案；安装请求超时放宽到 10 分钟。
 - 抽屉宽度改回 Vuetify 默认（移除 `width="280"`）。
@@ -357,12 +357,12 @@ cd frontend && npm run build
 - 该 fork 新增：`omnitask_entry.py`（stdio 适配器，生成临时 config.ini 调 main.py、合并 stderr、解析 `NN%` 进度）、`omnitask.json`（manifest：动作 study/learning_count、凭据账号密码、参数 course_list/speed/jobs/…）；`requirements.txt` 追加 `omnitask-sdk`。已推送。
 - 关键适配点：该工具日志/进度走 **stderr**（loguru+tqdm）→ 适配器 `stderr=STDOUT` 捕获；`course_list` 为空会交互式 `input()` → 适配器传 `all` 规避。
 - 验证：OmniTask 脚本页安装成功；Host `Health` 识别 `chaoxing`；任务链路 后端→Host→适配器→main.py 正常（因未装 chaoxing 依赖按预期 `failed`）。
-- 实机运行需：`agent.auto_install_deps: true`（安装其较重依赖，含 ddddocr）或手动装；建议 Python 3.13。
+- 实机运行需：`host.auto_install_deps: true`（安装其较重依赖，含 ddddocr）或手动装；建议 Python 3.13。
 - 许可：该仓库整体仍 GPL-3.0；上游“禁止盈利/闭源商用”声明继续有效；本项目/its SDK 保持 MIT，仅进程边界协作。
 
 
 ## 27. 平台发现（Discovery）与平台 schema 上后端（2026-09）
-- **proto**：`AgentService.Discover(DiscoverRequest) → DiscoverResponse{items[key,fields]}`；SDK 新增 `@listing()`；Host 新增 `Discover`（子进程发送 `type:discover`，收集 `type:items`）。
+- **proto**：`HostService.Discover(DiscoverRequest) → DiscoverResponse{items[key,fields]}`；SDK 新增 `@listing()`；Host 新增 `Discover`（子进程发送 `type:discover`，收集 `type:items`）。
 - **后端**：`platform_caches` 表（迁移 000004，items 存 JSON、刷新人限流 `discovery.min_interval` 默认 60s）；`DiscoverService`；接口 `GET /api/v1/platforms`（完整 manifest schema，任意登录用户）、`GET /api/v1/platforms/:id/items`、`POST /api/v1/platforms/:id/discover`；Casbin 放行 user。
 - **脚本**：cidaren/welearn/chaoxing 均新增 `@listing` 与 manifest `discovery`（已推送三个脚本仓库）。
 - **说明**：注册表里的 manifest 是**安装时**快照，新增 discovery 后需**重新安装**脚本以刷新；已在部署环境重装并验证 `/platforms` 返回三平台 schema。
@@ -385,21 +385,21 @@ cd frontend && npm run build
 - **安装管理**：安装任务落库 `script_install_jobs`（迁移 000008），重启可查；`scripts` 增加 `ref/commit_sha/manifest_hash/last_error`；新增 `POST /scripts/:id/reinstall` 与 `POST /scripts/:id/rollback`，安装前保留上一版本，前端支持「重新安装 / 回滚」。
 - **结果 schema**：`actions[].result` 支持 `table/links/keyvalue`；`ExecuteEvent.result_json` 保留数组/对象结构，`TaskResponse.result` 改为任意 JSON。
 - **发现筛选**：`POST /platforms/:id/discover` 接受 `params`，带筛选查询不读写缓存；平台页新增筛选、批量勾选与批量执行。
-- **并发与取消**：后端实现全局/平台/账号三级并发（`agent.global_concurrency`、`agent.platform_concurrency`）；Host 取消先发 `{"type":"cancel"}`，3 秒后强杀；SDK 提供 `ctx.canceled/ctx.check_canceled()`。
+- **并发与取消**：后端实现全局/平台/账号三级并发（`host.global_concurrency`、`host.platform_concurrency`）；Host 取消先发 `{"type":"cancel"}`，3 秒后强杀；SDK 提供 `ctx.canceled/ctx.check_canceled()`。
 
 ## 30. 部署与出口代理（2026-11）
 - **Full 一键 Compose**：`deploy/docker-compose/docker-compose.full.yml` 启动 MySQL、Redis、server、Host、nginx；多阶段 Dockerfile 内构建前端 + proto + Go 产物；配置模板首次复制到 Docker 卷，避免把随机密钥写回仓库；脚本与日志共享 `omnitask-data` 卷。
-- **Lite 单命令**：`agent.autostart` 默认在 lite 为 true，server 启动时检测端口并拉起同目录 `omnitask-agent`；可用 `agent.bin` 指定路径，或设为 false 手动启动。
+- **Lite 单命令**：`host.autostart` 默认在 lite 为 true，server 启动时检测端口并拉起同目录 `omnitask-host`；可用 `host.bin` 指定路径，或设为 false 手动启动。
 - **账号级粘性代理**：凭据可配置 `proxy`，加密存储并生成脱敏 `proxy_hint`；任务/发现解密时提取代理，经 gRPC `proxy` 字段由 Host 注入 `OMNITASK_PROXY`；SDK `new_session()` 自动读取该环境变量。调试接口也支持临时 proxy。
 - **多机决策**：当前仍是单 Host；多机需要节点注册、心跳、脚本分发、账号亲和与 TLS，暂不做。IP 风控优先用账号级代理，而不是直接拆多机。
 
 ## 31. 并发隔离与版本化脚本（2026-11）
 - **每任务工作区**：Host 将脚本源码复制到 `<workspaces_dir>/task-<id>/`（排除 `.venv/.git/node_modules/缓存`），以工作区为 cwd，注入 `OMNITASK_WORKDIR`、`OMNITASK_SCRIPT_DIR`、`TMPDIR`、`HOME`、`XDG_*`；`config.ini`、Cookie、缓存等不再跨任务/账号互相覆盖。失败工作区默认保留，便于排查。
-- **版本化脚本目录**：安装写入 `scripts/<id>/versions/<hash-time>/`，`active.json` 记录 active/previous；回滚只切换指针；旧版本按 `agent.keep_versions` 和 24 小时保护期清理。运行中的任务使用工作区副本，不受更新影响。
-- **Host 并发保护**：新增 `agent.max_processes`（默认 8）与 Host 级平台并发；任务、发现、调试统一受进程额度约束。
+- **版本化脚本目录**：安装写入 `scripts/<id>/versions/<hash-time>/`，`active.json` 记录 active/previous；回滚只切换指针；旧版本按 `host.keep_versions` 和 24 小时保护期清理。运行中的任务使用工作区副本，不受更新影响。
+- **Host 并发保护**：新增 `host.max_processes`（默认 8）与 Host 级平台并发；任务、发现、调试统一受进程额度约束。
 - **队列与用户配额**：`task.max_active_per_user`（默认 20）、`task.max_pending`（默认 500）；创建任务时拦截，避免单用户打满队列。
 - **跨进程节流**：Host 注入 `OMNITASK_RATE_DB`，SDK `RateLimiter` 用 SQLite（WAL + BEGIN IMMEDIATE）协调同一 Host 上多个脚本进程的平台请求间隔；未使用 SDK 限速器的脚本仍按进程独立。
-- **配置**：新增 `agent.workspaces_dir/rate_dir/max_processes/keep_workspaces/keep_failed_workspaces/keep_versions`；Docker full 与 local.yml 同步。
+- **配置**：新增 `host.workspaces_dir/rate_dir/max_processes/keep_workspaces/keep_failed_workspaces/keep_versions`；Docker full 与 local.yml 同步。
 
 ## 32. 凭据安全加固（2026-11）
 - **决策**：评估「浏览器本地存凭据」与「账号密码派生密钥」后，拍板维持服务端 AES 加密 + 无人值守执行，只做加固（方案 A）。浏览器本地存储防不住恶意服务端/XSS，且会破坏定时与无人值守任务；账号密码派生密钥只防备份泄露，仍防不住运行时代解密，且带来改密/找回/多端解锁的复杂度。
@@ -407,7 +407,7 @@ cd frontend && npm run build
 - **主密钥版本化**：新增 `crypto.Keyring`、`credentials.key_version`（迁移 000010）与 `security.master_keys`；映射非空时只读映射，新写入用最大版本，旧数据按记录版本解密。新增 `-rotate-credentials`：批量重加密到当前版本，成功后再移除旧密钥。`config.yaml` 在 Unix 上创建后 `chmod 0600`（Windows 需自行设置 ACL）。生成密钥时确保含字母，避免 YAML 把纯数字串当数值回写。
 - **审计与展示**：任务/发现/编辑解密均写访问日志，并更新 `last_used_at`；`security.credential_audit_fail_closed=true` 时审计失败即拒绝解密。凭据页新增「最后使用」列。
 - **传输与前端**：HTTPS 时下发 HSTS；全局 CSP（`script-src 'self'`，样式允许内联）、`X-Frame-Options`、`X-Content-Type-Options`、`Referrer-Policy`；API 响应 `Cache-Control: no-store`；登录/注册按 IP 限流（`security.auth_rate_limit_per_minute`，默认 20）。
-- **残余风险**：恶意部署者仍可在运行时取得凭据明文；JWT 仍在 `localStorage`，XSS 可窃取会话；Agent gRPC 仍为明文（默认仅监听回环，远程部署需私网/VPN 或后续补 TLS）。
+- **残余风险**：恶意部署者仍可在运行时取得凭据明文；JWT 仍在 `localStorage`，XSS 可窃取会话；Host gRPC 仍为明文（默认仅监听回环，远程部署需私网/VPN 或后续补 TLS）。
 
 ## 33. 平台页头部与批量操作（2026-11）
 - **头部压缩**：平台页顶栏改为单行 flex，不再用 `flex-md-nowrap` 的网格列；筛选、表格/卡片切换、刷新均为图标按钮（带 tooltip），顺序为筛选、视图切换、刷新。搜索框和账号下拉恢复原来的 outlined 样式；桌面端搜索框靠右，紧邻账号下拉，宽度 200px（账号下拉 160px）。
@@ -439,13 +439,13 @@ cd frontend && npm run build
 - **WeLearn 0.1.4**：发现新增 `scogeneral` 课程总览（练习总数、已完成、待完成、平均正确率、学习时长），并拆出 `get_course_identity` 避免发现时多拉单元；字段为 `total/done/remaining/avg_accuracy/study_time`，列 schema 同步更新。
 - **展示由脚本决定**：manifest `discovery.columns[].important` 标记重要列；任一处标记时表格只显示重要列，其余列进入「详细信息」弹窗；未标记时沿用旧行为展示全部列。卡片视图展示全部字段和全部动作。前端不写死 WeLearn 字段名，`primary` 决定卡片标题。
 - **交互**：表格行提供「动作」菜单和「详细信息」图标按钮；「动作」列出脚本全部动作，「详细信息」展示全部字段；卡片视图保留全部内容与动作。参数提示均来自脚本字段的 `help`。
-- **后端**：`agenthost.Field` 与 `v1.PlatformField` 增加 `important`，发现/平台 schema 透传。
+- **后端**：`scripthost.Field` 与 `v1.PlatformField` 增加 `important`，发现/平台 schema 透传。
 - **验证**：课程 566 返回 283 个练习、已完成 283、平均正确率 97%、学习时长 31 小时 7 分钟；表格只显示课程名/进度/状态/学习时长，详细信息弹窗显示课程ID/练习统计，卡片视图字段完整。
 
 ## 38. 表格操作、排序与挂时长总时长（2026-11）
 - **表格操作**：移除「更多」展开行；表格行改为「动作」`v-menu`（列出脚本动作）和「详细信息」图标按钮（带 tooltip）。详细信息弹窗只展示字段，不再放动作执行按钮；卡片视图仍直接展示全部字段与动作。
 - **表头排序**：使用 Vuetify `header.sortRaw`（条目字段在嵌套 `fields` 中，默认按 `f_*` 取不到值）。新增 `columns[].sort`（`number/percent/duration/date/text`）与通用比较器；学习时长按 `duration` 解析为秒，其他按数值/百分比/日期/自然文本兜底。实测学习时长升序 14 分钟→31 小时 7 分钟→50 小时 24 分钟→51 小时 35 分钟，降序相反。
-- **后端**：`agenthost.Field` 与 `v1.PlatformField` 增加 `sort` 透传。
+- **后端**：`scripthost.Field` 与 `v1.PlatformField` 增加 `sort` 透传。
 - **WeLearn 0.1.5**：`duration` 改为本次任务总挂时长，按本次 SCO 数均分（不再每个 SCO 都挂 duration 秒）；事件显示总时长与每个 SCO 的分配值。仓库提交 `3269213` 已推送。
 - **真实测试**：课程 2416 `time`、`limit=2`、`duration=60`，两个 SCO 各 30 秒，任务 wall time 约 90 秒（含登录/单元请求），学习时长从 14 分钟涨到 15 分钟；`progress`（课程 566，limit=1，含已完成，正确率 100）成功提交 1 个 SCO。
 
@@ -489,9 +489,9 @@ cd frontend && npm run build
 ## 42. 管理设置合并与可视化配置（2026-11）
 - **设置页**：移除侧边栏「安全」入口，管理员的安全与配置能力合并到「设置」页新增的「站点安全」「站点配置」标签；普通用户保留「个人」「账号安全」「协议」。
 - **站点安全**：展示注册方式、活跃会话、失败登录、锁定策略和任务配额，可吊销任意会话；卡片间距统一加大。
-- **站点配置**：只暴露注册、会话、登录防护、任务配额、发现间隔等安全可热更新字段，不暴露主密钥、数据库、Redis、Agent 等敏感配置。
+- **站点配置**：只暴露注册、会话、登录防护、任务配额、发现间隔等安全可热更新字段，不暴露主密钥、数据库、Redis、Host 等敏感配置。
 - **覆盖文件**：可视化修改写入主配置同目录的 `*.overrides.yml`（如 `deploy.overrides.yml`），不重写主配置、不丢失注释；启动时自动合并，已在 `.gitignore` 中排除。
-- **热更新**：保存后立即应用到运行中的 viper，注册方式、邀请码、登录锁定、认证限流、会话 Cookie、任务配额、发现间隔均无需重启；会话有效期仅对新登录生效。监听地址、数据库、Agent、日志和密钥仍需重启，页面单独列出。
+- **热更新**：保存后立即应用到运行中的 viper，注册方式、邀请码、登录锁定、认证限流、会话 Cookie、任务配额、发现间隔均无需重启；会话有效期仅对新登录生效。监听地址、数据库、Host、日志和密钥仍需重启，页面单独列出。
 - **手动重载**：配置页提供「重新读取文件」，修改主配置或覆盖文件后可立即刷新可编辑字段，无需重启。
 - **接口**：`GET /api/v1/admin/config`、`PUT /api/v1/admin/config`、`POST /api/v1/admin/config/reload`，仅管理员可用，更新日志只记录键名不记录值。
 - **验证**：可视化修改登录失败窗口后 `/admin/security` 立即反映；覆盖文件只包含实际修改的键；主配置保持不变；设置页标签、站点安全数据与卡片间距均已在生产构建验证。
@@ -508,8 +508,16 @@ cd frontend && npm run build
 
 ## 44. 脚本 manifest 更名为 omnitask.json（2026-11）
 - **决策**：项目刚开源，只有一个正式接入脚本，直接放弃 `script.json` 兼容，统一改为 `omnitask.json`，避免长期维护双文件名。
-- **后端**：`agenthost.ManifestFileName` 统一常量；脚本扫描、版本校验、回滚、压缩包查找和错误提示全部使用 `omnitask.json`。
+- **后端**：`scripthost.ManifestFileName` 统一常量；脚本扫描、版本校验、回滚、压缩包查找和错误提示全部使用 `omnitask.json`。
 - **SDK**：`omnitask-sdk` 的 CLI 和 bridge 只读取 `omnitask.json`。
 - **文档**：README、脚本协议、开发指南、接入指南和参数说明全部同步。
 - **官方脚本**：WeLearn 仓库已将 manifest 重命名为 `omnitask.json` 并推送。
 - **升级影响**：旧 Host 无法加载新脚本，旧脚本也无法被新 Host 加载；项目刚开源，当前只有 WeLearn 一个正式脚本，直接更新即可。新脚本目录必须包含 `omnitask.json`。
+
+## 45. Agent 概念统一为 Host（2026-11）
+- **范围**：移除脚本执行层的 `agent` 命名，统一使用 Host。`User-Agent`、`user_agent` 字段和 `AGENTS.md` 项目规则不属于脚本 Host，保持不变。
+- **协议**：`proto/agent/v1/agent.proto` → `proto/host/v1/host.proto`，package `agent.v1` → `host.v1`，`AgentService` → `HostService`，Go 生成目录 `backend/api/host/v1`，Python 生成目录 `sdk/python/omnitask_sdk/gen/host/v1`。
+- **代码**：`cmd/agent` → `cmd/host`，`internal/agenthost` → `internal/scripthost`，`AgentClient` → `HostClient`，`startLocalAgent` → `startLocalHost`。
+- **配置**：根节点 `agent` → `host`，原 `agent.host` → `host.listen`，其余字段保持相同语义；环境变量 `OMNITASK_AGENT_*` → `OMNITASK_HOST_*`。
+- **产物**：`omnitask-agent` → `omnitask-host`；Docker 服务、容器、镜像、卷、配置文件和 systemd 服务同步改名。
+- **兼容**：不保留旧 agent 命名兼容，旧二进制、旧配置和旧 gRPC 客户端需要一起升级。

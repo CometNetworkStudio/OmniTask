@@ -192,7 +192,7 @@ watch(
     <v-card class="mb-6">
       <v-card-item>
         <v-card-title class="text-title-large">需要重启的配置</v-card-title>
-        <v-card-subtitle>这些项涉及监听地址、数据库、Agent 或密钥，请修改主配置文件后重启服务</v-card-subtitle>
+        <v-card-subtitle>这些项涉及监听地址、数据库、Host 或密钥，请修改主配置文件后重启服务</v-card-subtitle>
       </v-card-item>
       <v-card-text>
         <v-list lines="two">

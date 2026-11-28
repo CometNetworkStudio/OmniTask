@@ -7,7 +7,7 @@ import (
 	"sync"
 	"time"
 
-	agentv1 "backend/api/agent/v1"
+	hostv1 "backend/api/host/v1"
 	v1 "backend/api/v1"
 	"backend/internal/model"
 	"backend/internal/repository"
@@ -18,12 +18,12 @@ import (
 	"go.uber.org/zap"
 )
 
-// Orchestrator 轮询 pending 任务，解密凭据后经 gRPC 下发给 Agent，
+// Orchestrator 轮询 pending 任务，解密凭据后经 gRPC 下发给 Host，
 // 汇聚事件到进度存储 / TaskEvent / WebSocket；支持取消与超时。
 type Orchestrator struct {
 	taskRepo *repository.TaskRepository
 	creds    *CredentialService
-	agent    *AgentClient
+	host     *HostClient
 	progress *ProgressStore
 	hub      *ws.Hub
 	sid      *sid.Sid
@@ -47,25 +47,25 @@ type Orchestrator struct {
 func NewOrchestrator(
 	taskRepo *repository.TaskRepository,
 	creds *CredentialService,
-	agent *AgentClient,
+	host *HostClient,
 	progress *ProgressStore,
 	hub *ws.Hub,
 	sid *sid.Sid,
 	conf *viper.Viper,
 	logger *log.Logger,
 ) *Orchestrator {
-	globalLimit := conf.GetInt("agent.global_concurrency")
+	globalLimit := conf.GetInt("host.global_concurrency")
 	if globalLimit <= 0 {
 		globalLimit = 4
 	}
-	platformLimit := conf.GetInt("agent.platform_concurrency")
+	platformLimit := conf.GetInt("host.platform_concurrency")
 	if platformLimit <= 0 {
 		platformLimit = 2
 	}
 	return &Orchestrator{
 		taskRepo:      taskRepo,
 		creds:         creds,
-		agent:         agent,
+		host:          host,
 		progress:      progress,
 		hub:           hub,
 		sid:           sid,
@@ -75,7 +75,7 @@ func NewOrchestrator(
 		platformSems:  map[string]chan struct{}{},
 		accountSems:   map[string]chan struct{}{},
 		interval:      2 * time.Second,
-		timeout:       conf.GetDuration("agent.task_timeout"),
+		timeout:       conf.GetDuration("host.task_timeout"),
 		running:       map[string]context.CancelFunc{},
 	}
 }
@@ -139,7 +139,7 @@ func (o *Orchestrator) Start(ctx context.Context) error {
 	}
 	o.wg.Add(1)
 	go o.loop(ctx)
-	o.logger.Info("orchestrator started", zap.String("agent", "see config agent.addr"))
+	o.logger.Info("orchestrator started", zap.String("host", "see config host.addr"))
 	return nil
 }
 
@@ -235,7 +235,7 @@ func (o *Orchestrator) run(ctx context.Context, task model.Task) {
 	if task.Params != "" {
 		_ = json.Unmarshal([]byte(task.Params), &params)
 	}
-	req := &agentv1.ExecuteRequest{
+	req := &hostv1.ExecuteRequest{
 		TaskId:      task.ID,
 		Platform:    task.Platform,
 		Action:      task.Action,
@@ -244,32 +244,32 @@ func (o *Orchestrator) run(ctx context.Context, task model.Task) {
 		Proxy:       proxy,
 	}
 	terminal := false
-	runErr := o.agent.Execute(runCtx, req, func(ev *agentv1.ExecuteEvent) {
+	runErr := o.host.Execute(runCtx, req, func(ev *hostv1.ExecuteEvent) {
 		if runCtx.Err() != nil {
 			return
 		}
 		switch ev.GetType() {
-		case agentv1.EventType_EVENT_TYPE_SUCCEEDED:
+		case hostv1.EventType_EVENT_TYPE_SUCCEEDED:
 			terminal = true
 			o.succeed(ctx, task.ID, ev.GetResult(), ev.GetResultJson())
-		case agentv1.EventType_EVENT_TYPE_FAILED:
+		case hostv1.EventType_EVENT_TYPE_FAILED:
 			terminal = true
 			o.fail(ctx, task.ID, ev.GetMessage(), lastPercent)
-		case agentv1.EventType_EVENT_TYPE_STARTED:
+		case hostv1.EventType_EVENT_TYPE_STARTED:
 			// 任务开始时后端已落一条 started，脚本侧 started 只用于本机调试。
-		case agentv1.EventType_EVENT_TYPE_LOG:
+		case hostv1.EventType_EVENT_TYPE_LOG:
 			o.publish(ctx, task.ID, "running", lastPercent, ev.GetMessage(), nil, eventMeta{
 				Kind: "log", Level: ev.GetLevel(),
 			})
-		case agentv1.EventType_EVENT_TYPE_STEP:
+		case hostv1.EventType_EVENT_TYPE_STEP:
 			o.publish(ctx, task.ID, "running", lastPercent, ev.GetMessage(), nil, eventMeta{
 				Kind: "step", Step: ev.GetStep(), Label: ev.GetLabel(), StepStatus: ev.GetStatus(),
 			})
-		case agentv1.EventType_EVENT_TYPE_METRIC:
+		case hostv1.EventType_EVENT_TYPE_METRIC:
 			o.publish(ctx, task.ID, "running", lastPercent, ev.GetMessage(), nil, eventMeta{
 				Kind: "metric", Key: ev.GetKey(), Label: ev.GetLabel(), Value: ev.GetValue(), Unit: ev.GetUnit(),
 			})
-		case agentv1.EventType_EVENT_TYPE_HEARTBEAT:
+		case hostv1.EventType_EVENT_TYPE_HEARTBEAT:
 			// 心跳只用于保活，不落事件表。
 		default:
 			if ev.GetHasPercent() {
@@ -289,12 +289,12 @@ func (o *Orchestrator) run(ctx context.Context, task model.Task) {
 		case errors.Is(runCtx.Err(), context.DeadlineExceeded):
 			o.fail(ctx, task.ID, "任务超时", lastPercent)
 		default:
-			o.fail(ctx, task.ID, "agent 通讯失败: "+runErr.Error(), lastPercent)
+			o.fail(ctx, task.ID, "Host 通讯失败: "+runErr.Error(), lastPercent)
 		}
 		return
 	}
 	if !terminal {
-		o.fail(ctx, task.ID, "agent 事件流意外结束", lastPercent)
+		o.fail(ctx, task.ID, "Host 事件流意外结束", lastPercent)
 	}
 }
 

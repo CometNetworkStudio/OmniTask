@@ -1,18 +1,18 @@
 # OmniTask 脚本协议（Host ↔ 脚本，stdio JSON）
 
 > 目标：脚本是**独立项目**（任意语言），既能本地单跑（CLI/GUI），也能被 OmniTask Host 以子进程方式调用。
-> Host 用 Go 编写，统一负责生命周期与调度，并沿用现有 gRPC `AgentService` 与后端通讯。
+> Host 用 Go 编写，统一负责生命周期与调度，并沿用现有 gRPC `HostService` 与后端通讯。
 
 ## 1. 总体架构
 
 ```
-浏览器 ── REST/WS ── Go 后端(server) ──gRPC AgentService──▶ Go Host(agent)
+浏览器 ── REST/WS ── Go 后端(server) ──gRPC HostService──▶ Go Host(host)
                                                               │ 子进程 + stdio JSON
                                                               ▼
                                                      脚本(任意语言) ──gRPC QuestionBank──▶ 后端
 ```
 
-- 后端只连 Host（`agent.addr`），不直接管脚本。
+- 后端只连 Host（`host.addr`），不直接管脚本。
 - Host 扫描脚本目录，按 manifest 启动/调用脚本子进程。
 - 脚本可通过后端 gRPC `QuestionBank` 读写题库（若需要）。
 
@@ -88,7 +88,7 @@
   - `module`：Host 以 `runtime -m <module> args...` 启动（Python 模块）。
   - **你不需要把文件叫 `runner.py`/`main.py`**——那只是官方脚本的示例。
 - `args`：附加命令行参数。
-- `requires`：运行时依赖说明，供展示与预检；实际安装读取脚本目录的 `requirements.txt`（需开启 `agent.auto_install_deps`）。
+- `requires`：运行时依赖说明，供展示与预检；实际安装读取脚本目录的 `requirements.txt`（需开启 `host.auto_install_deps`）。
 - `permissions`：权限声明（如 `network`、`filesystem`），目前仅透明展示，不强制执行。
 - `progress_regex`：CLI 桥提取进度的正则（捕获组 1=百分比，2=消息），可空。
 - `actions[].command`：**仅 CLI 桥**使用；该动作要执行的命令（支持 `{占位符}`）。
@@ -169,7 +169,7 @@ Host 启动脚本后，**一个任务一个子进程**：
 
 ## 5. 与后端 gRPC 的映射
 
-Host 实现既有 `AgentService`：
+Host 实现既有 `HostService`：
 
 - `Health` → 返回可用脚本的 `platforms`。
 - `ListScripts` → 返回 Host 实际加载的完整 manifest、hash、运行时与可用性；后端以此同步注册表，修改 manifest 无需重装。
@@ -218,7 +218,7 @@ python main.py --cli --action time --param cid=2416 --credential username=u --cr
 
 ## 9. 发现（Discover / @listing）
 
-除 `Execute` 外，Agent 还提供 `Discover`：列出账号在平台上的条目（课程/任务），供前端选择。
+除 `Execute` 外，Host 还提供 `Discover`：列出账号在平台上的条目（课程/任务），供前端选择。
 
 - 请求：`DiscoverRequest{platform, params, credentials}`；Host 以子进程发送 `{"type":"discover",...}`。平台页的「筛选」会把参数传入 `params`，带筛选的查询不读写缓存。
 - 脚本（Python SDK）：用 `@listing()` 注册发现函数，返回条目列表；运行时归一化后输出

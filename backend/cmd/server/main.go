@@ -61,8 +61,8 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-	stopAgent := startLocalAgent(conf, *envConf, logger)
-	defer stopAgent()
+	stopHost := startLocalHost(conf, *envConf, logger)
+	defer stopHost()
 	scheme := "http"
 	if conf.GetBool("http.tls.enabled") {
 		scheme = "https"

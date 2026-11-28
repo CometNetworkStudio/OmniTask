@@ -60,9 +60,9 @@ class ConfigTest(unittest.TestCase):
             self.assertEqual(env["C"], "")
 
     def test_from_env_uses_dict(self):
-        env = {"OMNITASK_AGENT_PORT": "1234", "OMNITASK_PLATFORM_CONCURRENCY": "5"}
+        env = {"OMNITASK_HOST_PORT": "1234", "OMNITASK_PLATFORM_CONCURRENCY": "5"}
         cfg = Config.from_env(env=env)
-        self.assertEqual(cfg.agent_port, 1234)
+        self.assertEqual(cfg.host_port, 1234)
         self.assertEqual(cfg.platform_concurrency, 5)
         self.assertFalse(cfg.llm.enabled)
 

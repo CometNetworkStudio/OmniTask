@@ -17,13 +17,13 @@ Go + Gin + GORM + gRPC 后端：用户/凭据/任务/题库/脚本注册表与�
 | 入口 | 说明 |
 |------|------|
 | `cmd/server` | HTTP API（前缀 `/api/v1`）+ WebSocket + 任务编排 + `QuestionBank` gRPC；在 `/` 托管内嵌前端 dist；`-migrate` 执行数据库迁移（实现见 `internal/migration`）|
-| `cmd/agent` | Go 脚本 Host：扫描脚本目录，以子进程 + stdio JSON 运行平台脚本 |
+| `cmd/host` | Go 脚本 Host：扫描脚本目录，以子进程 + stdio JSON 运行平台脚本 |
 
 ## 目录
 
 ```
 internal/
-├── agenthost/     # Go Host（manifest 解析 / 子进程 stdio / 热扫描）
+├── scripthost/     # Go Host（manifest 解析 / 子进程 stdio / 热扫描）
 ├── handler/       # HTTP handler（auth/credential/task/question/script/ws）
 ├── middleware/    # JWT / Casbin 鉴权 / 日志 / CORS
 ├── model/         # GORM 模型

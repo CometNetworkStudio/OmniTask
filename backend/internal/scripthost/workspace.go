@@ -1,4 +1,4 @@
-package agenthost
+package scripthost
 
 import (
 	"fmt"

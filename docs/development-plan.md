@@ -8,11 +8,11 @@
 ## 1. 排序原则
 
 1. **先攻坚不确定性最高的部分**：平台协议（词达人签名/jv 混淆、WeLearn SSO）是最大技术风险，先用 Python 独立跑通，避免后期推翻架构。
-2. **契约先行**：proto 与数据库 schema 尽早冻结，前端/后端/Agent 可并行。
+2. **契约先行**：proto 与数据库 schema 尽早冻结，前端/后端/Host 可并行。
 3. **每阶段可独立验收**：不依赖后续阶段即可证明"这一步对了"。
-4. **保持三层边界**：前端只交互、后端只编排、Agent 只执行且**不直连数据库**。
+4. **保持三层边界**：前端只交互、后端只编排、Host 只执行且**不直连数据库**。
 
-用户建议顺序：`py → 后端 → 后端与 agent 通讯 → 前端 → 测试 → 上线`。
+用户建议顺序：`py → 后端 → 后端与 host 通讯 → 前端 → 测试 → 上线`。
 本规划**采纳**该顺序，仅做两点增强：
 - 在 py 之前补一个 **P0.5 契约补全**（题库 RPC、schema），否则 py 阶段无法定义题库读写接口。
 - 把"测试"贯穿各阶段（每阶段自带验收），P5 只做集成/E2E 与加固。
@@ -24,9 +24,9 @@
 - `backend/`：Nunu advanced，端口 8080，`go build/vet` 通过，示例代码已清理并重跑 wire。
 - `frontend/`：Vite + Vue3 + JS + Pinia/Router/Axios，`npm run build` 通过。
 - `sdk/python/`：平台脚本 Python SDK（`core/`、`runtime.py`、`gen/`、`tests/`），依赖在 `sdk/python/.venv`。
-- `proto/agent/v1/agent.proto`：`AgentService.Health/Execute(server-streaming)` + `QuestionBank.Lookup/Save`。
+- `proto/host/v1/host.proto`：`HostService.Health/Execute(server-streaming)` + `QuestionBank.Lookup/Save`。
 - `backend/internal/model/model.go`：冻结 `User/Credential/Task/TaskEvent/Question` 五张表 schema。
-- `.env.example`：约定主密钥、Agent/QuestionBank gRPC 地址、LLM、限流与脚本凭据。
+- `.env.example`：约定主密钥、Host/QuestionBank gRPC 地址、LLM、限流与脚本凭据。
 - `sdk/python/core/`：公共层 config/events/http/ratelimit/bank/llm（单测通过）。
 - 平台脚本：已迁出为独立仓库（`CometNetworkStudio/{cidaren,welearn}`），由 Go Host 以子进程运行；旧 `run_cli.py` 已移除。
 - 文档：`README.md`、`docs/`（reference-analysis / development-plan / script-protocol / integration-guide / build-and-run 等）。
@@ -46,7 +46,7 @@
 | 阶段 | 名称 | 产出 | 依赖 |
 |------|------|------|------|
 | P0.5 | 契约补全 | proto 题库 RPC、DB schema、配置约定 | P0 |
-| P1 | Agent 平台协议层 | 词达人/WeLearn 无界面实现 + 本地 CLI 验证 | P0.5 |
+| P1 | Host 平台协议层 | 词达人/WeLearn 无界面实现 + 本地 CLI 验证 | P0.5 |
 | P2 | 后端领域层 | 用户/凭据/任务/题库 + REST + 迁移 | P0.5 |
 | P3 | 通讯层 | Go gRPC 客户端 + 进度汇聚 Redis + WebSocket | P1、P2 |
 | P4 | 前端 | 登录/凭据/任务/实时进度/题库管理 | P2、P3 |
@@ -60,19 +60,19 @@
 ### P0.5 契约补全（已完成）
 
 **任务**
-- proto 增加 `QuestionBank` service（Go 实现服务端，Agent 作为客户端调用）：
+- proto 增加 `QuestionBank` service（Go 实现服务端，Host 作为客户端调用）：
   - `rpc Lookup(LookupRequest) returns (LookupResponse)`：按 `platform + question_key` 查题库。
   - `rpc Save(SaveRequest) returns (SaveResponse)`：回写确认正确答案。
 - 冻结数据库 schema（见 §5.1）。
-- 约定配置来源：统一的 `.env` + 各服务 config（后端 viper yaml，Agent env）。
+- 约定配置来源：统一的 `.env` + 各服务 config（后端 viper yaml，Host env）。
 
 **验收**：`make proto` 生成双端代码；Go/Python 均可编译/导入；schema 评审通过。
 
-**需确认 #1**：题库架构是否采用「后端 gRPC 服务 + Agent 客户端」，而非 Agent 直连 MySQL。
+**需确认 #1**：题库架构是否采用「后端 gRPC 服务 + Host 客户端」，而非 Host 直连 MySQL。
 
 ---
 
-### P1 Agent 平台协议层（最高风险；代码已实现，待真实凭据联调）
+### P1 Host 平台协议层（最高风险；代码已实现，待真实凭据联调）
 
 **P1.0 公共层**
 - `sdk/python/core/config.py`：读取 env/yaml（平台凭据、限流、LLM）。
@@ -98,7 +98,7 @@
 - 两种动作：刷时长（按配置时长 + 每 60s keepalive）、提交进度。
 
 **P1.3 本地验证**
-- （历史）曾用 `agent/run_cli.py` 本地验证；该入口已移除，改用脚本自带 CLI 与 Go Host。
+- （历史）曾用本地 `run_cli.py` 验证；该入口已移除，改用脚本自带 CLI 与 Go Host。
 - **当前无可用 token**：先用脱敏样本写单元测试（签名、jv 解码、答题分支）；拿到 token 后再跑真实取题/判分/回写。
 
 **验收**：命令行独立完成词达人与 WeLearn 各一次任务；题库有新增记录；不依赖 Go 后端。（真实 token 到位前，以单测 + 脱敏回放通过为阶段验收）
@@ -139,26 +139,26 @@
 ### P3 通讯层（已完成）
 
 **已实现**
-- `internal/service/agent.go`：Go gRPC 客户端（`grpc.NewClient`，Health / Execute server-streaming）。
+- `internal/service/host.go`：Go gRPC 客户端（`grpc.NewClient`，Health / Execute server-streaming）。
 - `internal/server/bank.go`：`QuestionBank` gRPC 服务端（Go，端口 9000），Lookup/Save 直连题库。
-- `internal/service/orchestrator.go`：轮询 pending → `Claim` 原子领取 → running → 解密凭据 → 下发 Agent → 终态；事件写 Redis（`ProgressStore`）、`task_events`、WebSocket。
+- `internal/service/orchestrator.go`：轮询 pending → `Claim` 原子领取 → running → 解密凭据 → 下发 Host → 终态；事件写 Redis（`ProgressStore`）、`task_events`、WebSocket。
 - `internal/ws/hub.go` + `handler/ws.go`：`/api/v1/ws?task_id=` 订阅，连上先回放 Redis 快照。
-- Agent：`core/bank.py` 新增 `GrpcBank`，`OMNITASK_BANK_MODE=grpc` 时经后端读写（Agent 不直连 DB）。
-- wire 接入 Redis/AgentClient/ProgressStore/Hub/Orchestrator/BankGRPCServer。
+- Host：`core/bank.py` 新增 `GrpcBank`，`OMNITASK_BANK_MODE=grpc` 时经后端读写（Host 不直连 DB）。
+- wire 接入 Redis/HostClient/ProgressStore/Hub/Orchestrator/BankGRPCServer。
 
 **验收记录**
-- 端到端（WeLearn，无副作用）：REST 建任务 → orchestrator 领取 → 从 DB 解密账密 → gRPC 下发 Agent → WebSocket 依次收到 `running(start/登录成功/课程数/没有未完成的 SCO)` → `succeeded`。
-- 失败路径（词达人）：Agent 侧返回 `SecurityVerifyError`（11003 需安全验证）→ `failed` 事件经 WS 推送并落 `task_events`。
+- 端到端（WeLearn，无副作用）：REST 建任务 → orchestrator 领取 → 从 DB 解密账密 → gRPC 下发 Host → WebSocket 依次收到 `running(start/登录成功/课程数/没有未完成的 SCO)` → `succeeded`。
+- 失败路径（词达人）：Host 侧返回 `SecurityVerifyError`（11003 需安全验证）→ `failed` 事件经 WS 推送并落 `task_events`。
 - `QuestionBank` gRPC 直连验证：Lookup 命中/未命中、Save 写入、再次 Lookup 命中并 `hit_count+1`；MySQL `questions` 落库。
 - **待办**：词达人 token 触发平台风控（11003），需在 App/微信完成安全验证后重试；届时可验证完整答题+题库回写闭环。
 
-- proto：`AgentService` 已有；P0.5 的 `QuestionBank` 在此实现 Go 服务端，并让 Agent 以客户端接入。
-- Go gRPC 客户端：`internal/service/agent`（dial Agent@50051，`Execute` 流式）。
+- proto：`HostService` 已有；P0.5 的 `QuestionBank` 在此实现 Go 服务端，并让 Host 以客户端接入。
+- Go gRPC 客户端：`internal/service/host`（dial Host@50051，`Execute` 流式）。
 - 任务编排：消费者取 `pending` 任务 → 组装 `ExecuteRequest` → 流式接收事件 → 写 Redis 进度 + `TaskEvent` 落库 → 终态更新。
 - WebSocket：`/ws` 订阅 `task_id`，事件驱动推送（后端→前端）。
-- 并发/限流：后端侧任务队列 + Agent 侧平台信号量。
+- 并发/限流：后端侧任务队列 + Host 侧平台信号量。
 
-**验收**：从后端 REST 发起任务，Agent 执行，`websocat`/前端实时收到进度，终态与题库正确落库。
+**验收**：从后端 REST 发起任务，Host 执行，`websocat`/前端实时收到进度，终态与题库正确落库。
 
 ---
 
@@ -189,7 +189,7 @@
 - 单测：Python（签名/解码/答题策略，纯函数优先）、Go（service）。
 - E2E：`docker compose` 起全套，脚本化跑一次任务。
 - 安全：密钥不入库/不入日志；接口鉴权；输入校验；凭据解密仅在下发瞬间。
-- 稳定性：重试、幂等、任务超时、Agent 掉线处理。
+- 稳定性：重试、幂等、任务超时、Host 掉线处理。
 
 **验收**：CI 命令一键跑通；无明文凭据泄漏路径。
 
@@ -197,8 +197,8 @@
 
 ### P6 部署上线
 
-- `deploy/docker-compose/Dockerfile`：多阶段构建前端 + proto + server + agent。
-- `deploy/docker-compose/docker-compose.full.yml`：mysql/redis/server/agent/nginx。
+- `deploy/docker-compose/Dockerfile`：多阶段构建前端 + proto + server + host。
+- `deploy/docker-compose/docker-compose.full.yml`：mysql/redis/server/host/nginx。
 - 配置模板首启复制到 Docker 卷；密钥由 server 首次生成；数据卷持久化。
 - nginx：内嵌前端反代 + `/api` + WebSocket 升级。
 
@@ -220,7 +220,7 @@
 
 ### 5.2 凭据加密
 
-AES-256-GCM，随机 nonce 随密文存储；解密仅在下发 Agent 指令时进行；任何日志禁止出现明文。
+AES-256-GCM，随机 nonce 随密文存储；解密仅在下发 Host 指令时进行；任何日志禁止出现明文。
 
 - **密钥来源**：`security.master_key`，其次 `OMNITASK_MASTER_KEY`；默认版本 1。
 - **版本与轮换**：`security.master_keys` 为 `版本号 -> 密钥` 映射，`credentials.key_version` 记录密文所用版本；映射非空时只读该映射，不再读取 `master_key`。新写入使用最大版本（可用 `security.master_key_version` 显式指定）。轮换步骤：把旧 `master_key` 以原版本号加入 `master_keys`，再加入新版本；执行 `server -rotate-credentials` 将全部凭据重加密到当前版本；确认后从映射移除旧版本。
@@ -241,7 +241,7 @@ AES-256-GCM，随机 nonce 随密文存储；解密仅在下发 Agent 指令时�
 | 服务 | 端口 |
 |------|------|
 | 后端 HTTP | 8080 |
-| Agent gRPC | 50051 |
+| Host gRPC | 50051 |
 | MySQL | 3380 |
 | Redis | 6350 |
 | 前端 dev | 5173 |
@@ -276,7 +276,7 @@ AES-256-GCM，随机 nonce 随密文存储；解密仅在下发 Agent 指令时�
 
 ## 8. 已确认决策（原开放问题）
 
-1. **题库架构**：由 Go 后端暴露 gRPC `QuestionBank`（`Lookup`/`Save`），Agent 作为客户端调用；Agent 独立测试时用本地 SQLite/JSON 适配器。✅
+1. **题库架构**：由 Go 后端暴露 gRPC `QuestionBank`（`Lookup`/`Save`），Host 作为客户端调用；Host 独立测试时用本地 SQLite/JSON 适配器。✅
 2. **LLM 供应商**：**DeepSeek**（OpenAI 兼容）；`base_url/api_key/model` 由环境变量注入，key 由用户提供。✅
 3. **词达人 token**：暂时无法提供 → P1 先写实现 + 单元测试（用脱敏样本），真实 token 的 `answer_tag` 实测与联调后置。⏳
 4. **前端组件库**：**Vuetify**（最新 4.2.1，`npm i vuetify`），官方 MCP `@vuetify/mcp` 已接入 opencode 全局配置。✅
@@ -290,9 +290,9 @@ AES-256-GCM，随机 nonce 随密文存储；解密仅在下发 Agent 指令时�
 
 **已完成**
 - 协议文档 `docs/script-protocol.md`（manifest + NDJSON 事件 + 运行时检测 + gRPC 映射）。
-- Go Host：`backend/internal/agenthost`（扫描脚本目录、manifest 解析、绝对路径解析、子进程 + stdio JSON 转发、事件映射），入口 `cmd/agent`，实现既有 `AgentService`，后端零改动。
-- Python 便捷运行时 `sdk/python/runtime.py`（`serve(run_func)`）；`agent/scripts/<id>/{main.py,omnitask.json}`。
-- 配置：`agent.{host,port,scripts_dir,python,pythonpath,bank_addr}`；`omnitask.sh deploy` 改为构建并运行 Go Host（不再跑 Python gRPC server）。
+- Go Host：`backend/internal/scripthost`（扫描脚本目录、manifest 解析、绝对路径解析、子进程 + stdio JSON 转发、事件映射），入口 `cmd/host`，实现既有 `HostService`，后端零改动。
+- Python 便捷运行时 `sdk/python/runtime.py`（`serve(run_func)`）；`scripts/<id>/{main.py,omnitask.json}`。
+- 配置：`host.{host,port,scripts_dir,python,pythonpath,bank_addr}`；`omnitask.sh deploy` 改为构建并运行 Go Host（不再跑 Python gRPC server）。
 - 验证：`Health` 返回 `['cidaren','welearn']`；`Execute(welearn, progress)` 子进程执行成功（登录→课程→完成→SUCCEEDED）。
 
 **待办（下一阶段）**

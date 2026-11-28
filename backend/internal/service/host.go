@@ -6,7 +6,7 @@ import (
 	"net"
 	"strings"
 
-	agentv1 "backend/api/agent/v1"
+	hostv1 "backend/api/host/v1"
 	"backend/pkg/log"
 	"github.com/spf13/viper"
 	"go.uber.org/zap"
@@ -14,19 +14,19 @@ import (
 	"google.golang.org/grpc/credentials/insecure"
 )
 
-// AgentClient 是后端到 Python Agent 的 gRPC 客户端。
-type AgentClient struct {
+// HostClient 是后端到 Python 脚本 Host 的 gRPC 客户端。
+type HostClient struct {
 	addr   string
 	logger *log.Logger
 }
 
-func NewAgentClient(conf *viper.Viper, logger *log.Logger) *AgentClient {
-	addr := conf.GetString("agent.addr")
+func NewHostClient(conf *viper.Viper, logger *log.Logger) *HostClient {
+	addr := conf.GetString("host.addr")
 	if host, _, err := net.SplitHostPort(addr); err == nil && !isLoopbackHost(host) {
-		logger.Warn("Agent gRPC 未启用 TLS，凭据会以明文跨网络传输；请确保链路位于可信私网，或在网络层加密。",
-			zap.String("agent_addr", addr))
+		logger.Warn("Host gRPC 未启用 TLS，凭据会以明文跨网络传输；请确保链路位于可信私网，或在网络层加密。",
+			zap.String("host_addr", addr))
 	}
-	return &AgentClient{addr: addr, logger: logger}
+	return &HostClient{addr: addr, logger: logger}
 }
 
 func isLoopbackHost(host string) bool {
@@ -38,37 +38,37 @@ func isLoopbackHost(host string) bool {
 	return ip != nil && ip.IsLoopback()
 }
 
-func (c *AgentClient) dial() (*grpc.ClientConn, error) {
+func (c *HostClient) dial() (*grpc.ClientConn, error) {
 	return grpc.NewClient(c.addr, grpc.WithTransportCredentials(insecure.NewCredentials()))
 }
 
-func (c *AgentClient) Health(ctx context.Context) (*agentv1.HealthResponse, error) {
+func (c *HostClient) Health(ctx context.Context) (*hostv1.HealthResponse, error) {
 	conn, err := c.dial()
 	if err != nil {
 		return nil, err
 	}
 	defer conn.Close()
-	return agentv1.NewAgentServiceClient(conn).Health(ctx, &agentv1.HealthRequest{})
+	return hostv1.NewHostServiceClient(conn).Health(ctx, &hostv1.HealthRequest{})
 }
 
 // ListScripts 返回 Host 实际加载的脚本与运行时状态。
-func (c *AgentClient) ListScripts(ctx context.Context) (*agentv1.ListScriptsResponse, error) {
+func (c *HostClient) ListScripts(ctx context.Context) (*hostv1.ListScriptsResponse, error) {
 	conn, err := c.dial()
 	if err != nil {
 		return nil, err
 	}
 	defer conn.Close()
-	return agentv1.NewAgentServiceClient(conn).ListScripts(ctx, &agentv1.ListScriptsRequest{})
+	return hostv1.NewHostServiceClient(conn).ListScripts(ctx, &hostv1.ListScriptsRequest{})
 }
 
 // Execute 下发任务并同步消费事件流；每条事件回调 onEvent。
-func (c *AgentClient) Execute(ctx context.Context, req *agentv1.ExecuteRequest, onEvent func(*agentv1.ExecuteEvent)) error {
+func (c *HostClient) Execute(ctx context.Context, req *hostv1.ExecuteRequest, onEvent func(*hostv1.ExecuteEvent)) error {
 	conn, err := c.dial()
 	if err != nil {
 		return err
 	}
 	defer conn.Close()
-	stream, err := agentv1.NewAgentServiceClient(conn).Execute(ctx, req)
+	stream, err := hostv1.NewHostServiceClient(conn).Execute(ctx, req)
 	if err != nil {
 		return err
 	}
@@ -85,11 +85,11 @@ func (c *AgentClient) Execute(ctx context.Context, req *agentv1.ExecuteRequest, 
 }
 
 // Discover 列出该账号在平台上的条目（脚本用 @listing 实现）。
-func (c *AgentClient) Discover(ctx context.Context, req *agentv1.DiscoverRequest) (*agentv1.DiscoverResponse, error) {
+func (c *HostClient) Discover(ctx context.Context, req *hostv1.DiscoverRequest) (*hostv1.DiscoverResponse, error) {
 	conn, err := c.dial()
 	if err != nil {
 		return nil, err
 	}
 	defer conn.Close()
-	return agentv1.NewAgentServiceClient(conn).Discover(ctx, req)
+	return hostv1.NewHostServiceClient(conn).Discover(ctx, req)
 }

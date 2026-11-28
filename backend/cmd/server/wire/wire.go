@@ -54,7 +54,7 @@ var serviceSet = wire.NewSet(
 	service.NewScriptService,
 	service.NewDiscoverService,
 	service.NewUserService,
-	service.NewAgentClient,
+	service.NewHostClient,
 	service.NewProgressStore,
 	service.NewOrchestrator,
 )

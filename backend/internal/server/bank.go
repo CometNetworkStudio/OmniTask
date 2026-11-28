@@ -4,7 +4,7 @@ import (
 	"context"
 	"errors"
 
-	agentv1 "backend/api/agent/v1"
+	hostv1 "backend/api/host/v1"
 	apiv1 "backend/api/v1"
 	"backend/internal/service"
 	"backend/pkg/log"
@@ -15,9 +15,9 @@ import (
 	"gorm.io/gorm"
 )
 
-// bankServer 实现 proto 的 QuestionBank 服务，供 Python Agent 读写题库。
+// bankServer 实现 proto 的 QuestionBank 服务，供 Python 脚本 Host 读写题库。
 type bankServer struct {
-	agentv1.UnimplementedQuestionBankServer
+	hostv1.UnimplementedQuestionBankServer
 	svc    *service.QuestionService
 	logger *log.Logger
 }
@@ -28,21 +28,21 @@ func NewBankGRPCServer(svc *service.QuestionService, conf *viper.Viper, logger *
 		grpcserver.WithServerHost(conf.GetString("grpc.host")),
 		grpcserver.WithServerPort(conf.GetInt("grpc.port")),
 	)
-	agentv1.RegisterQuestionBankServer(s.Server, &bankServer{svc: svc, logger: logger})
+	hostv1.RegisterQuestionBankServer(s.Server, &bankServer{svc: svc, logger: logger})
 	return s
 }
 
-func (b *bankServer) Lookup(ctx context.Context, req *agentv1.LookupRequest) (*agentv1.LookupResponse, error) {
+func (b *bankServer) Lookup(ctx context.Context, req *hostv1.LookupRequest) (*hostv1.LookupResponse, error) {
 	q, err := b.svc.Lookup(ctx, req.GetPlatform(), req.GetQuestionKey())
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return &agentv1.LookupResponse{Found: false}, nil
+			return &hostv1.LookupResponse{Found: false}, nil
 		}
 		return nil, status.Error(codes.Internal, err.Error())
 	}
-	return &agentv1.LookupResponse{
+	return &hostv1.LookupResponse{
 		Found: true,
-		Question: &agentv1.Question{
+		Question: &hostv1.Question{
 			Platform:    q.Platform,
 			QuestionKey: q.QuestionKey,
 			Stem:        q.Stem,
@@ -55,7 +55,7 @@ func (b *bankServer) Lookup(ctx context.Context, req *agentv1.LookupRequest) (*a
 	}, nil
 }
 
-func (b *bankServer) Save(ctx context.Context, req *agentv1.SaveRequest) (*agentv1.SaveResponse, error) {
+func (b *bankServer) Save(ctx context.Context, req *hostv1.SaveRequest) (*hostv1.SaveResponse, error) {
 	q := req.GetQuestion()
 	if q == nil {
 		return nil, status.Error(codes.InvalidArgument, "question is required")
@@ -73,5 +73,5 @@ func (b *bankServer) Save(ctx context.Context, req *agentv1.SaveRequest) (*agent
 	if err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
 	}
-	return &agentv1.SaveResponse{Saved: true}, nil
+	return &hostv1.SaveResponse{Saved: true}, nil
 }

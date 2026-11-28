@@ -1,12 +1,12 @@
 syntax = "proto3";
 
-package agent.v1;
+package host.v1;
 
-option go_package = "backend/api/agent/v1;agentv1";
+option go_package = "backend/api/host/v1;hostv1";
 
-// AgentService 是 Go 后端与 Python Agent 之间的唯一契约。
-// 后端通过 Execute 下发任务，Agent 以 server-streaming 持续回传进度与结果。
-service AgentService {
+// HostService 是 Go 后端与 Python 脚本 Host 之间的唯一契约。
+// 后端通过 Execute 下发任务，Host 以 server-streaming 持续回传进度与结果。
+service HostService {
   rpc Health(HealthRequest) returns (HealthResponse);
   rpc Execute(ExecuteRequest) returns (stream ExecuteEvent);
   // Discover 列出该账号在平台上的条目（课程/任务等），用于前端选择。
@@ -38,7 +38,7 @@ message ListScriptsResponse {
 message DiscoverRequest {
   string platform = 1;
   map<string, string> params = 2;
-  // 已由后端解密后下发的凭据，Agent 不得持久化。
+  // 已由后端解密后下发的凭据，Host 不得持久化。
   map<string, string> credentials = 3;
   // 账号级粘性代理，Host 以 OMNITASK_PROXY 注入脚本环境。
   string proxy = 4;
@@ -65,7 +65,7 @@ message ExecuteRequest {
   string platform = 2;
   string action = 3;
   map<string, string> params = 4;
-  // 已由后端解密后下发的平台凭据，Agent 不得持久化。
+  // 已由后端解密后下发的平台凭据，Host 不得持久化。
   map<string, string> credentials = 5;
   // 账号级粘性代理，Host 以 OMNITASK_PROXY 注入脚本环境。
   string proxy = 6;
@@ -106,8 +106,8 @@ message ExecuteEvent {
   string result_json = 18; // 结构化结果（可为对象/数组），优先于 result map
 }
 
-// QuestionBank 由 Go 后端实现，Python Agent 作为客户端调用。
-// 题库读写统一经此服务，Agent 不直连数据库。
+// QuestionBank 由 Go 后端实现，Python 脚本 Host 作为客户端调用。
+// 题库读写统一经此服务，Host 不直连数据库。
 service QuestionBank {
   // Lookup 按 platform + question_key 查询题库。
   rpc Lookup(LookupRequest) returns (LookupResponse);

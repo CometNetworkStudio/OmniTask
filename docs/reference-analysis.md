@@ -107,14 +107,14 @@
 题型按 `topic_mode` 分支：`42`（选项，中文释义）、`32`（短语填空，按模板空位对齐）、`73`（空位单词）等。
 净室实现独立设计，不复用原项目的 `answer_lib`、spacy 流程与谷歌翻译。
 
-## 三、对 Agent 架构的映射
+## 三、对 Host 架构的映射
 
 - 每个平台一个独立脚本项目，实现 `run(action, params, credentials)` 生成器；共享 SDK 见 `sdk/python/`。
 - 凭据：
   - WeLearn：`{"username": ..., "password": ...}`
   - 词达人：`{"token": ...}`
 - GUI 全部剥离；登录、抓取、答题逻辑改为无界面函数。
-- 题库访问：Agent 不直连数据库，经后端 gRPC `QuestionBank` 服务读写（见 `docs/development-plan.md` §4/§5）。
+- 题库访问：Host 不直连数据库，经后端 gRPC `QuestionBank` 服务读写（见 `docs/development-plan.md` §4/§5）。
 
 ## 四、已确认决策
 
@@ -124,6 +124,6 @@
 
 ## 五、脚本迁出说明
 
-原 `agent/scripts/{cidaren,welearn}` 已迁出主库，作为独立 MIT 项目发布并开源：
+原 `scripts/{cidaren,welearn}` 已迁出主库，作为独立 MIT 项目发布并开源：
 `github.com/CometNetworkStudio/cidaren`、`github.com/CometNetworkStudio/welearn`。
 主库通过运行目录 `scripts/<id>/`（gitignore）与 OmniTask「脚本」页安装，见 `docs/script-protocol.md`。

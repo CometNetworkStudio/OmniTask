@@ -35,9 +35,9 @@ http:
 grpc:
   host: 127.0.0.1
   port: 9000
-agent:
+host:
   addr: 127.0.0.1:50051
-  host: 127.0.0.1
+  listen: 127.0.0.1
   port: 50051
   scripts_dir: scripts
   python: python3
@@ -190,16 +190,16 @@ func postProcess(conf *viper.Viper, path string) {
 			conf.Set("data.db.user.dsn", "data/omnitask.db")
 		}
 	}
-	if !conf.IsSet("agent.autostart") {
-		conf.Set("agent.autostart", conf.GetString("mode") == "lite")
+	if !conf.IsSet("host.autostart") {
+		conf.Set("host.autostart", conf.GetString("mode") == "lite")
 	}
 	defaults := map[string]any{
-		"agent.workspaces_dir":                  "workspaces",
-		"agent.rate_dir":                        "rate",
-		"agent.max_processes":                   8,
-		"agent.keep_workspaces":                 false,
-		"agent.keep_failed_workspaces":          true,
-		"agent.keep_versions":                   3,
+		"host.workspaces_dir":                   "workspaces",
+		"host.rate_dir":                         "rate",
+		"host.max_processes":                    8,
+		"host.keep_workspaces":                  false,
+		"host.keep_failed_workspaces":           true,
+		"host.keep_versions":                    3,
 		"task.max_active_per_user":              20,
 		"task.daily_tasks_per_user":             0,
 		"task.max_pending_per_user":             0,
@@ -219,7 +219,7 @@ func postProcess(conf *viper.Viper, path string) {
 			conf.Set(key, value)
 		}
 	}
-	dirs := []string{"data", "logs", conf.GetString("agent.scripts_dir")}
+	dirs := []string{"data", "logs", conf.GetString("host.scripts_dir")}
 	for _, dir := range dirs {
 		if dir != "" {
 			_ = os.MkdirAll(dir, 0o755)

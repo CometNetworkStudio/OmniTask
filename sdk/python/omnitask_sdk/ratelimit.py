@@ -1,7 +1,7 @@
 """平台级并发与请求间隔限流。
 
 - 平台并发默认 2（全可配），同一账号串行。
-- Agent 以线程池运行，故用 threading。
+- Host 以线程池运行，故用 threading。
 """
 
 from __future__ import annotations

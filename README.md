@@ -38,9 +38,9 @@ OmniTask 把学习通、词达人、WeLearn 等平台的重复任务交给可插
         │ REST + WebSocket
         ▼
 Go 后端（Gin + GORM + Casbin）── 编排、存储、鉴权、脚本安装
-        │ gRPC AgentService
+        │ gRPC HostService
         ▼
-Go Host（cmd/agent）── 扫描脚本、启动子进程、转发事件
+Go Host（cmd/host）── 扫描脚本、启动子进程、转发事件
         │ stdio JSON
         ▼
 平台脚本（任意语言，推荐 Python）
@@ -68,7 +68,7 @@ docker compose --env-file deploy/docker-compose/.env \
 cd frontend && npm install && npm run build && cd ..
 cd backend
 go build -o omnitask-server ./cmd/server
-go build -o omnitask-agent  ./cmd/agent
+go build -o omnitask-host  ./cmd/host
 ./omnitask-server -conf config.yaml
 ```
 

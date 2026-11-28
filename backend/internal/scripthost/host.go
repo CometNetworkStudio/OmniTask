@@ -1,4 +1,4 @@
-package agenthost
+package scripthost
 
 import (
 	"bufio"
@@ -13,7 +13,7 @@ import (
 	"sync"
 	"time"
 
-	agentv1 "backend/api/agent/v1"
+	hostv1 "backend/api/host/v1"
 	"backend/pkg/log"
 	"github.com/spf13/viper"
 	"go.uber.org/zap"
@@ -21,12 +21,12 @@ import (
 	"google.golang.org/grpc/status"
 )
 
-const Version = "agent-go/0.1.0"
+const Version = "host-go/0.1.0"
 
 // Host 是 Go 脚本宿主：扫描脚本目录，按 manifest 以子进程 + stdio JSON 调用脚本，
-// 并实现 gRPC AgentService 供后端调用。支持热扫描（安装后无需重启）。
+// 并实现 gRPC HostService 供后端调用。支持热扫描（安装后无需重启）。
 type Host struct {
-	agentv1.UnimplementedAgentServiceServer
+	hostv1.UnimplementedHostServiceServer
 	mu            sync.RWMutex
 	scripts       map[string]Script
 	available     map[string]bool
@@ -50,19 +50,19 @@ type Host struct {
 }
 
 func NewHost(conf *viper.Viper, logger *log.Logger) (*Host, error) {
-	workspacesDir := absolute(conf.GetString("agent.workspaces_dir"))
+	workspacesDir := absolute(conf.GetString("host.workspaces_dir"))
 	if workspacesDir == "" {
 		workspacesDir = absolute("workspaces")
 	}
-	rateDir := absolute(conf.GetString("agent.rate_dir"))
+	rateDir := absolute(conf.GetString("host.rate_dir"))
 	if rateDir == "" {
 		rateDir = absolute("rate")
 	}
-	maxProcesses := conf.GetInt("agent.max_processes")
+	maxProcesses := conf.GetInt("host.max_processes")
 	if maxProcesses <= 0 {
 		maxProcesses = 8
 	}
-	platformLimit := conf.GetInt("agent.platform_concurrency")
+	platformLimit := conf.GetInt("host.platform_concurrency")
 	if platformLimit <= 0 {
 		platformLimit = 2
 	}
@@ -71,18 +71,18 @@ func NewHost(conf *viper.Viper, logger *log.Logger) (*Host, error) {
 		available:       map[string]bool{},
 		runtimes:        map[string]string{},
 		runtimeErrors:   map[string]string{},
-		dir:             absolute(conf.GetString("agent.scripts_dir")),
-		python:          conf.GetString("agent.python"),
-		sdkDir:          absolute(conf.GetString("agent.pythonpath")),
-		bankAddr:        conf.GetString("agent.bank_addr"),
+		dir:             absolute(conf.GetString("host.scripts_dir")),
+		python:          conf.GetString("host.python"),
+		sdkDir:          absolute(conf.GetString("host.pythonpath")),
+		bankAddr:        conf.GetString("host.bank_addr"),
 		logger:          logger,
 		workspacesDir:   workspacesDir,
 		rateDir:         rateDir,
 		processSem:      make(chan struct{}, maxProcesses),
 		platformLimit:   platformLimit,
 		platformSems:    map[string]chan struct{}{},
-		keepWorkspaces:  conf.GetBool("agent.keep_workspaces"),
-		keepFailedWorks: conf.GetBool("agent.keep_failed_workspaces"),
+		keepWorkspaces:  conf.GetBool("host.keep_workspaces"),
+		keepFailedWorks: conf.GetBool("host.keep_failed_workspaces"),
 	}
 	if err := os.MkdirAll(h.dir, 0o755); err != nil {
 		return nil, err
@@ -191,7 +191,7 @@ func (h *Host) lookup(id string) (Script, string, bool) {
 	return script, h.runtimes[id], true
 }
 
-func (h *Host) Health(ctx context.Context, req *agentv1.HealthRequest) (*agentv1.HealthResponse, error) {
+func (h *Host) Health(ctx context.Context, req *hostv1.HealthRequest) (*hostv1.HealthResponse, error) {
 	h.reload()
 	h.mu.RLock()
 	defer h.mu.RUnlock()
@@ -202,11 +202,11 @@ func (h *Host) Health(ctx context.Context, req *agentv1.HealthRequest) (*agentv1
 		}
 	}
 	sort.Strings(platforms)
-	return &agentv1.HealthResponse{Version: Version, Platforms: platforms}, nil
+	return &hostv1.HealthResponse{Version: Version, Platforms: platforms}, nil
 }
 
 // ListScripts 返回 Host 实际加载的脚本清单，后端以此同步注册表。
-func (h *Host) ListScripts(ctx context.Context, req *agentv1.ListScriptsRequest) (*agentv1.ListScriptsResponse, error) {
+func (h *Host) ListScripts(ctx context.Context, req *hostv1.ListScriptsRequest) (*hostv1.ListScriptsResponse, error) {
 	h.reload()
 	h.mu.RLock()
 	defer h.mu.RUnlock()
@@ -215,10 +215,10 @@ func (h *Host) ListScripts(ctx context.Context, req *agentv1.ListScriptsRequest)
 		ids = append(ids, id)
 	}
 	sort.Strings(ids)
-	resp := &agentv1.ListScriptsResponse{}
+	resp := &hostv1.ListScriptsResponse{}
 	for _, id := range ids {
 		s := h.scripts[id]
-		item := &agentv1.ScriptInfo{
+		item := &hostv1.ScriptInfo{
 			Id:          id,
 			Name:        s.Manifest.Name,
 			Version:     s.Manifest.Version,
@@ -266,7 +266,7 @@ type scriptEvent struct {
 	Value   string `json:"value"`
 }
 
-func (h *Host) Execute(req *agentv1.ExecuteRequest, stream agentv1.AgentService_ExecuteServer) error {
+func (h *Host) Execute(req *hostv1.ExecuteRequest, stream hostv1.HostService_ExecuteServer) error {
 	h.reload()
 	taskID := req.GetTaskId()
 	script, runtimePath, ok := h.lookup(req.GetPlatform())
@@ -346,9 +346,9 @@ func (h *Host) Execute(req *agentv1.ExecuteRequest, stream agentv1.AgentService_
 		if err := json.Unmarshal([]byte(line), &ev); err != nil || (ev.Type != "event" && ev.Type != "ready") {
 			badLines++
 			if badLines == 1 {
-				_ = stream.Send(&agentv1.ExecuteEvent{
+				_ = stream.Send(&hostv1.ExecuteEvent{
 					TaskId:    taskID,
-					Type:      agentv1.EventType_EVENT_TYPE_LOG,
+					Type:      hostv1.EventType_EVENT_TYPE_LOG,
 					Level:     "warn",
 					Message:   "脚本 stdout 出现非协议输出，已忽略；stdout 只能逐行输出 JSON，调试信息请走 stderr",
 					Timestamp: time.Now().Unix(),
@@ -379,7 +379,7 @@ func (h *Host) Execute(req *agentv1.ExecuteRequest, stream agentv1.AgentService_
 				resultJSON = string(buf)
 			}
 		}
-		event := &agentv1.ExecuteEvent{
+		event := &hostv1.ExecuteEvent{
 			TaskId:     taskID,
 			Percent:    int32(percent),
 			HasPercent: hasPercent,
@@ -400,24 +400,24 @@ func (h *Host) Execute(req *agentv1.ExecuteRequest, stream agentv1.AgentService_
 		}
 		switch ev.Event {
 		case "succeeded":
-			event.Type = agentv1.EventType_EVENT_TYPE_SUCCEEDED
+			event.Type = hostv1.EventType_EVENT_TYPE_SUCCEEDED
 			terminal = true
 			succeeded = true
 		case "failed":
-			event.Type = agentv1.EventType_EVENT_TYPE_FAILED
+			event.Type = hostv1.EventType_EVENT_TYPE_FAILED
 			terminal = true
 		case "started":
-			event.Type = agentv1.EventType_EVENT_TYPE_STARTED
+			event.Type = hostv1.EventType_EVENT_TYPE_STARTED
 		case "log":
-			event.Type = agentv1.EventType_EVENT_TYPE_LOG
+			event.Type = hostv1.EventType_EVENT_TYPE_LOG
 		case "step":
-			event.Type = agentv1.EventType_EVENT_TYPE_STEP
+			event.Type = hostv1.EventType_EVENT_TYPE_STEP
 		case "metric":
-			event.Type = agentv1.EventType_EVENT_TYPE_METRIC
+			event.Type = hostv1.EventType_EVENT_TYPE_METRIC
 		case "heartbeat":
-			event.Type = agentv1.EventType_EVENT_TYPE_HEARTBEAT
+			event.Type = hostv1.EventType_EVENT_TYPE_HEARTBEAT
 		default:
-			event.Type = agentv1.EventType_EVENT_TYPE_PROGRESS
+			event.Type = hostv1.EventType_EVENT_TYPE_PROGRESS
 		}
 		if err := stream.Send(event); err != nil {
 			break
@@ -458,7 +458,7 @@ type discoverRequest struct {
 }
 
 // Discover 让脚本列出该账号在平台上的条目（@listing）。
-func (h *Host) Discover(ctx context.Context, req *agentv1.DiscoverRequest) (*agentv1.DiscoverResponse, error) {
+func (h *Host) Discover(ctx context.Context, req *hostv1.DiscoverRequest) (*hostv1.DiscoverResponse, error) {
 	h.reload()
 	script, runtimePath, ok := h.lookup(req.GetPlatform())
 	if !ok {
@@ -521,9 +521,9 @@ func (h *Host) Discover(ctx context.Context, req *agentv1.DiscoverRequest) (*age
 		if err := json.Unmarshal([]byte(line), &message); err != nil || message.Type != "items" {
 			continue
 		}
-		resp := &agentv1.DiscoverResponse{}
+		resp := &hostv1.DiscoverResponse{}
 		for _, item := range message.Items {
-			resp.Items = append(resp.Items, &agentv1.DiscoverItem{Key: item.Key, Fields: item.Fields})
+			resp.Items = append(resp.Items, &hostv1.DiscoverItem{Key: item.Key, Fields: item.Fields})
 		}
 		_ = cmd.Wait()
 		return resp, nil
@@ -532,11 +532,11 @@ func (h *Host) Discover(ctx context.Context, req *agentv1.DiscoverRequest) (*age
 	return nil, status.Error(codes.Internal, "discover 未返回条目: "+lastLine(stderr.String()))
 }
 
-func (h *Host) fail(stream agentv1.AgentService_ExecuteServer, taskID, message string) error {
+func (h *Host) fail(stream hostv1.HostService_ExecuteServer, taskID, message string) error {
 	h.logger.Warn("host execute failed", zap.String("task", taskID), zap.String("error", message))
-	return stream.Send(&agentv1.ExecuteEvent{
+	return stream.Send(&hostv1.ExecuteEvent{
 		TaskId:    taskID,
-		Type:      agentv1.EventType_EVENT_TYPE_FAILED,
+		Type:      hostv1.EventType_EVENT_TYPE_FAILED,
 		Message:   message,
 		Timestamp: time.Now().Unix(),
 	})

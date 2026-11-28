@@ -72,7 +72,7 @@ type fieldSpec struct {
 	Effect  string
 }
 
-// editableFields 是管理端唯一允许修改的配置白名单。密钥、数据库、agent 等不在其中。
+// editableFields 是管理端唯一允许修改的配置白名单。密钥、数据库、Host 等不在其中。
 var editableFields = []fieldSpec{
 	{
 		Key: "security.registration", Label: "注册方式", Group: "注册与登录", Type: FieldSelect,
@@ -195,7 +195,7 @@ var restartItems = []RestartItem{
 	{Key: "http.tls.*", Label: "TLS 证书"},
 	{Key: "data.db.*", Label: "数据库连接"},
 	{Key: "data.redis.*", Label: "Redis 连接"},
-	{Key: "agent.*", Label: "Agent 与脚本运行参数"},
+	{Key: "host.*", Label: "Host 与脚本运行参数"},
 	{Key: "log.*", Label: "日志参数"},
 	{Key: "security.master_key*", Label: "凭据主密钥", Note: "请通过环境变量或文件修改"},
 }

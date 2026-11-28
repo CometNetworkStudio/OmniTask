@@ -1,4 +1,4 @@
-PROTO := proto/agent/v1/agent.proto
+PROTO := proto/host/v1/host.proto
 
 .PHONY: proto proto-go proto-py sdk-test backend-run frontend-dev
 
@@ -12,8 +12,8 @@ proto-py:
 	mkdir -p sdk/python/omnitask_sdk/gen
 	sdk/python/.venv/bin/python -m grpc_tools.protoc -I proto \
 		--python_out=sdk/python/omnitask_sdk/gen --grpc_python_out=sdk/python/omnitask_sdk/gen $(PROTO)
-	touch sdk/python/omnitask_sdk/gen/__init__.py sdk/python/omnitask_sdk/gen/agent/__init__.py sdk/python/omnitask_sdk/gen/agent/v1/__init__.py
-	sed -i 's#^from agent.v1 import agent_pb2 as agent_dot_v1_dot_agent__pb2#from omnitask_sdk.gen.agent.v1 import agent_pb2 as agent_dot_v1_dot_agent__pb2#' sdk/python/omnitask_sdk/gen/agent/v1/agent_pb2_grpc.py
+	touch sdk/python/omnitask_sdk/gen/__init__.py sdk/python/omnitask_sdk/gen/host/__init__.py sdk/python/omnitask_sdk/gen/host/v1/__init__.py
+	sed -i 's#^from host.v1 import host_pb2 as host_dot_v1_dot_host__pb2#from omnitask_sdk.gen.host.v1 import host_pb2 as host_dot_v1_dot_host__pb2#' sdk/python/omnitask_sdk/gen/host/v1/host_pb2_grpc.py
 
 sdk-test:
 	cd sdk/python && ./.venv/bin/python -m unittest discover -s tests -t .

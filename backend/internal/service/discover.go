@@ -5,11 +5,11 @@ import (
 	"encoding/json"
 	"time"
 
-	agentv1 "backend/api/agent/v1"
+	hostv1 "backend/api/host/v1"
 	v1 "backend/api/v1"
-	"backend/internal/agenthost"
 	"backend/internal/model"
 	"backend/internal/repository"
+	"backend/internal/scripthost"
 	"backend/pkg/log"
 	"backend/pkg/sid"
 	"github.com/spf13/viper"
@@ -21,7 +21,7 @@ type DiscoverService struct {
 	scriptRepo *repository.ScriptRepository
 	scripts    *ScriptService
 	creds      *CredentialService
-	agent      *AgentClient
+	host       *HostClient
 	conf       *viper.Viper
 	sid        *sid.Sid
 	logger     *log.Logger
@@ -32,12 +32,12 @@ func NewDiscoverService(
 	scriptRepo *repository.ScriptRepository,
 	scripts *ScriptService,
 	creds *CredentialService,
-	agent *AgentClient,
+	host *HostClient,
 	conf *viper.Viper,
 	sid *sid.Sid,
 	logger *log.Logger,
 ) *DiscoverService {
-	return &DiscoverService{cacheRepo: cacheRepo, scriptRepo: scriptRepo, scripts: scripts, creds: creds, agent: agent, conf: conf, sid: sid, logger: logger}
+	return &DiscoverService{cacheRepo: cacheRepo, scriptRepo: scriptRepo, scripts: scripts, creds: creds, host: host, conf: conf, sid: sid, logger: logger}
 }
 
 // Platforms 返回已启用脚本的完整 schema（供任意登录用户使用）。
@@ -120,7 +120,7 @@ func (s *DiscoverService) Refresh(ctx context.Context, userID, platform, credent
 	}
 	proxy := creds[proxyKey]
 	delete(creds, proxyKey)
-	result, err := s.agent.Discover(ctx, &agentv1.DiscoverRequest{Platform: platform, Params: params, Credentials: creds, Proxy: proxy})
+	result, err := s.host.Discover(ctx, &hostv1.DiscoverRequest{Platform: platform, Params: params, Credentials: creds, Proxy: proxy})
 	if err != nil {
 		return nil, err
 	}
@@ -149,7 +149,7 @@ func (s *DiscoverService) Refresh(ctx context.Context, userID, platform, credent
 	return s.Items(ctx, userID, platform, credID)
 }
 
-func schemaResponse(platform string, manifest *agenthost.Manifest) *v1.DiscoveryResponse {
+func schemaResponse(platform string, manifest *scripthost.Manifest) *v1.DiscoveryResponse {
 	resp := &v1.DiscoveryResponse{Platform: platform, Items: []v1.DiscoveryItem{}}
 	if manifest != nil && manifest.Discovery != nil {
 		resp.Label = manifest.Discovery.Label
@@ -161,12 +161,12 @@ func schemaResponse(platform string, manifest *agenthost.Manifest) *v1.Discovery
 	return resp
 }
 
-func (s *DiscoverService) manifest(ctx context.Context, platform string) *agenthost.Manifest {
+func (s *DiscoverService) manifest(ctx context.Context, platform string) *scripthost.Manifest {
 	script, err := s.scriptRepo.Get(ctx, platform)
 	if err != nil || !script.Enabled {
 		return nil
 	}
-	var m agenthost.Manifest
+	var m scripthost.Manifest
 	if script.Manifest != "" && json.Unmarshal([]byte(script.Manifest), &m) == nil {
 		return &m
 	}
@@ -180,7 +180,7 @@ func toPlatformResponse(script *model.Script) v1.PlatformResponse {
 		Status:    script.Status, Actions: []v1.PlatformAction{},
 		Params: []v1.PlatformField{}, Credentials: []v1.PlatformField{},
 	}
-	var m agenthost.Manifest
+	var m scripthost.Manifest
 	if script.Manifest == "" || json.Unmarshal([]byte(script.Manifest), &m) != nil {
 		return resp
 	}
@@ -216,7 +216,7 @@ func toPlatformResponse(script *model.Script) v1.PlatformResponse {
 	return resp
 }
 
-func toPlatformField(f agenthost.Field) v1.PlatformField {
+func toPlatformField(f scripthost.Field) v1.PlatformField {
 	out := v1.PlatformField{
 		Key: f.Key, Label: f.Label, Type: f.Type, Default: f.Default,
 		Required: f.Required, Placeholder: f.Placeholder, Help: f.Help,

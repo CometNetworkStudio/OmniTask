@@ -242,7 +242,7 @@ function statusText(status) {
           <p class="mb-2">脚本需要对应的运行时才能执行。状态显示「缺少运行时」时，请在服务器上安装：</p>
           <ul class="ps-4">
             <li>Python 脚本：安装 <code>python3</code> 与依赖（<code>pip install -r requirements.txt</code>）</li>
-            <li>Host 使用的解释器由配置 <code>agent.python</code> 指定</li>
+            <li>Host 使用的解释器由配置 <code>host.python</code> 指定</li>
             <li>也可在脚本仓库中自带二进制，并把 <code>runtime</code> 指向它</li>
           </ul>
         </v-card-text>

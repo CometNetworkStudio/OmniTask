@@ -42,7 +42,7 @@ class QuestionBank(ABC):
 
 
 class LocalBank(QuestionBank):
-    """P1 本地开发适配器，仅供 Agent 独立验证；不属于生产数据路径。"""
+    """P1 本地开发适配器，仅供 Host 独立验证；不属于生产数据路径。"""
 
     def __init__(self, path: str) -> None:
         self.path = path
@@ -124,7 +124,7 @@ def _as_text(value) -> str:
 
 
 class GrpcBank(QuestionBank):
-    """经后端 gRPC QuestionBank 读写（生产路径，Agent 不直连数据库）。"""
+    """经后端 gRPC QuestionBank 读写（生产路径，Host 不直连数据库）。"""
 
     def __init__(self, addr: str, stub=None, pb2=None, timeout: float = 10.0) -> None:
         self.addr = addr
@@ -136,11 +136,11 @@ class GrpcBank(QuestionBank):
     def _ensure(self) -> None:
         if self._stub is not None:
             return
-        from .gen.agent.v1 import agent_pb2, agent_pb2_grpc
+        from .gen.host.v1 import host_pb2, host_pb2_grpc
 
-        self._pb2 = agent_pb2
+        self._pb2 = host_pb2
         self._channel = grpc.insecure_channel(self.addr)
-        self._stub = agent_pb2_grpc.QuestionBankStub(self._channel)
+        self._stub = host_pb2_grpc.QuestionBankStub(self._channel)
 
     def lookup(self, platform: str, question_key: str) -> dict | None:
         self._ensure()

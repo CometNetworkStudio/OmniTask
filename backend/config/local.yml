@@ -7,9 +7,9 @@ http:
 grpc:
   host: 127.0.0.1
   port: 9000
-agent:
+host:
   addr: 127.0.0.1:50051
-  host: 127.0.0.1
+  listen: 127.0.0.1
   port: 50051
   scripts_dir: ../scripts
   python: ../sdk/python/.venv/bin/python
@@ -30,8 +30,6 @@ security:
   api_sign:
     app_key: 123456
     app_security: 123456
-  jwt:
-    key: QQYnRFerJTSEcrfB89fw8prOaObmrch8
 data:
   db:
     user:

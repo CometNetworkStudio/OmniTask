@@ -65,23 +65,23 @@ services:
       retries: 12
       start_period: 20s
 
-  omnitask-agent:
+  omnitask-host:
     build:
       context: ../..
       dockerfile: deploy/docker-compose/Dockerfile
-      target: agent
+      target: host
       args:
         GOPROXY: ${GOPROXY:-https://goproxy.cn,direct}
-    image: omnitask-agent:local
-    container_name: omnitask-agent
+    image: omnitask-host:local
+    container_name: omnitask-host
     restart: unless-stopped
     init: true
     depends_on:
       omnitask-server:
         condition: service_healthy
     volumes:
-      - ./config.agent.yml:/config-template/config.yml:ro
-      - omnitask-agent-config:/config
+      - ./config.host.yml:/config-template/config.yml:ro
+      - omnitask-host-config:/config
       - omnitask-data:/data
     healthcheck:
       test:
@@ -111,5 +111,5 @@ services:
 volumes:
   omnitask-db-data:
   omnitask-server-config:
-  omnitask-agent-config:
+  omnitask-host-config:
   omnitask-data:

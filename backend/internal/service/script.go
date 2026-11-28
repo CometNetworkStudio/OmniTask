@@ -20,11 +20,11 @@ import (
 	"sync"
 	"time"
 
-	agentv1 "backend/api/agent/v1"
+	hostv1 "backend/api/host/v1"
 	v1 "backend/api/v1"
-	"backend/internal/agenthost"
 	"backend/internal/model"
 	"backend/internal/repository"
+	"backend/internal/scripthost"
 	"backend/pkg/log"
 	"backend/pkg/sid"
 	"github.com/spf13/viper"
@@ -45,7 +45,7 @@ type InstallJob struct {
 type ScriptService struct {
 	repo         *repository.ScriptRepository
 	jobs         *repository.ScriptInstallJobRepository
-	agent        *AgentClient
+	host         *HostClient
 	scriptsDir   string
 	python       string
 	autoInstall  bool
@@ -61,7 +61,7 @@ type ScriptService struct {
 func NewScriptService(
 	repo *repository.ScriptRepository,
 	jobs *repository.ScriptInstallJobRepository,
-	agent *AgentClient,
+	host *HostClient,
 	conf *viper.Viper,
 	sid *sid.Sid,
 	logger *log.Logger,
@@ -70,12 +70,12 @@ func NewScriptService(
 	return &ScriptService{
 		repo:         repo,
 		jobs:         jobs,
-		agent:        agent,
-		scriptsDir:   conf.GetString("agent.scripts_dir"),
-		python:       conf.GetString("agent.python"),
-		autoInstall:  conf.GetBool("agent.auto_install_deps"),
-		keepVersions: conf.GetInt("agent.keep_versions"),
-		pipIndex:     conf.GetString("agent.pip_index_url"),
+		host:         host,
+		scriptsDir:   conf.GetString("host.scripts_dir"),
+		python:       conf.GetString("host.python"),
+		autoInstall:  conf.GetBool("host.auto_install_deps"),
+		keepVersions: conf.GetInt("host.keep_versions"),
+		pipIndex:     conf.GetString("host.pip_index_url"),
 		sid:          sid,
 		logger:       logger,
 	}
@@ -84,7 +84,7 @@ func NewScriptService(
 // Sync 以 Host 实际加载的 manifest 为准刷新注册表，解决安装快照漂移。
 // Host 不可达时保持现状，不误标记脚本缺失。
 func (s *ScriptService) Sync(ctx context.Context) {
-	if s.agent == nil {
+	if s.host == nil {
 		return
 	}
 	s.syncMu.Lock()
@@ -96,7 +96,7 @@ func (s *ScriptService) Sync(ctx context.Context) {
 	s.syncMu.Unlock()
 	cctx, cancel := context.WithTimeout(ctx, 3*time.Second)
 	defer cancel()
-	resp, err := s.agent.ListScripts(cctx)
+	resp, err := s.host.ListScripts(cctx)
 	if err != nil {
 		return
 	}
@@ -269,7 +269,7 @@ func (s *ScriptService) hasBackup(id string) bool {
 	if err != nil || active.Previous == "" {
 		return false
 	}
-	_, err = os.Stat(filepath.Join(s.versionDir(id, active.Previous), agenthost.ManifestFileName))
+	_, err = os.Stat(filepath.Join(s.versionDir(id, active.Previous), scripthost.ManifestFileName))
 	return err == nil
 }
 
@@ -279,7 +279,7 @@ func (s *ScriptService) Rollback(ctx context.Context, id string) (*v1.ScriptResp
 	if err != nil || active.Previous == "" {
 		return nil, fmt.Errorf("%w: 没有可回滚的版本", v1.ErrBadRequest)
 	}
-	if _, err := os.Stat(filepath.Join(s.versionDir(id, active.Previous), agenthost.ManifestFileName)); err != nil {
+	if _, err := os.Stat(filepath.Join(s.versionDir(id, active.Previous), scripthost.ManifestFileName)); err != nil {
 		return nil, fmt.Errorf("%w: 上一版本文件不存在", v1.ErrBadRequest)
 	}
 	active.Active, active.Previous = active.Previous, active.Active
@@ -383,8 +383,8 @@ func (s *ScriptService) Debug(ctx context.Context, id string, req *v1.ScriptDebu
 	if _, err := s.repo.Get(ctx, id); err != nil {
 		return nil, v1.ErrNotFound
 	}
-	if s.agent == nil {
-		return nil, fmt.Errorf("%w: Agent 未连接", v1.ErrBadRequest)
+	if s.host == nil {
+		return nil, fmt.Errorf("%w: Host 未连接", v1.ErrBadRequest)
 	}
 	taskID, err := s.sid.GenString()
 	if err != nil {
@@ -393,10 +393,10 @@ func (s *ScriptService) Debug(ctx context.Context, id string, req *v1.ScriptDebu
 	cctx, cancel := context.WithTimeout(ctx, 60*time.Second)
 	defer cancel()
 	events := make([]v1.ScriptDebugEvent, 0, 32)
-	err = s.agent.Execute(cctx, &agentv1.ExecuteRequest{
+	err = s.host.Execute(cctx, &hostv1.ExecuteRequest{
 		TaskId: taskID, Platform: id, Action: req.Action,
 		Params: req.Params, Credentials: req.Credentials, Proxy: req.Proxy,
-	}, func(ev *agentv1.ExecuteEvent) {
+	}, func(ev *hostv1.ExecuteEvent) {
 		events = append(events, debugEvent(ev))
 	})
 	if err != nil {
@@ -436,11 +436,11 @@ func (s *ScriptService) install(ctx context.Context, rawURL, ref string, report 
 		return nil, err
 	}
 	rawManifest := bytes.TrimPrefix(buf, []byte{0xEF, 0xBB, 0xBF})
-	var manifest agenthost.Manifest
+	var manifest scripthost.Manifest
 	if err := json.Unmarshal(rawManifest, &manifest); err != nil {
-		return nil, fmt.Errorf("解析 %s 失败: %w", agenthost.ManifestFileName, err)
+		return nil, fmt.Errorf("解析 %s 失败: %w", scripthost.ManifestFileName, err)
 	}
-	if err := agenthost.ValidateManifest(&manifest); err != nil {
+	if err := scripthost.ValidateManifest(&manifest); err != nil {
 		return nil, err
 	}
 	if manifest.Entry != "" {
@@ -642,7 +642,7 @@ func lastLines(text string, n int) string {
 	return strings.Join(lines, " | ")
 }
 
-func (s *ScriptService) runtimeFor(m agenthost.Manifest) string {
+func (s *ScriptService) runtimeFor(m scripthost.Manifest) string {
 	if s.python != "" && strings.HasPrefix(m.Runtime, "python") {
 		return s.python
 	}
@@ -657,7 +657,7 @@ func toScriptResponse(script *model.Script) *v1.ScriptResponse {
 		LastError: script.LastError, Enabled: script.Enabled, Status: script.Status,
 		InstalledAt: script.InstalledAt, UpdatedAt: script.UpdatedAt,
 	}
-	var m agenthost.Manifest
+	var m scripthost.Manifest
 	if script.Manifest != "" && json.Unmarshal([]byte(script.Manifest), &m) == nil {
 		resp.Runtime = m.Runtime
 		resp.Author = m.Author
@@ -669,20 +669,20 @@ func toScriptResponse(script *model.Script) *v1.ScriptResponse {
 	return resp
 }
 
-func debugEvent(ev *agentv1.ExecuteEvent) v1.ScriptDebugEvent {
+func debugEvent(ev *hostv1.ExecuteEvent) v1.ScriptDebugEvent {
 	kind := "progress"
 	switch ev.GetType() {
-	case agentv1.EventType_EVENT_TYPE_STARTED:
+	case hostv1.EventType_EVENT_TYPE_STARTED:
 		kind = "started"
-	case agentv1.EventType_EVENT_TYPE_LOG:
+	case hostv1.EventType_EVENT_TYPE_LOG:
 		kind = "log"
-	case agentv1.EventType_EVENT_TYPE_STEP:
+	case hostv1.EventType_EVENT_TYPE_STEP:
 		kind = "step"
-	case agentv1.EventType_EVENT_TYPE_METRIC:
+	case hostv1.EventType_EVENT_TYPE_METRIC:
 		kind = "metric"
-	case agentv1.EventType_EVENT_TYPE_SUCCEEDED:
+	case hostv1.EventType_EVENT_TYPE_SUCCEEDED:
 		kind = "succeeded"
-	case agentv1.EventType_EVENT_TYPE_FAILED:
+	case hostv1.EventType_EVENT_TYPE_FAILED:
 		kind = "failed"
 	}
 	var result any
@@ -785,7 +785,7 @@ func findManifest(root string) (string, error) {
 		if err != nil {
 			return err
 		}
-		if !info.IsDir() && info.Name() == agenthost.ManifestFileName {
+		if !info.IsDir() && info.Name() == scripthost.ManifestFileName {
 			found = path
 			return filepath.SkipAll
 		}
@@ -795,7 +795,7 @@ func findManifest(root string) (string, error) {
 		return "", err
 	}
 	if found == "" {
-		return "", fmt.Errorf("压缩包中未找到 %s", agenthost.ManifestFileName)
+		return "", fmt.Errorf("压缩包中未找到 %s", scripthost.ManifestFileName)
 	}
 	return found, nil
 }

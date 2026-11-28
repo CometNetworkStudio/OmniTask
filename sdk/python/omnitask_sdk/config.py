@@ -47,7 +47,7 @@ class LLMConfig:
 @dataclass(frozen=True)
 class Config:
     llm: LLMConfig
-    agent_port: int
+    host_port: int
     bank_mode: str
     bank_addr: str
     bank_local_path: str
@@ -69,7 +69,7 @@ class Config:
                 api_key=get("OMNITASK_LLM_API_KEY") or "",
                 model=get("OMNITASK_LLM_MODEL") or "",
             ),
-            agent_port=int(get("OMNITASK_AGENT_PORT") or 50051),
+            host_port=int(get("OMNITASK_HOST_PORT") or 50051),
             bank_mode=(get("OMNITASK_BANK_MODE") or "local").lower(),
             bank_addr=get("OMNITASK_BANK_ADDR") or "127.0.0.1:9000",
             bank_local_path=get("OMNITASK_BANK_LOCAL_PATH")

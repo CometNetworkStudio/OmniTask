@@ -3,7 +3,7 @@
 import grpc
 import warnings
 
-from omnitask_sdk.gen.agent.v1 import agent_pb2 as agent_dot_v1_dot_agent__pb2
+from omnitask_sdk.gen.host.v1 import host_pb2 as host_dot_v1_dot_host__pb2
 
 GRPC_GENERATED_VERSION = '1.84.0'
 GRPC_VERSION = grpc.__version__
@@ -18,16 +18,16 @@ except ImportError:
 if _version_not_supported:
     raise RuntimeError(
         f'The grpc package installed is at version {GRPC_VERSION},'
-        + ' but the generated code in agent/v1/agent_pb2_grpc.py depends on'
+        + ' but the generated code in host/v1/host_pb2_grpc.py depends on'
         + f' grpcio>={GRPC_GENERATED_VERSION}.'
         + f' Please upgrade your grpc module to grpcio>={GRPC_GENERATED_VERSION}'
         + f' or downgrade your generated code using grpcio-tools<={GRPC_VERSION}.'
     )
 
 
-class AgentServiceStub:
-    """AgentService 是 Go 后端与 Python Agent 之间的唯一契约。
-    后端通过 Execute 下发任务，Agent 以 server-streaming 持续回传进度与结果。
+class HostServiceStub:
+    """HostService 是 Go 后端与 Python 脚本 Host 之间的唯一契约。
+    后端通过 Execute 下发任务，Host 以 server-streaming 持续回传进度与结果。
     """
 
     def __init__(self, channel):
@@ -37,25 +37,30 @@ class AgentServiceStub:
             channel: A grpc.Channel.
         """
         self.Health = channel.unary_unary(
-                '/agent.v1.AgentService/Health',
-                request_serializer=agent_dot_v1_dot_agent__pb2.HealthRequest.SerializeToString,
-                response_deserializer=agent_dot_v1_dot_agent__pb2.HealthResponse.FromString,
+                '/host.v1.HostService/Health',
+                request_serializer=host_dot_v1_dot_host__pb2.HealthRequest.SerializeToString,
+                response_deserializer=host_dot_v1_dot_host__pb2.HealthResponse.FromString,
                 _registered_method=True)
         self.Execute = channel.unary_stream(
-                '/agent.v1.AgentService/Execute',
-                request_serializer=agent_dot_v1_dot_agent__pb2.ExecuteRequest.SerializeToString,
-                response_deserializer=agent_dot_v1_dot_agent__pb2.ExecuteEvent.FromString,
+                '/host.v1.HostService/Execute',
+                request_serializer=host_dot_v1_dot_host__pb2.ExecuteRequest.SerializeToString,
+                response_deserializer=host_dot_v1_dot_host__pb2.ExecuteEvent.FromString,
                 _registered_method=True)
         self.Discover = channel.unary_unary(
-                '/agent.v1.AgentService/Discover',
-                request_serializer=agent_dot_v1_dot_agent__pb2.DiscoverRequest.SerializeToString,
-                response_deserializer=agent_dot_v1_dot_agent__pb2.DiscoverResponse.FromString,
+                '/host.v1.HostService/Discover',
+                request_serializer=host_dot_v1_dot_host__pb2.DiscoverRequest.SerializeToString,
+                response_deserializer=host_dot_v1_dot_host__pb2.DiscoverResponse.FromString,
+                _registered_method=True)
+        self.ListScripts = channel.unary_unary(
+                '/host.v1.HostService/ListScripts',
+                request_serializer=host_dot_v1_dot_host__pb2.ListScriptsRequest.SerializeToString,
+                response_deserializer=host_dot_v1_dot_host__pb2.ListScriptsResponse.FromString,
                 _registered_method=True)
 
 
-class AgentServiceServicer:
-    """AgentService 是 Go 后端与 Python Agent 之间的唯一契约。
-    后端通过 Execute 下发任务，Agent 以 server-streaming 持续回传进度与结果。
+class HostServiceServicer:
+    """HostService 是 Go 后端与 Python 脚本 Host 之间的唯一契约。
+    后端通过 Execute 下发任务，Host 以 server-streaming 持续回传进度与结果。
     """
 
     def Health(self, request, context):
@@ -77,35 +82,47 @@ class AgentServiceServicer:
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
+    def ListScripts(self, request, context):
+        """ListScripts 返回 Host 实际加载的脚本清单与运行时状态（后端以它为准同步注册表）。
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
 
-def add_AgentServiceServicer_to_server(servicer, server):
+
+def add_HostServiceServicer_to_server(servicer, server):
     rpc_method_handlers = {
             'Health': grpc.unary_unary_rpc_method_handler(
                     servicer.Health,
-                    request_deserializer=agent_dot_v1_dot_agent__pb2.HealthRequest.FromString,
-                    response_serializer=agent_dot_v1_dot_agent__pb2.HealthResponse.SerializeToString,
+                    request_deserializer=host_dot_v1_dot_host__pb2.HealthRequest.FromString,
+                    response_serializer=host_dot_v1_dot_host__pb2.HealthResponse.SerializeToString,
             ),
             'Execute': grpc.unary_stream_rpc_method_handler(
                     servicer.Execute,
-                    request_deserializer=agent_dot_v1_dot_agent__pb2.ExecuteRequest.FromString,
-                    response_serializer=agent_dot_v1_dot_agent__pb2.ExecuteEvent.SerializeToString,
+                    request_deserializer=host_dot_v1_dot_host__pb2.ExecuteRequest.FromString,
+                    response_serializer=host_dot_v1_dot_host__pb2.ExecuteEvent.SerializeToString,
             ),
             'Discover': grpc.unary_unary_rpc_method_handler(
                     servicer.Discover,
-                    request_deserializer=agent_dot_v1_dot_agent__pb2.DiscoverRequest.FromString,
-                    response_serializer=agent_dot_v1_dot_agent__pb2.DiscoverResponse.SerializeToString,
+                    request_deserializer=host_dot_v1_dot_host__pb2.DiscoverRequest.FromString,
+                    response_serializer=host_dot_v1_dot_host__pb2.DiscoverResponse.SerializeToString,
+            ),
+            'ListScripts': grpc.unary_unary_rpc_method_handler(
+                    servicer.ListScripts,
+                    request_deserializer=host_dot_v1_dot_host__pb2.ListScriptsRequest.FromString,
+                    response_serializer=host_dot_v1_dot_host__pb2.ListScriptsResponse.SerializeToString,
             ),
     }
     generic_handler = grpc.method_handlers_generic_handler(
-            'agent.v1.AgentService', rpc_method_handlers)
+            'host.v1.HostService', rpc_method_handlers)
     server.add_generic_rpc_handlers((generic_handler,))
-    server.add_registered_method_handlers('agent.v1.AgentService', rpc_method_handlers)
+    server.add_registered_method_handlers('host.v1.HostService', rpc_method_handlers)
 
 
  # This class is part of an EXPERIMENTAL API.
-class AgentService:
-    """AgentService 是 Go 后端与 Python Agent 之间的唯一契约。
-    后端通过 Execute 下发任务，Agent 以 server-streaming 持续回传进度与结果。
+class HostService:
+    """HostService 是 Go 后端与 Python 脚本 Host 之间的唯一契约。
+    后端通过 Execute 下发任务，Host 以 server-streaming 持续回传进度与结果。
     """
 
     @staticmethod
@@ -122,9 +139,9 @@ class AgentService:
         return grpc.experimental.unary_unary(
             request,
             target,
-            '/agent.v1.AgentService/Health',
-            agent_dot_v1_dot_agent__pb2.HealthRequest.SerializeToString,
-            agent_dot_v1_dot_agent__pb2.HealthResponse.FromString,
+            '/host.v1.HostService/Health',
+            host_dot_v1_dot_host__pb2.HealthRequest.SerializeToString,
+            host_dot_v1_dot_host__pb2.HealthResponse.FromString,
             options,
             channel_credentials,
             insecure,
@@ -149,9 +166,9 @@ class AgentService:
         return grpc.experimental.unary_stream(
             request,
             target,
-            '/agent.v1.AgentService/Execute',
-            agent_dot_v1_dot_agent__pb2.ExecuteRequest.SerializeToString,
-            agent_dot_v1_dot_agent__pb2.ExecuteEvent.FromString,
+            '/host.v1.HostService/Execute',
+            host_dot_v1_dot_host__pb2.ExecuteRequest.SerializeToString,
+            host_dot_v1_dot_host__pb2.ExecuteEvent.FromString,
             options,
             channel_credentials,
             insecure,
@@ -176,9 +193,36 @@ class AgentService:
         return grpc.experimental.unary_unary(
             request,
             target,
-            '/agent.v1.AgentService/Discover',
-            agent_dot_v1_dot_agent__pb2.DiscoverRequest.SerializeToString,
-            agent_dot_v1_dot_agent__pb2.DiscoverResponse.FromString,
+            '/host.v1.HostService/Discover',
+            host_dot_v1_dot_host__pb2.DiscoverRequest.SerializeToString,
+            host_dot_v1_dot_host__pb2.DiscoverResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def ListScripts(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/host.v1.HostService/ListScripts',
+            host_dot_v1_dot_host__pb2.ListScriptsRequest.SerializeToString,
+            host_dot_v1_dot_host__pb2.ListScriptsResponse.FromString,
             options,
             channel_credentials,
             insecure,
@@ -191,8 +235,8 @@ class AgentService:
 
 
 class QuestionBankStub:
-    """QuestionBank 由 Go 后端实现，Python Agent 作为客户端调用。
-    题库读写统一经此服务，Agent 不直连数据库。
+    """QuestionBank 由 Go 后端实现，Python 脚本 Host 作为客户端调用。
+    题库读写统一经此服务，Host 不直连数据库。
     """
 
     def __init__(self, channel):
@@ -202,20 +246,20 @@ class QuestionBankStub:
             channel: A grpc.Channel.
         """
         self.Lookup = channel.unary_unary(
-                '/agent.v1.QuestionBank/Lookup',
-                request_serializer=agent_dot_v1_dot_agent__pb2.LookupRequest.SerializeToString,
-                response_deserializer=agent_dot_v1_dot_agent__pb2.LookupResponse.FromString,
+                '/host.v1.QuestionBank/Lookup',
+                request_serializer=host_dot_v1_dot_host__pb2.LookupRequest.SerializeToString,
+                response_deserializer=host_dot_v1_dot_host__pb2.LookupResponse.FromString,
                 _registered_method=True)
         self.Save = channel.unary_unary(
-                '/agent.v1.QuestionBank/Save',
-                request_serializer=agent_dot_v1_dot_agent__pb2.SaveRequest.SerializeToString,
-                response_deserializer=agent_dot_v1_dot_agent__pb2.SaveResponse.FromString,
+                '/host.v1.QuestionBank/Save',
+                request_serializer=host_dot_v1_dot_host__pb2.SaveRequest.SerializeToString,
+                response_deserializer=host_dot_v1_dot_host__pb2.SaveResponse.FromString,
                 _registered_method=True)
 
 
 class QuestionBankServicer:
-    """QuestionBank 由 Go 后端实现，Python Agent 作为客户端调用。
-    题库读写统一经此服务，Agent 不直连数据库。
+    """QuestionBank 由 Go 后端实现，Python 脚本 Host 作为客户端调用。
+    题库读写统一经此服务，Host 不直连数据库。
     """
 
     def Lookup(self, request, context):
@@ -237,25 +281,25 @@ def add_QuestionBankServicer_to_server(servicer, server):
     rpc_method_handlers = {
             'Lookup': grpc.unary_unary_rpc_method_handler(
                     servicer.Lookup,
-                    request_deserializer=agent_dot_v1_dot_agent__pb2.LookupRequest.FromString,
-                    response_serializer=agent_dot_v1_dot_agent__pb2.LookupResponse.SerializeToString,
+                    request_deserializer=host_dot_v1_dot_host__pb2.LookupRequest.FromString,
+                    response_serializer=host_dot_v1_dot_host__pb2.LookupResponse.SerializeToString,
             ),
             'Save': grpc.unary_unary_rpc_method_handler(
                     servicer.Save,
-                    request_deserializer=agent_dot_v1_dot_agent__pb2.SaveRequest.FromString,
-                    response_serializer=agent_dot_v1_dot_agent__pb2.SaveResponse.SerializeToString,
+                    request_deserializer=host_dot_v1_dot_host__pb2.SaveRequest.FromString,
+                    response_serializer=host_dot_v1_dot_host__pb2.SaveResponse.SerializeToString,
             ),
     }
     generic_handler = grpc.method_handlers_generic_handler(
-            'agent.v1.QuestionBank', rpc_method_handlers)
+            'host.v1.QuestionBank', rpc_method_handlers)
     server.add_generic_rpc_handlers((generic_handler,))
-    server.add_registered_method_handlers('agent.v1.QuestionBank', rpc_method_handlers)
+    server.add_registered_method_handlers('host.v1.QuestionBank', rpc_method_handlers)
 
 
  # This class is part of an EXPERIMENTAL API.
 class QuestionBank:
-    """QuestionBank 由 Go 后端实现，Python Agent 作为客户端调用。
-    题库读写统一经此服务，Agent 不直连数据库。
+    """QuestionBank 由 Go 后端实现，Python 脚本 Host 作为客户端调用。
+    题库读写统一经此服务，Host 不直连数据库。
     """
 
     @staticmethod
@@ -272,9 +316,9 @@ class QuestionBank:
         return grpc.experimental.unary_unary(
             request,
             target,
-            '/agent.v1.QuestionBank/Lookup',
-            agent_dot_v1_dot_agent__pb2.LookupRequest.SerializeToString,
-            agent_dot_v1_dot_agent__pb2.LookupResponse.FromString,
+            '/host.v1.QuestionBank/Lookup',
+            host_dot_v1_dot_host__pb2.LookupRequest.SerializeToString,
+            host_dot_v1_dot_host__pb2.LookupResponse.FromString,
             options,
             channel_credentials,
             insecure,
@@ -299,9 +343,9 @@ class QuestionBank:
         return grpc.experimental.unary_unary(
             request,
             target,
-            '/agent.v1.QuestionBank/Save',
-            agent_dot_v1_dot_agent__pb2.SaveRequest.SerializeToString,
-            agent_dot_v1_dot_agent__pb2.SaveResponse.FromString,
+            '/host.v1.QuestionBank/Save',
+            host_dot_v1_dot_host__pb2.SaveRequest.SerializeToString,
+            host_dot_v1_dot_host__pb2.SaveResponse.FromString,
             options,
             channel_credentials,
             insecure,

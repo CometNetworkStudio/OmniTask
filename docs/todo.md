@@ -5,7 +5,7 @@
 > 进度总览见 `docs/context.md` 第 20 节。
 
 ## 已完成（P0，本轮）
-- 任务生命周期：取消 / 重试 / 删除接口 + 前端按钮；server 重启把 `running/queued` 标记为 `interrupted`；支持配置 `agent.task_timeout` 超时。
+- 任务生命周期：取消 / 重试 / 删除接口 + 前端按钮；server 重启把 `running/queued` 标记为 `interrupted`；支持配置 `host.task_timeout` 超时。
 - 注册控制：`security.registration: open|closed`。
 - 生产默认关闭 Swagger（`http.swagger`）。
 - CORS 收敛为可配置白名单（`http.cors_origins`，默认同源）。
@@ -33,13 +33,13 @@
 ### 本轮已完成（P1 剩余）
 - [x] 任务列表按状态/平台筛选（后端查询参数 + 前端下拉）。
 - [x] 脚本安装支持指定分支/标签/commit（`ref`）；「运行时缺失」帮助弹窗。
-- [x] backend / agent **systemd 服务化**（`deploy/systemd/`，服务器重启自动拉起）。
+- [x] backend / host **systemd 服务化**（`deploy/systemd/`，服务器重启自动拉起）。
 
 ## P2 生态 / 长期
 - [ ] 脚本依赖自动安装（隔离 venv）或更明确的安装提示。
 - [ ] SDK 多语言示例（Node/Go 各一个最小实现）。
 - [ ] 新平台脚本（学习通、知到等）。
-- [ ] 多机 Agent（已评估，暂不做；需要时再加 agent_id/心跳）。
+- [ ] 多机 Host（已评估，暂不做；需要时再加 host_id/心跳）。
 - [ ] 脚本安装固定 commit/tag + 签名/白名单（供应链安全）。
 
 ## 工程卫生 / 运维
